@@ -519,7 +519,42 @@ function AnalyticsPage() {
   // Shared fromStr for all data fetches
   const fromStrRef = useRef('')
 
-  // Core data: dailyData (base + modules), netStats, totals — always loaded (powers KPIs)
+  // Helper: lazily fetch a daily module and merge into dailyData
+  const fetchModuleLazy = useCallback((module: string, fromStr: string, cancelled: { current: boolean }) => {
+    if (loadedGroups.current.has(`mod_${module}`)) return
+    loadedGroups.current.add(`mod_${module}`)
+    fetchAnalyticsDailyModule(module, fromStr)
+      .then((rows) => {
+        if (cancelled.current || !rows || rows.length === 0) return
+        const modByDate = new Map((rows as DailyRow[]).map((r) => [r.date, r]))
+        setDailyData((prev) => prev.map((row) => {
+          const mod = modByDate.get(row.date)
+          if (!mod) return row
+          if (module === 'accounts') {
+            return { ...row, new_accounts: mod.new_accounts, coa_new_accounts: mod.coa_new_accounts }
+          }
+          if (module === 'evm') {
+            return { ...row, evm_active_addresses: mod.evm_active_addresses }
+          }
+          if (module === 'defi') {
+            return { ...row, defi_swap_count: mod.defi_swap_count, defi_unique_traders: mod.defi_unique_traders }
+          }
+          if (module === 'epoch') {
+            return { ...row, epoch_payout_total: mod.epoch_payout_total, epoch: mod.epoch }
+          }
+          if (module === 'bridge') {
+            return { ...row, bridge_to_evm_txs: mod.bridge_to_evm_txs }
+          }
+          if (module === 'contracts') {
+            return { ...row, contract_updates: mod.contract_updates }
+          }
+          return row
+        }))
+      })
+      .catch(() => {})
+  }, [])
+
+  // Core data: base dailyData, netStats, totals — always loaded (powers base KPIs)
   useEffect(() => {
     let cancelled = false
     ensureHeyApiConfigured().then(() => {
@@ -534,39 +569,6 @@ function AnalyticsPage() {
         const sortedBase = (data as DailyRow[]).slice().sort((a, b) => a.date.localeCompare(b.date))
         setDailyData(sortedBase)
         setDailyLoading(false)
-
-        const modules = ['accounts', 'evm', 'defi', 'epoch', 'bridge', 'contracts'] as const
-        for (const module of modules) {
-          fetchAnalyticsDailyModule(module, fromStr)
-            .then((rows) => {
-              if (cancelled || !rows || rows.length === 0) return
-              const modByDate = new Map((rows as DailyRow[]).map((r) => [r.date, r]))
-              setDailyData((prev) => prev.map((row) => {
-                const mod = modByDate.get(row.date)
-                if (!mod) return row
-                if (module === 'accounts') {
-                  return { ...row, new_accounts: mod.new_accounts, coa_new_accounts: mod.coa_new_accounts }
-                }
-                if (module === 'evm') {
-                  return { ...row, evm_active_addresses: mod.evm_active_addresses }
-                }
-                if (module === 'defi') {
-                  return { ...row, defi_swap_count: mod.defi_swap_count, defi_unique_traders: mod.defi_unique_traders }
-                }
-                if (module === 'epoch') {
-                  return { ...row, epoch_payout_total: mod.epoch_payout_total, epoch: mod.epoch }
-                }
-                if (module === 'bridge') {
-                  return { ...row, bridge_to_evm_txs: mod.bridge_to_evm_txs }
-                }
-                if (module === 'contracts') {
-                  return { ...row, contract_updates: mod.contract_updates }
-                }
-                return row
-              }))
-            })
-            .catch(() => {})
-        }
       }).catch(() => { if (!cancelled) setDailyLoading(false) })
 
       fetchNetworkStats().then((data) => {
@@ -586,85 +588,108 @@ function AnalyticsPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Lazy-load tab-specific data when a tab is first visited
+  // Lazy-load tab-specific data only when that tab is first visited.
+  // The 'all' tab only loads base data — individual tab data loads on demand.
   useEffect(() => {
-    const needsTransfers = activeTab === 'all' || activeTab === 'transactions' || activeTab === 'tokens'
-    const needsPrice = activeTab === 'all' || activeTab === 'price'
-    const needsEpoch = activeTab === 'all' || activeTab === 'network'
-    const needsWhales = activeTab === 'all' || activeTab === 'tokens'
-    const needsTopContracts = activeTab === 'all' || activeTab === 'network'
-    const needsTokenVolume = activeTab === 'all' || activeTab === 'tokens'
-
-    let cancelled = false
+    const tab = activeTab
+    const cancelledRef = { current: false }
     ensureHeyApiConfigured().then(() => {
-      if (cancelled) return
+      if (cancelledRef.current) return
       const fromStr = fromStrRef.current
 
-      if (needsTransfers && !loadedGroups.current.has('transfers')) {
-        loadedGroups.current.add('transfers')
-        setTransferLoading(true)
-        fetchAnalyticsTransfersDaily(fromStr).then((data) => {
-          if (cancelled || !data) return
-          setTransferData((data as TransferRow[]).sort((a, b) => a.date.localeCompare(b.date)))
-        }).catch(() => {}).finally(() => { if (!cancelled) setTransferLoading(false) })
+      // ── transactions tab ──
+      if (tab === 'transactions') {
+        if (!loadedGroups.current.has('transfers')) {
+          loadedGroups.current.add('transfers')
+          setTransferLoading(true)
+          fetchAnalyticsTransfersDaily(fromStr).then((data) => {
+            if (cancelledRef.current || !data) return
+            setTransferData((data as TransferRow[]).sort((a, b) => a.date.localeCompare(b.date)))
+          }).catch(() => {}).finally(() => { if (!cancelledRef.current) setTransferLoading(false) })
+        }
+        fetchModuleLazy('evm', fromStr, cancelledRef)
+        fetchModuleLazy('bridge', fromStr, cancelledRef)
       }
 
-      if (needsPrice && !loadedGroups.current.has('price')) {
-        loadedGroups.current.add('price')
-        setPriceLoading(true)
-        fetch(`${getBaseURL()}/status/price/history?limit=8760`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((json) => {
-            if (cancelled || !json?.data) return
-            setPriceHistory(
-              (json.data as PricePoint[]).slice().sort((a, b) => new Date(a.as_of).getTime() - new Date(b.as_of).getTime()),
-            )
-          }).catch(() => {}).finally(() => { if (!cancelled) setPriceLoading(false) })
+      // ── tokens tab ──
+      if (tab === 'tokens') {
+        if (!loadedGroups.current.has('transfers')) {
+          loadedGroups.current.add('transfers')
+          setTransferLoading(true)
+          fetchAnalyticsTransfersDaily(fromStr).then((data) => {
+            if (cancelledRef.current || !data) return
+            setTransferData((data as TransferRow[]).sort((a, b) => a.date.localeCompare(b.date)))
+          }).catch(() => {}).finally(() => { if (!cancelledRef.current) setTransferLoading(false) })
+        }
+        if (!loadedGroups.current.has('whales')) {
+          loadedGroups.current.add('whales')
+          setWhaleLoading(true)
+          fetchBigTransfers({ limit: 8 }).then((data) => {
+            if (cancelledRef.current) return
+            setWhaleTransfers(data)
+          }).catch(() => { if (!cancelledRef.current) setWhaleTransfers([]) })
+            .finally(() => { if (!cancelledRef.current) setWhaleLoading(false) })
+        }
+        if (!loadedGroups.current.has('tokenVolume')) {
+          loadedGroups.current.add('tokenVolume')
+          setTokenVolumeLoading(true)
+          fetchTokenVolume({ limit: 10 }).then((data) => {
+            if (cancelledRef.current) return
+            setTokenVolume(data)
+          }).catch(() => { if (!cancelledRef.current) setTokenVolume([]) })
+            .finally(() => { if (!cancelledRef.current) setTokenVolumeLoading(false) })
+        }
+        fetchModuleLazy('defi', fromStr, cancelledRef)
       }
 
-      if (needsEpoch && !loadedGroups.current.has('epoch')) {
-        loadedGroups.current.add('epoch')
-        setEpochLoading(true)
-        fetch(`${getBaseURL()}/staking/epoch/stats?limit=200`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((json) => {
-            if (cancelled || !json?.data) return
-            setEpochData((json.data as EpochRow[]).slice().sort((a, b) => a.epoch - b.epoch))
-          }).catch(() => {}).finally(() => { if (!cancelled) setEpochLoading(false) })
+      // ── network tab ──
+      if (tab === 'network') {
+        if (!loadedGroups.current.has('epoch')) {
+          loadedGroups.current.add('epoch')
+          setEpochLoading(true)
+          fetch(`${getBaseURL()}/staking/epoch/stats?limit=200`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+              if (cancelledRef.current || !json?.data) return
+              setEpochData((json.data as EpochRow[]).slice().sort((a, b) => a.epoch - b.epoch))
+            }).catch(() => {}).finally(() => { if (!cancelledRef.current) setEpochLoading(false) })
+        }
+        if (!loadedGroups.current.has('topContracts')) {
+          loadedGroups.current.add('topContracts')
+          setTopContractsLoading(true)
+          fetchTopContracts({ limit: 10 }).then((data) => {
+            if (cancelledRef.current) return
+            setTopContracts(data)
+          }).catch(() => { if (!cancelledRef.current) setTopContracts([]) })
+            .finally(() => { if (!cancelledRef.current) setTopContractsLoading(false) })
+        }
+        fetchModuleLazy('accounts', fromStr, cancelledRef)
+        fetchModuleLazy('epoch', fromStr, cancelledRef)
+        fetchModuleLazy('contracts', fromStr, cancelledRef)
       }
 
-      if (needsWhales && !loadedGroups.current.has('whales')) {
-        loadedGroups.current.add('whales')
-        setWhaleLoading(true)
-        fetchBigTransfers({ limit: 8 }).then((data) => {
-          if (cancelled) return
-          setWhaleTransfers(data)
-        }).catch(() => { if (!cancelled) setWhaleTransfers([]) })
-          .finally(() => { if (!cancelled) setWhaleLoading(false) })
+      // ── price tab ──
+      if (tab === 'price') {
+        if (!loadedGroups.current.has('price')) {
+          loadedGroups.current.add('price')
+          setPriceLoading(true)
+          fetch(`${getBaseURL()}/status/price/history?limit=8760`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((json) => {
+              if (cancelledRef.current || !json?.data) return
+              setPriceHistory(
+                (json.data as PricePoint[]).slice().sort((a, b) => new Date(a.as_of).getTime() - new Date(b.as_of).getTime()),
+              )
+            }).catch(() => {}).finally(() => { if (!cancelledRef.current) setPriceLoading(false) })
+        }
       }
 
-      if (needsTopContracts && !loadedGroups.current.has('topContracts')) {
-        loadedGroups.current.add('topContracts')
-        setTopContractsLoading(true)
-        fetchTopContracts({ limit: 10 }).then((data) => {
-          if (cancelled) return
-          setTopContracts(data)
-        }).catch(() => { if (!cancelled) setTopContracts([]) })
-          .finally(() => { if (!cancelled) setTopContractsLoading(false) })
-      }
+      // ── whales tab ── (BigTransfersFull handles its own fetch)
 
-      if (needsTokenVolume && !loadedGroups.current.has('tokenVolume')) {
-        loadedGroups.current.add('tokenVolume')
-        setTokenVolumeLoading(true)
-        fetchTokenVolume({ limit: 10 }).then((data) => {
-          if (cancelled) return
-          setTokenVolume(data)
-        }).catch(() => { if (!cancelled) setTokenVolume([]) })
-          .finally(() => { if (!cancelled) setTokenVolumeLoading(false) })
-      }
+      // ── all tab ── no extra fetches; cards show skeleton/empty until user visits specific tabs
     })
-    return () => { cancelled = true }
-  }, [activeTab])
+    return () => { cancelledRef.current = true }
+  }, [activeTab, fetchModuleLazy])
 
   /* ── derived visible slices ── */
 
