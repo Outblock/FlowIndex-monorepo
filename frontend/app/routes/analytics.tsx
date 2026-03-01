@@ -588,8 +588,9 @@ function AnalyticsPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Lazy-load tab-specific data only when that tab is first visited.
-  // The 'all' tab only loads base data — individual tab data loads on demand.
+  // Lazy-load tab-specific data when a tab is first visited.
+  // The 'all' tab loads everything; specific tabs only load their own data.
+  // loadedGroups prevents double-loading when switching between tabs.
   useEffect(() => {
     const tab = activeTab
     const cancelledRef = { current: false }
@@ -598,7 +599,7 @@ function AnalyticsPage() {
       const fromStr = fromStrRef.current
 
       // ── transactions tab ──
-      if (tab === 'transactions') {
+      if (tab === 'all' || tab === 'transactions') {
         if (!loadedGroups.current.has('transfers')) {
           loadedGroups.current.add('transfers')
           setTransferLoading(true)
@@ -612,7 +613,7 @@ function AnalyticsPage() {
       }
 
       // ── tokens tab ──
-      if (tab === 'tokens') {
+      if (tab === 'all' || tab === 'tokens') {
         if (!loadedGroups.current.has('transfers')) {
           loadedGroups.current.add('transfers')
           setTransferLoading(true)
@@ -643,7 +644,7 @@ function AnalyticsPage() {
       }
 
       // ── network tab ──
-      if (tab === 'network') {
+      if (tab === 'all' || tab === 'network') {
         if (!loadedGroups.current.has('epoch')) {
           loadedGroups.current.add('epoch')
           setEpochLoading(true)
@@ -669,7 +670,7 @@ function AnalyticsPage() {
       }
 
       // ── price tab ──
-      if (tab === 'price') {
+      if (tab === 'all' || tab === 'price') {
         if (!loadedGroups.current.has('price')) {
           loadedGroups.current.add('price')
           setPriceLoading(true)
@@ -686,7 +687,7 @@ function AnalyticsPage() {
 
       // ── whales tab ── (BigTransfersFull handles its own fetch)
 
-      // ── all tab ── no extra fetches; cards show skeleton/empty until user visits specific tabs
+      // ── whales tab and all tab need no extra logic here
     })
     return () => { cancelledRef.current = true }
   }, [activeTab, fetchModuleLazy])
