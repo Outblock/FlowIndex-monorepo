@@ -6,15 +6,18 @@ const ThemeContext = createContext({
 });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-    // Lazy initializer: reads localStorage on client, defaults to 'dark' on server/SSR.
-    // This avoids calling setState inside an effect (React 19 strict mode violation).
-    const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-        if (typeof window === 'undefined') return 'dark';
-        const saved = window.localStorage.getItem('theme');
-        return saved === 'light' ? 'light' : 'dark';
-    });
+    // Keep SSR and initial client render deterministic to avoid hydration mismatch.
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
+        const saved = window.localStorage.getItem('theme');
+        setTheme(saved === 'light' ? 'light' : 'dark');
+        setReady(true);
+    }, []);
+
+    useEffect(() => {
+        if (!ready) return;
         const root = window.document.documentElement;
         if (theme === 'dark') {
             root.classList.add('dark');
@@ -22,7 +25,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             root.classList.remove('dark');
         }
         localStorage.setItem('theme', theme);
-    }, [theme]);
+    }, [theme, ready]);
 
     const toggleTheme = async (e?: React.MouseEvent) => {
         // Fallback if View Transition API not supported or no coordinates

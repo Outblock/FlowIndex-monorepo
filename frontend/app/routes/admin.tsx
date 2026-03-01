@@ -38,9 +38,18 @@ async function adminFetch(path: string, token: string, options?: RequestInit) {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => null)
-    throw new Error(body?.error || `HTTP ${res.status}`)
+    throw new AdminApiError(body?.error || `HTTP ${res.status}`, res.status)
   }
   return res.json()
+}
+
+class AdminApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'AdminApiError'
+    this.status = status
+  }
 }
 
 // ── main component ──────────────────────────────────────────────────
@@ -49,6 +58,12 @@ function AdminPage() {
   const { user, accessToken, loading, signOut } = useAuth()
   const token = accessToken || ''
   const authed = !!accessToken
+  const roleClaims = user?.roles?.length ? user.roles : user?.role ? [user.role] : []
+  const teamClaims = user?.teams?.length ? user.teams : user?.team ? [user.team] : []
+  const hasAdminRole = roleClaims.some((role) => ['platform_admin', 'ops_admin', 'admin'].includes(role.toLowerCase()))
+  const inFlowindexTeam = teamClaims.some((team) => team.toLowerCase() === 'flowindex')
+  const [authzState, setAuthzState] = useState<'idle' | 'checking' | 'allowed' | 'denied'>('idle')
+  const [authzMessage, setAuthzMessage] = useState('')
 
   const { tab: searchTab } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
@@ -59,6 +74,42 @@ function AdminPage() {
     signOut()
     navigate({ to: '/developer/login', search: { redirect: '/admin' } })
   }
+
+  useEffect(() => {
+    let cancelled = false
+    if (!authed) {
+      setAuthzState('idle')
+      setAuthzMessage('')
+      return
+    }
+
+    if (!hasAdminRole) {
+      setAuthzState('denied')
+      setAuthzMessage('Admin access denied: missing required role (need platform_admin or ops_admin).')
+      return
+    }
+
+    setAuthzState('checking')
+    setAuthzMessage('')
+    adminFetch('admin/ft?limit=1&offset=0', token)
+      .then(() => {
+        if (!cancelled) setAuthzState('allowed')
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        if (err instanceof AdminApiError && (err.status === 401 || err.status === 403)) {
+          setAuthzState('denied')
+          setAuthzMessage(err.message)
+          return
+        }
+        setAuthzState('denied')
+        setAuthzMessage(err instanceof Error ? err.message : 'Failed to verify admin permission')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [authed, token, hasAdminRole])
 
   if (loading) {
     return (
@@ -97,6 +148,52 @@ function AdminPage() {
             Sign in with Developer Account
           </Link>
         </motion.div>
+      </div>
+    )
+  }
+
+  if (authzState === 'checking') {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-md bg-white dark:bg-nothing-dark border border-zinc-200 dark:border-white/10 p-6 rounded-sm shadow-sm dark:shadow-none space-y-3">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono uppercase tracking-widest">Verifying Access</p>
+          <p className="text-sm text-zinc-700 dark:text-zinc-200 font-mono">Checking your admin role and permissions...</p>
+          <Loader2 className="w-4 h-4 animate-spin text-nothing-green" />
+        </div>
+      </div>
+    )
+  }
+
+  if (authzState === 'denied') {
+    return (
+      <div className="container mx-auto px-4 py-8 space-y-6">
+        <div className="max-w-xl bg-white dark:bg-nothing-dark border border-zinc-200 dark:border-white/10 p-6 rounded-sm shadow-sm dark:shadow-none space-y-4">
+          <div className="flex items-center gap-3">
+            <Ban className="w-5 h-5 text-red-500" />
+            <h1 className="text-lg font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Access Denied</h1>
+          </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300 font-mono">{authzMessage || 'You do not have admin access.'}</p>
+          <div className="text-xs text-zinc-500 dark:text-zinc-400 font-mono space-y-1">
+            <p>Roles: {roleClaims.length ? roleClaims.join(', ') : '(none)'}</p>
+            <p>Teams: {teamClaims.length ? teamClaims.join(', ') : '(none)'}</p>
+            {!inFlowindexTeam ? <p>Tip: if team-based restriction is enabled, your token must include team `flowindex`.</p> : null}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1.5 border border-zinc-200 dark:border-white/10 text-xs uppercase tracking-widest font-mono text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+            >
+              Sign out
+            </button>
+            <Link
+              to="/developer/login"
+              search={{ redirect: '/admin' }}
+              className="px-3 py-1.5 bg-nothing-green text-black text-xs uppercase tracking-widest font-mono font-bold hover:bg-nothing-green/90 transition-colors"
+            >
+              Sign in as another user
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }

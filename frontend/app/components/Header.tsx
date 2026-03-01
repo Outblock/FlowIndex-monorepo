@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { Search, Menu, X, Globe, ChevronDown, Check, ExternalLink } from 'lucide-react';
 import { useWebSocketStatus } from '../hooks/useWebSocket';
@@ -23,20 +23,34 @@ const NETWORKS = [
   },
 ];
 
-function getCurrentNetwork() {
-  const host = typeof window !== 'undefined' ? window.location.hostname : '';
+type CurrentNetwork = { type: 'cadence' | 'evm'; network: 'mainnet' | 'testnet' };
+
+function normalizeFlowNetwork(value: string): 'mainnet' | 'testnet' {
+  return value === 'testnet' ? 'testnet' : 'mainnet';
+}
+
+function getCurrentNetworkFromHost(host: string): CurrentNetwork {
   if (host.startsWith('testnet.evm.')) return { type: 'evm', network: 'testnet' };
   if (host.startsWith('evm.')) return { type: 'evm', network: 'mainnet' };
   if (host.startsWith('testnet.')) return { type: 'cadence', network: 'testnet' };
-  return { type: 'cadence', network: network || 'mainnet' };
+  return { type: 'cadence', network: normalizeFlowNetwork(network || 'mainnet') };
 }
 
-function NetworkSwitcher() {
+function NetworkSwitcher({ pathname }: { pathname: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const current = getCurrentNetwork();
+  const [current, setCurrent] = useState<CurrentNetwork>(() => ({
+    type: 'cadence',
+    network: normalizeFlowNetwork(network || 'mainnet'),
+  }));
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrent(getCurrentNetworkFromHost(window.location.hostname));
+  }, []);
 
   const currentLabel = `${current.type === 'evm' ? 'EVM ' : ''}${current.network.charAt(0).toUpperCase() + current.network.slice(1)}`;
+  const currentPath = pathname || '/';
 
   const handleEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -78,7 +92,7 @@ function NetworkSwitcher() {
                 return (
                   <a
                     key={`${item.type}-${item.network}`}
-                    href={item.url + (typeof window !== 'undefined' ? window.location.pathname : '')}
+                    href={`${item.url}${currentPath}`}
                     className={`flex items-center justify-between px-3 py-2 text-xs transition-colors ${
                       isActive
                         ? 'text-nothing-green bg-nothing-green/5'
@@ -110,6 +124,7 @@ function Header() {
   const navigate = useNavigate();
   const { isConnected } = useWebSocketStatus();
   const isNavigating = useRouterState({ select: (s) => s.status === 'pending' });
+  const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const { isOpen: isMobileOpen, toggle: toggleMobileMenu } = useMobileMenu();
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -217,7 +232,7 @@ function Header() {
 
         {/* Network Switcher + System Status */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
-          <NetworkSwitcher />
+          <NetworkSwitcher pathname={currentPath} />
           <div className={`flex items-center gap-2 px-3 py-1.5 border rounded-sm text-[10px] uppercase tracking-widest ${isConnected ? 'bg-nothing-green/10 border-nothing-green/30' : 'bg-zinc-200 dark:bg-white/5 border-zinc-300 dark:border-white/10'}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-nothing-green animate-pulse' : 'bg-gray-500'}`} />
             <span className={isConnected ? 'text-nothing-green' : 'text-gray-500'}>
