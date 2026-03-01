@@ -551,6 +551,9 @@ func main() {
 			log.Printf("[webhooks] DB connection failed: %v (webhooks disabled)", whDBErr)
 		} else {
 			whStore := webhooks.NewStore(whDB.Pool)
+			if err := whStore.EnsureRBACSchema(context.Background()); err != nil {
+				log.Printf("[webhooks] warning: failed to ensure RBAC schema: %v", err)
+			}
 			if err := whStore.EnsureTiers(context.Background()); err != nil {
 				log.Printf("[webhooks] warning: failed to ensure tiers: %v", err)
 			}
