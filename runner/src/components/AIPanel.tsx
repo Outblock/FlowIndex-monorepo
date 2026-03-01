@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { Bot, X, Send, Code, ReplaceAll, ChevronRight } from 'lucide-react';
+import { DefaultChatTransport } from 'ai';
+import { Bot, X, Send, Code, ReplaceAll, ChevronLeft } from 'lucide-react';
 
 const AI_CHAT_URL = import.meta.env.VITE_AI_CHAT_URL || 'https://ai.flowindex.io';
 
@@ -32,18 +33,30 @@ function parseCodeBlocks(text: string): Array<{ type: 'text' | 'code'; content: 
   return parts.length === 0 ? [{ type: 'text', content: text }] : parts;
 }
 
+/** Extract text content from a UIMessage's parts array */
+function getMessageText(msg: { parts: Array<{ type: string; text?: string }> }): string {
+  return msg.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text' && typeof p.text === 'string')
+    .map((p) => p.text)
+    .join('');
+}
+
 export default function AIPanel({ onInsertCode, editorCode, network }: AIPanelProps) {
   const [open, setOpen] = useState(false);
+  const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: `${AI_CHAT_URL}/api/runner-chat`,
-    initialMessages: [],
-    body: {
-      editorCode: editorCode || '',
-      network: network || 'mainnet',
-    },
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: `${AI_CHAT_URL}/api/runner-chat`,
+      body: {
+        editorCode: editorCode || '',
+        network: network || 'mainnet',
+      },
+    }),
   });
+
+  const isLoading = status === 'streaming' || status === 'submitted';
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -52,21 +65,30 @@ export default function AIPanel({ onInsertCode, editorCode, network }: AIPanelPr
     }
   }, [messages]);
 
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isLoading) return;
+    setInput('');
+    sendMessage({ text });
+  };
+
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex flex-col items-center justify-center w-10 h-full bg-zinc-900 border-r border-zinc-700 hover:bg-zinc-800 transition-colors shrink-0"
+        className="flex flex-col items-center justify-center w-10 h-full bg-zinc-900 border-l border-zinc-700 hover:bg-zinc-800 transition-colors shrink-0 group"
         title="Open AI Assistant"
       >
-        <Bot className="w-5 h-5 text-zinc-400" />
-        <ChevronRight className="w-3 h-3 text-zinc-500 mt-1" />
+        <Bot className="w-5 h-5 text-emerald-500 group-hover:text-emerald-400" />
+        <span className="text-[9px] text-zinc-500 group-hover:text-zinc-400 mt-1 font-medium">AI</span>
+        <ChevronLeft className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 mt-0.5" />
       </button>
     );
   }
 
   return (
-    <div className="flex flex-col w-80 h-full bg-zinc-900 border-r border-zinc-700 shrink-0">
+    <div className="flex flex-col w-80 h-full bg-zinc-900 border-l border-zinc-700 shrink-0">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-700">
         <div className="flex items-center gap-2">
@@ -89,52 +111,56 @@ export default function AIPanel({ onInsertCode, editorCode, network }: AIPanelPr
             <p className="text-zinc-600">I can see your current editor code.</p>
           </div>
         )}
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div
-              className={`max-w-[95%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-emerald-700/40 text-zinc-100'
-                  : 'bg-zinc-800 text-zinc-200'
-              }`}
-            >
-              {parseCodeBlocks(msg.content).map((part, i) =>
-                part.type === 'code' ? (
-                  <div key={i} className="my-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-zinc-500 uppercase">{part.lang || 'code'}</span>
-                      <div className="flex items-center gap-2">
-                        {(part.lang === 'cadence' || part.lang === 'cdc') && (
+        {messages.map((msg) => {
+          const text = getMessageText(msg);
+          if (!text) return null;
+          return (
+            <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div
+                className={`max-w-[95%] rounded-lg px-3 py-2 text-xs leading-relaxed ${
+                  msg.role === 'user'
+                    ? 'bg-emerald-700/40 text-zinc-100'
+                    : 'bg-zinc-800 text-zinc-200'
+                }`}
+              >
+                {parseCodeBlocks(text).map((part, i) =>
+                  part.type === 'code' ? (
+                    <div key={i} className="my-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-zinc-500 uppercase">{part.lang || 'code'}</span>
+                        <div className="flex items-center gap-2">
+                          {(part.lang === 'cadence' || part.lang === 'cdc') && (
+                            <button
+                              onClick={() => onInsertCode(part.content)}
+                              className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
+                              title="Replace editor content with this code"
+                            >
+                              <ReplaceAll className="w-3 h-3" />
+                              Replace
+                            </button>
+                          )}
                           <button
-                            onClick={() => onInsertCode(part.content)}
-                            className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors font-medium"
-                            title="Replace editor content with this code"
+                            onClick={() => navigator.clipboard.writeText(part.content)}
+                            className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                            title="Copy to clipboard"
                           >
-                            <ReplaceAll className="w-3 h-3" />
-                            Replace
+                            <Code className="w-3 h-3" />
+                            Copy
                           </button>
-                        )}
-                        <button
-                          onClick={() => navigator.clipboard.writeText(part.content)}
-                          className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors"
-                          title="Copy to clipboard"
-                        >
-                          <Code className="w-3 h-3" />
-                          Copy
-                        </button>
+                        </div>
                       </div>
+                      <pre className="bg-zinc-950 rounded p-2 overflow-x-auto text-[11px] text-zinc-300 font-mono whitespace-pre-wrap">
+                        {part.content}
+                      </pre>
                     </div>
-                    <pre className="bg-zinc-950 rounded p-2 overflow-x-auto text-[11px] text-zinc-300 font-mono whitespace-pre-wrap">
-                      {part.content}
-                    </pre>
-                  </div>
-                ) : (
-                  <span key={i} className="whitespace-pre-wrap">{part.content}</span>
-                )
-              )}
+                  ) : (
+                    <span key={i} className="whitespace-pre-wrap">{part.content}</span>
+                  )
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
           <div className="flex items-start">
             <div className="bg-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-400">
@@ -153,7 +179,7 @@ export default function AIPanel({ onInsertCode, editorCode, network }: AIPanelPr
         <div className="flex items-center gap-2">
           <input
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about Cadence..."
             className="flex-1 bg-zinc-800 text-zinc-200 text-xs rounded px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500 placeholder:text-zinc-500"
           />

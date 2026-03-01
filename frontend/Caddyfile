@@ -2,6 +2,10 @@ flowindex.io {
 	reverse_proxy localhost:8080
 }
 
+run.flowindex.io {
+	reverse_proxy localhost:8081
+}
+
 supabase.flowindex.io {
 	reverse_proxy localhost:8080
 }
