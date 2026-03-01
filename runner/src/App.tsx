@@ -143,7 +143,7 @@ export default function App() {
   return (
     <div className="flex h-full bg-zinc-900 text-zinc-100">
       {/* AI Panel (collapsible left sidebar) */}
-      <AIPanel onInsertCode={handleInsertCode} />
+      <AIPanel onInsertCode={handleInsertCode} editorCode={activeCode} network={network} />
 
       {/* File Explorer (collapsible) */}
       {showExplorer && (
