@@ -824,7 +824,7 @@ function ContractDetail() {
                                                         {scripts.find(s => s.script_hash === selectedScript)?.label || `${selectedScript?.slice(0, 16)}...`}
                                                     </span>
                                                     <a
-                                                        href={`${import.meta.env.VITE_RUNNER_URL || 'https://runner.flowindex.io'}?code=${btoa(selectedScriptText)}`}
+                                                        href={`${import.meta.env.VITE_RUNNER_URL || 'https://run.flowindex.io'}?code=${btoa(selectedScriptText)}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${

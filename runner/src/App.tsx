@@ -65,10 +65,12 @@ export default function App() {
     return (localStorage.getItem('runner:network') as FlowNetwork) || 'mainnet';
   });
 
+  const isIframe = window.self !== window.top;
+
   const [results, setResults] = useState<ExecutionResult[]>([]);
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [showExplorer, setShowExplorer] = useState(false);
+  const [showExplorer, setShowExplorer] = useState(!isIframe);
   const [showAI, setShowAI] = useState(true);
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
@@ -221,7 +223,7 @@ export default function App() {
         {/* File Explorer (collapsible) */}
         {showExplorer && (
           <>
-            <Panel defaultSize={15} minSize={10} maxSize={25}>
+            <Panel defaultSize={18} minSize={12} maxSize={30}>
               <div className="h-full bg-zinc-900 overflow-hidden">
                 <FileExplorer
                   project={project}
@@ -237,7 +239,7 @@ export default function App() {
         )}
 
         {/* Editor + Results (vertical split) */}
-        <Panel defaultSize={showAI ? 65 : 85} minSize={30}>
+        <Panel defaultSize={showAI ? 55 : 80} minSize={30}>
           <PanelGroup orientation="vertical">
             {/* Editor area */}
             <Panel defaultSize={70} minSize={20}>
@@ -265,7 +267,7 @@ export default function App() {
             {/* Results area (params + results) */}
             {(scriptParams.length > 0 || results.length > 0 || loading) && (
               <>
-                <ResizeHandle orientation="vertical" />
+                <ResizeHandle direction="vertical" />
                 <Panel defaultSize={30} minSize={10} maxSize={60}>
                   <div className="h-full overflow-y-auto bg-zinc-900">
                     <ParamPanel
@@ -285,7 +287,7 @@ export default function App() {
         {showAI ? (
           <>
             <ResizeHandle />
-            <Panel defaultSize={20} minSize={15} maxSize={45}>
+            <Panel defaultSize={27} minSize={18} maxSize={50}>
               <AIPanel
                 onInsertCode={handleInsertCode}
                 onLoadTemplate={handleLoadTemplate}
