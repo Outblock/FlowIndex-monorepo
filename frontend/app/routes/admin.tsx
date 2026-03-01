@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import { Pagination } from '../components/Pagination'
 import Avatar from 'boring-avatars'
 import { colorsFromAddress } from '../components/AddressLink'
+import { useAuth } from '../contexts/AuthContext'
 
 type AdminTab = 'ft' | 'nft' | 'contracts' | 'scripts' | 'import' | 'labels' | 'users'
 const VALID_TABS: AdminTab[] = ['ft', 'nft', 'contracts', 'scripts', 'import', 'labels', 'users']
@@ -42,34 +43,31 @@ async function adminFetch(path: string, token: string, options?: RequestInit) {
   return res.json()
 }
 
-const STORAGE_KEY = 'flowindex_admin_token'
-
 // ── main component ──────────────────────────────────────────────────
 
 function AdminPage() {
-  const [token, setToken] = useState(() =>
-    typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) || '' : '',
-  )
-  const [tokenInput, setTokenInput] = useState(token)
-  const [authed, setAuthed] = useState(!!token)
+  const { user, accessToken, loading, signOut } = useAuth()
+  const token = accessToken || ''
+  const authed = !!accessToken
 
   const { tab: searchTab } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const tab: AdminTab = searchTab || 'ft'
   const setTab = (t: AdminTab) => navigate({ search: { tab: t } as any })
 
-  const handleLogin = () => {
-    if (!tokenInput.trim()) return
-    localStorage.setItem(STORAGE_KEY, tokenInput.trim())
-    setToken(tokenInput.trim())
-    setAuthed(true)
+  const handleLogout = () => {
+    signOut()
+    navigate({ to: '/developer/login', search: { redirect: '/admin' } })
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem(STORAGE_KEY)
-    setToken('')
-    setTokenInput('')
-    setAuthed(false)
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="p-8 text-center text-zinc-500 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin inline-block" />
+        </div>
+      </div>
+    )
   }
 
   if (!authed) {
@@ -87,21 +85,17 @@ function AdminPage() {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="max-w-md bg-white dark:bg-nothing-dark border border-zinc-200 dark:border-white/10 p-6 rounded-sm shadow-sm dark:shadow-none space-y-4">
-          <label className="block text-xs text-zinc-500 dark:text-gray-400 uppercase tracking-widest font-mono">Admin Token</label>
-          <input
-            type="password"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-            placeholder="Enter admin token..."
-            className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-sm text-sm font-mono text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-nothing-green"
-          />
-          <button
-            onClick={handleLogin}
-            className="px-4 py-2 bg-nothing-green text-black text-xs uppercase tracking-widest font-mono font-bold hover:bg-nothing-green/90 transition-colors"
+          <p className="text-xs text-zinc-500 dark:text-gray-400 font-mono leading-relaxed">
+            Admin access now uses your Developer account JWT.
+            Server will verify role/team claims instead of static admin token.
+          </p>
+          <Link
+            to="/developer/login"
+            search={{ redirect: '/admin' }}
+            className="inline-flex px-4 py-2 bg-nothing-green text-black text-xs uppercase tracking-widest font-mono font-bold hover:bg-nothing-green/90 transition-colors"
           >
-            Authenticate
-          </button>
+            Sign in with Developer Account
+          </Link>
         </motion.div>
       </div>
     )
@@ -116,7 +110,10 @@ function AdminPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold text-zinc-900 dark:text-white uppercase tracking-tighter">Admin</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono">Token Metadata Management</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono">
+              Token Metadata Management
+              {user?.email ? ` · ${user.email}` : ''}
+            </p>
           </div>
         </div>
         <button

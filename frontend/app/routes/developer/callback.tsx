@@ -1,16 +1,21 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 
 export const Route = createFileRoute('/developer/callback')({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = typeof search.redirect === 'string' ? search.redirect : undefined
+    return { redirect }
+  },
   component: DeveloperCallbackPage,
 })
 
 function DeveloperCallbackPage() {
   const { handleCallback } = useAuth()
-  const navigate = useNavigate()
+  const { redirect } = Route.useSearch()
   const processed = useRef(false)
+  const redirectTo = redirect && redirect.startsWith('/') ? redirect : '/developer'
 
   useEffect(() => {
     if (processed.current) return
@@ -21,9 +26,9 @@ function DeveloperCallbackPage() {
       handleCallback(hash)
     }
 
-    // Navigate to developer dashboard after processing
-    navigate({ to: '/developer' })
-  }, [handleCallback, navigate])
+    // Navigate after processing.
+    window.location.assign(redirectTo)
+  }, [handleCallback, redirectTo])
 
   return (
     <div className="flex-1 flex items-center justify-center">

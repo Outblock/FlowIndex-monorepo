@@ -7,6 +7,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 interface AuthUser {
   id: string;
   email: string;
+  role?: string;
+  roles?: string[];
+  team?: string;
+  teams?: string[];
 }
 
 interface AuthState {
@@ -19,7 +23,7 @@ interface AuthContextValue extends AuthState {
   loading: boolean;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  sendMagicLink: (email: string) => Promise<void>;
+  sendMagicLink: (email: string, redirectTo?: string) => Promise<void>;
   verifyOtp: (email: string, token: string) => Promise<void>;
   handleCallback: (hash: string) => void;
   signOut: () => void;
@@ -36,13 +40,18 @@ const GOTRUE_URL = import.meta.env.VITE_GOTRUE_URL || 'http://localhost:9999';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseJwt(token: string): { sub: string; email: string; exp: number } | null {
+function parseJwt(token: string): Record<string, unknown> | null {
   try {
     const payload = token.split('.')[1];
     // Handle URL-safe base64
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
     const json = atob(base64);
-    return JSON.parse(json);
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    if (typeof parsed.exp === 'string') {
+      const n = Number(parsed.exp);
+      if (Number.isFinite(n)) parsed.exp = n;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -50,21 +59,78 @@ function parseJwt(token: string): { sub: string; email: string; exp: number } | 
 
 function isExpired(token: string): boolean {
   const payload = parseJwt(token);
-  if (!payload?.exp) return true;
+  const exp = typeof payload?.exp === 'number' ? payload.exp : 0;
+  if (!exp) return true;
   // Consider expired if within 5 seconds of expiry
-  return Date.now() >= payload.exp * 1000 - 5_000;
+  return Date.now() >= exp * 1000 - 5_000;
 }
 
 function secondsUntilExpiry(token: string): number {
   const payload = parseJwt(token);
-  if (!payload?.exp) return 0;
-  return Math.max(0, payload.exp - Date.now() / 1000);
+  const exp = typeof payload?.exp === 'number' ? payload.exp : 0;
+  if (!exp) return 0;
+  return Math.max(0, exp - Date.now() / 1000);
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function normalizeClaimsList(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''))
+      .filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((v) => v.trim().toLowerCase())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 function userFromToken(token: string): AuthUser | null {
   const payload = parseJwt(token);
-  if (!payload?.sub) return null;
-  return { id: payload.sub, email: payload.email ?? '' };
+  const sub = typeof payload?.sub === 'string' ? payload.sub : '';
+  if (!sub) return null;
+
+  const appMetadata = asObject(payload?.app_metadata);
+  const userMetadata = asObject(payload?.user_metadata);
+
+  const roles = unique([
+    ...normalizeClaimsList(payload?.role),
+    ...normalizeClaimsList(payload?.roles),
+    ...normalizeClaimsList(appMetadata?.role),
+    ...normalizeClaimsList(appMetadata?.roles),
+    ...normalizeClaimsList(userMetadata?.role),
+    ...normalizeClaimsList(userMetadata?.roles),
+  ]);
+
+  const teams = unique([
+    ...normalizeClaimsList(payload?.team),
+    ...normalizeClaimsList(payload?.teams),
+    ...normalizeClaimsList(appMetadata?.team),
+    ...normalizeClaimsList(appMetadata?.teams),
+    ...normalizeClaimsList(userMetadata?.team),
+    ...normalizeClaimsList(userMetadata?.teams),
+  ]);
+
+  return {
+    id: sub,
+    email: typeof payload?.email === 'string' ? payload.email : '',
+    role: roles[0],
+    roles,
+    team: teams[0],
+    teams,
+  };
 }
 
 interface StoredTokens {
@@ -228,8 +294,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [applyTokenResponse],
   );
 
-  const sendMagicLink = useCallback(async (email: string) => {
-    await gotruePost('/magiclink', { email });
+  const sendMagicLink = useCallback(async (email: string, redirectTo?: string) => {
+    const payload: Record<string, unknown> = { email };
+    if (redirectTo) {
+      payload.redirect_to = redirectTo;
+    }
+    await gotruePost('/magiclink', payload);
   }, []);
 
   const verifyOtp = useCallback(

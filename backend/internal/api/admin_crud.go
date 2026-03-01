@@ -1,38 +1,215 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 
 	"flowscan-clone/internal/models"
 
+	jwtlib "github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 )
 
-// adminAuthMiddleware checks for a valid admin token in the Authorization header.
-// Token is read from ADMIN_TOKEN env var.
+// adminAuthMiddleware supports two auth methods:
+// 1) Legacy static ADMIN_TOKEN (kept for emergency fallback)
+// 2) JWT (ADMIN_JWT_SECRET or SUPABASE_JWT_SECRET) with role/team claims
+//
+// JWT authorization rules:
+// - ADMIN_ALLOWED_ROLES (csv, default: "admin") must match at least one role claim
+// - ADMIN_ALLOWED_TEAMS (csv, optional) if set, must match at least one team claim
 func adminAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			next.ServeHTTP(w, r)
 			return
 		}
-		token := os.Getenv("ADMIN_TOKEN")
-		if token == "" {
-			writeAPIError(w, http.StatusForbidden, "admin API is disabled (no ADMIN_TOKEN configured)")
+
+		bearer := extractBearerToken(r.Header.Get("Authorization"))
+		if bearer == "" {
+			writeAPIError(w, http.StatusUnauthorized, "missing Authorization bearer token")
 			return
 		}
-		auth := r.Header.Get("Authorization")
-		auth = strings.TrimPrefix(auth, "Bearer ")
-		auth = strings.TrimSpace(auth)
-		if auth != token {
-			writeAPIError(w, http.StatusUnauthorized, "invalid admin token")
+
+		// Legacy static admin token path (fallback).
+		if staticToken := strings.TrimSpace(os.Getenv("ADMIN_TOKEN")); staticToken != "" {
+			if subtle.ConstantTimeCompare([]byte(bearer), []byte(staticToken)) == 1 {
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		jwtSecret := strings.TrimSpace(os.Getenv("ADMIN_JWT_SECRET"))
+		if jwtSecret == "" {
+			jwtSecret = strings.TrimSpace(os.Getenv("SUPABASE_JWT_SECRET"))
+		}
+		if jwtSecret == "" {
+			writeAPIError(w, http.StatusForbidden, "admin API is disabled (set ADMIN_TOKEN or ADMIN_JWT_SECRET/SUPABASE_JWT_SECRET)")
 			return
 		}
+
+		claims, err := parseAndValidateAdminJWT(bearer, jwtSecret)
+		if err != nil {
+			writeAPIError(w, http.StatusUnauthorized, fmt.Sprintf("invalid admin JWT: %v", err))
+			return
+		}
+
+		allowedRoles := parseCSVSet(os.Getenv("ADMIN_ALLOWED_ROLES"))
+		if len(allowedRoles) == 0 {
+			allowedRoles = map[string]struct{}{"admin": {}}
+		}
+		roles := extractRoleClaims(claims)
+		if !hasAnyAllowedValue(roles, allowedRoles) {
+			writeAPIError(w, http.StatusForbidden, "admin access denied: missing required role")
+			return
+		}
+
+		allowedTeams := parseCSVSet(os.Getenv("ADMIN_ALLOWED_TEAMS"))
+		if len(allowedTeams) > 0 {
+			teams := extractTeamClaims(claims)
+			if !hasAnyAllowedValue(teams, allowedTeams) {
+				writeAPIError(w, http.StatusForbidden, "admin access denied: missing required team")
+				return
+			}
+		}
+
 		next.ServeHTTP(w, r)
 	})
+}
+
+func extractBearerToken(authHeader string) string {
+	auth := strings.TrimSpace(authHeader)
+	auth = strings.TrimPrefix(auth, "Bearer ")
+	return strings.TrimSpace(auth)
+}
+
+func parseAndValidateAdminJWT(tokenStr, secret string) (jwtlib.MapClaims, error) {
+	token, err := jwtlib.Parse(tokenStr, func(token *jwtlib.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwtlib.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	}, jwtlib.WithValidMethods([]string{
+		jwtlib.SigningMethodHS256.Alg(),
+		jwtlib.SigningMethodHS384.Alg(),
+		jwtlib.SigningMethodHS512.Alg(),
+	}))
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := token.Claims.(jwtlib.MapClaims)
+	if !ok || !token.Valid {
+		return nil, fmt.Errorf("invalid claims")
+	}
+	return claims, nil
+}
+
+func parseCSVSet(raw string) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, part := range strings.Split(raw, ",") {
+		v := normalizeClaimValue(part)
+		if v != "" {
+			out[v] = struct{}{}
+		}
+	}
+	return out
+}
+
+func extractRoleClaims(claims jwtlib.MapClaims) []string {
+	return extractClaimValues(claims,
+		[]string{"role"},
+		[]string{"roles"},
+		[]string{"app_metadata", "role"},
+		[]string{"app_metadata", "roles"},
+		[]string{"user_metadata", "role"},
+		[]string{"user_metadata", "roles"},
+	)
+}
+
+func extractTeamClaims(claims jwtlib.MapClaims) []string {
+	return extractClaimValues(claims,
+		[]string{"team"},
+		[]string{"teams"},
+		[]string{"app_metadata", "team"},
+		[]string{"app_metadata", "teams"},
+		[]string{"user_metadata", "team"},
+		[]string{"user_metadata", "teams"},
+	)
+}
+
+func extractClaimValues(claims jwtlib.MapClaims, paths ...[]string) []string {
+	seen := make(map[string]struct{})
+	for _, path := range paths {
+		if len(path) == 0 {
+			continue
+		}
+		if v, ok := claimValueAtPath(map[string]interface{}(claims), path...); ok {
+			collectClaimValues(seen, v)
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for v := range seen {
+		out = append(out, v)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func claimValueAtPath(m map[string]interface{}, path ...string) (interface{}, bool) {
+	var cur interface{} = m
+	for _, key := range path {
+		obj, ok := cur.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		v, exists := obj[key]
+		if !exists {
+			return nil, false
+		}
+		cur = v
+	}
+	return cur, true
+}
+
+func collectClaimValues(dst map[string]struct{}, value interface{}) {
+	switch v := value.(type) {
+	case string:
+		// Support both single values and comma-separated values.
+		for _, part := range strings.Split(v, ",") {
+			n := normalizeClaimValue(part)
+			if n != "" {
+				dst[n] = struct{}{}
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			collectClaimValues(dst, item)
+		}
+	case []string:
+		for _, item := range v {
+			collectClaimValues(dst, item)
+		}
+	}
+}
+
+func normalizeClaimValue(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
+func hasAnyAllowedValue(values []string, allowed map[string]struct{}) bool {
+	if len(values) == 0 || len(allowed) == 0 {
+		return false
+	}
+	for _, v := range values {
+		if _, ok := allowed[normalizeClaimValue(v)]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 // --- FT Token CRUD ---

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Mail, Loader2, Sparkles, Wallet } from 'lucide-react'
@@ -6,12 +6,17 @@ import { useAuth } from '../../contexts/AuthContext'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp'
 
 export const Route = createFileRoute('/developer/login')({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const redirect = typeof search.redirect === 'string' ? search.redirect : undefined
+    return { redirect }
+  },
   component: DeveloperLoginPage,
 })
 
 function DeveloperLoginPage() {
   const { user, loading: authLoading, sendMagicLink, verifyOtp } = useAuth()
-  const navigate = useNavigate()
+  const { redirect } = Route.useSearch()
+  const redirectTo = redirect && redirect.startsWith('/') ? redirect : '/developer'
 
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,9 +28,9 @@ function DeveloperLoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (!authLoading && user) {
-      navigate({ to: '/developer' })
+      window.location.assign(redirectTo)
     }
-  }, [authLoading, user, navigate])
+  }, [authLoading, user, redirectTo])
 
   async function handleSendLink(e: React.FormEvent) {
     e.preventDefault()
@@ -33,7 +38,12 @@ function DeveloperLoginPage() {
     setLoading(true)
 
     try {
-      await sendMagicLink(email)
+      await sendMagicLink(
+        email,
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/developer/callback?redirect=${encodeURIComponent(redirectTo)}`
+          : undefined,
+      )
       setOtpSent(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send magic link')
@@ -143,7 +153,12 @@ function DeveloperLoginPage() {
                     setError(null)
                     setLoading(true)
                     try {
-                      await sendMagicLink(email)
+                      await sendMagicLink(
+                        email,
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/developer/callback?redirect=${encodeURIComponent(redirectTo)}`
+                          : undefined,
+                      )
                       setOtpValue('')
                     } catch (err) {
                       setError(err instanceof Error ? err.message : 'Failed to resend')
