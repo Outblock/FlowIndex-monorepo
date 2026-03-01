@@ -474,6 +474,7 @@ jobs:
             -e STUDIO_USER="${STUDIO_USER:-admin}" \
             -e STUDIO_PASSWORD="${STUDIO_PASSWORD:-changeme}" \
             -e STUDIO_UPSTREAM=http://127.0.0.1:3100 \
+            -e SUPABASE_SERVICE_KEY="${SUPABASE_SERVICE_KEY}" \
             "$REGISTRY_IMAGE"
 
           echo "Studio stack deployed successfully"
