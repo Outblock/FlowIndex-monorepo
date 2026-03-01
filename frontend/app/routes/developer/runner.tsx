@@ -6,7 +6,7 @@ export const Route = createFileRoute('/developer/runner')({
 })
 
 function RunnerPage() {
-  const RUNNER_URL = import.meta.env.VITE_RUNNER_URL || 'https://runner.flowindex.io'
+  const RUNNER_URL = import.meta.env.VITE_RUNNER_URL || 'https://run.flowindex.io'
 
   return (
     <DeveloperLayout>
