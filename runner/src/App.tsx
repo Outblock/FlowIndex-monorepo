@@ -16,7 +16,8 @@ import type { FlowNetwork } from './flow/networks';
 import {
   loadProject, saveProject, updateFileContent, createFile, deleteFile,
   openFile, closeFile, getFileContent, addDependencyFile,
-  type ProjectState,
+  TEMPLATES,
+  type ProjectState, type Template,
 } from './fs/fileSystem';
 import { Play, Loader2, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 
@@ -47,7 +48,7 @@ export default function App() {
   const [results, setResults] = useState<ExecutionResult[]>([]);
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [showExplorer, setShowExplorer] = useState(true);
+  const [showExplorer, setShowExplorer] = useState(false);
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
 
@@ -112,6 +113,15 @@ export default function App() {
   // AI code insertion
   const handleInsertCode = useCallback((newCode: string) => {
     setProject((prev) => updateFileContent(prev, prev.activeFile, newCode));
+  }, []);
+
+  // Load a template
+  const handleLoadTemplate = useCallback((template: Template) => {
+    setProject({
+      files: template.files,
+      activeFile: template.activeFile,
+      openFiles: [template.activeFile],
+    });
   }, []);
 
   // File explorer actions
@@ -233,7 +243,12 @@ export default function App() {
       </div>
 
       {/* AI Panel (collapsible right sidebar) */}
-      <AIPanel onInsertCode={handleInsertCode} editorCode={activeCode} network={network} />
+      <AIPanel
+        onInsertCode={handleInsertCode}
+        onLoadTemplate={handleLoadTemplate}
+        editorCode={activeCode}
+        network={network}
+      />
     </div>
   );
 }

@@ -24,6 +24,254 @@ access(all) fun main(): String {
 }
 `;
 
+export interface Template {
+  label: string;
+  description: string;
+  icon: string;
+  files: FileEntry[];
+  activeFile: string;
+}
+
+export const TEMPLATES: Template[] = [
+  {
+    label: 'Hello World',
+    description: 'Simple script that returns a string',
+    icon: 'wave',
+    files: [{ path: 'main.cdc', content: DEFAULT_CODE }],
+    activeFile: 'main.cdc',
+  },
+  {
+    label: 'Query Account Balance',
+    description: 'Check FLOW balance of any address',
+    icon: 'search',
+    files: [{
+      path: 'main.cdc',
+      content: `import FungibleToken from 0xf233dcee88fe0abe
+import FlowToken from 0x1654653399040a61
+
+access(all) fun main(address: Address): UFix64 {
+    let account = getAccount(address)
+    let vaultRef = account.capabilities
+        .borrow<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+        ?? panic("Could not borrow Balance capability")
+    return vaultRef.balance
+}
+`,
+    }],
+    activeFile: 'main.cdc',
+  },
+  {
+    label: 'Query NFT Collection',
+    description: 'List NFT IDs in a collection',
+    icon: 'image',
+    files: [{
+      path: 'main.cdc',
+      content: `import NonFungibleToken from 0x1d7e57aa55817448
+
+access(all) fun main(address: Address, storagePath: String): [UInt64] {
+    let account = getAuthAccount<auth(Storage) &Account>(address)
+    let path = StoragePath(identifier: storagePath)
+        ?? panic("Invalid storage path")
+    if let collection = account.storage.borrow<&{NonFungibleToken.Collection}>(from: path) {
+        return collection.getIDs()
+    }
+    return []
+}
+`,
+    }],
+    activeFile: 'main.cdc',
+  },
+  {
+    label: 'Create Fungible Token',
+    description: 'Define a basic FT contract',
+    icon: 'coins',
+    files: [{
+      path: 'MyToken.cdc',
+      content: `import FungibleToken from 0xf233dcee88fe0abe
+
+access(all) contract MyToken: FungibleToken {
+
+    access(all) var totalSupply: UFix64
+
+    access(all) entitlement Withdraw
+
+    access(all) resource Vault: FungibleToken.Vault {
+        access(all) var balance: UFix64
+
+        init(balance: UFix64) {
+            self.balance = balance
+        }
+
+        access(FungibleToken.Withdraw) fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
+            self.balance = self.balance - amount
+            return <- create Vault(balance: amount)
+        }
+
+        access(all) fun deposit(from: @{FungibleToken.Vault}) {
+            let vault <- from as! @MyToken.Vault
+            self.balance = self.balance + vault.balance
+            vault.balance = 0.0
+            destroy vault
+        }
+
+        access(all) fun createEmptyVault(): @{FungibleToken.Vault} {
+            return <- create Vault(balance: 0.0)
+        }
+
+        access(all) view fun isAvailableToWithdraw(amount: UFix64): Bool {
+            return self.balance >= amount
+        }
+    }
+
+    access(all) fun createEmptyVault(vaultType: Type): @{FungibleToken.Vault} {
+        return <- create Vault(balance: 0.0)
+    }
+
+    init() {
+        self.totalSupply = 1000000.0
+    }
+}
+`,
+    }],
+    activeFile: 'MyToken.cdc',
+  },
+  {
+    label: 'Create NFT Collection',
+    description: 'Define a basic NFT contract',
+    icon: 'image-plus',
+    files: [{
+      path: 'MyNFT.cdc',
+      content: `import NonFungibleToken from 0x1d7e57aa55817448
+import MetadataViews from 0x1d7e57aa55817448
+
+access(all) contract MyNFT: NonFungibleToken {
+
+    access(all) var totalSupply: UInt64
+
+    access(all) event ContractInitialized()
+    access(all) event Withdraw(id: UInt64, from: Address?)
+    access(all) event Deposit(id: UInt64, to: Address?)
+
+    access(all) resource NFT: NonFungibleToken.NFT {
+        access(all) let id: UInt64
+        access(all) let name: String
+        access(all) let description: String
+        access(all) let thumbnail: String
+
+        init(name: String, description: String, thumbnail: String) {
+            self.id = MyNFT.totalSupply
+            self.name = name
+            self.description = description
+            self.thumbnail = thumbnail
+            MyNFT.totalSupply = MyNFT.totalSupply + 1
+        }
+
+        access(all) fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+            return <- MyNFT.createEmptyCollection(nftType: Type<@MyNFT.NFT>())
+        }
+
+        access(all) view fun getViews(): [Type] {
+            return [Type<MetadataViews.Display>()]
+        }
+
+        access(all) fun resolveView(_ view: Type): AnyStruct? {
+            switch view {
+                case Type<MetadataViews.Display>():
+                    return MetadataViews.Display(
+                        name: self.name,
+                        description: self.description,
+                        thumbnail: MetadataViews.HTTPFile(url: self.thumbnail)
+                    )
+            }
+            return nil
+        }
+    }
+
+    access(all) resource Collection: NonFungibleToken.Collection {
+        access(all) var ownedNFTs: @{UInt64: {NonFungibleToken.NFT}}
+
+        init() {
+            self.ownedNFTs <- {}
+        }
+
+        access(all) view fun getIDs(): [UInt64] {
+            return self.ownedNFTs.keys
+        }
+
+        access(all) view fun borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}? {
+            return &self.ownedNFTs[id]
+        }
+
+        access(NonFungibleToken.Withdraw) fun withdraw(withdrawID: UInt64): @{NonFungibleToken.NFT} {
+            let token <- self.ownedNFTs.remove(key: withdrawID)
+                ?? panic("NFT not found in collection")
+            return <- token
+        }
+
+        access(all) fun deposit(token: @{NonFungibleToken.NFT}) {
+            let nft <- token as! @MyNFT.NFT
+            self.ownedNFTs[nft.id] <-! nft
+        }
+
+        access(all) fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+            return <- create Collection()
+        }
+
+        access(all) view fun getSupportedNFTTypes(): {Type: Bool} {
+            return { Type<@MyNFT.NFT>(): true }
+        }
+
+        access(all) view fun isSupportedNFTType(type: Type): Bool {
+            return type == Type<@MyNFT.NFT>()
+        }
+    }
+
+    access(all) fun createEmptyCollection(nftType: Type): @{NonFungibleToken.Collection} {
+        return <- create Collection()
+    }
+
+    init() {
+        self.totalSupply = 0
+        emit ContractInitialized()
+    }
+}
+`,
+    }],
+    activeFile: 'MyNFT.cdc',
+  },
+  {
+    label: 'Send FLOW Transaction',
+    description: 'Transfer FLOW tokens to another address',
+    icon: 'send',
+    files: [{
+      path: 'main.cdc',
+      content: `import FungibleToken from 0xf233dcee88fe0abe
+import FlowToken from 0x1654653399040a61
+
+transaction(amount: UFix64, recipient: Address) {
+
+    let sentVault: @{FungibleToken.Vault}
+
+    prepare(signer: auth(BorrowValue) &Account) {
+        let vaultRef = signer.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
+            ?? panic("Could not borrow reference to the owner's Vault")
+        self.sentVault <- vaultRef.withdraw(amount: amount)
+    }
+
+    execute {
+        let receiverRef = getAccount(recipient)
+            .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            ?? panic("Could not borrow receiver reference")
+        receiverRef.deposit(from: <- self.sentVault)
+    }
+}
+`,
+    }],
+    activeFile: 'main.cdc',
+  },
+];
+
 function defaultProject(): ProjectState {
   return {
     files: [{ path: 'main.cdc', content: DEFAULT_CODE }],

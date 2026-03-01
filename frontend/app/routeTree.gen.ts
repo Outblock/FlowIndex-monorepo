@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StatsRouteImport } from './routes/stats'
+import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as NodesRouteImport } from './routes/nodes'
 import { Route as ApiDocsRouteImport } from './routes/api-docs'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -34,6 +35,7 @@ import { Route as TokensTokenRouteImport } from './routes/tokens/$token'
 import { Route as NftsNftTypeRouteImport } from './routes/nfts/$nftType'
 import { Route as KeyPublicKeyRouteImport } from './routes/key/$publicKey'
 import { Route as DeveloperSubscriptionsRouteImport } from './routes/developer/subscriptions'
+import { Route as DeveloperRunnerRouteImport } from './routes/developer/runner'
 import { Route as DeveloperLogsRouteImport } from './routes/developer/logs'
 import { Route as DeveloperLoginRouteImport } from './routes/developer/login'
 import { Route as DeveloperKeysRouteImport } from './routes/developer/keys'
@@ -52,6 +54,11 @@ import { Route as NftsNftTypeItemIdRouteImport } from './routes/nfts/$nftType/it
 const StatsRoute = StatsRouteImport.update({
   id: '/stats',
   path: '/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaygroundRoute = PlaygroundRouteImport.update({
+  id: '/playground',
+  path: '/playground',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NodesRoute = NodesRouteImport.update({
@@ -174,6 +181,11 @@ const DeveloperSubscriptionsRoute = DeveloperSubscriptionsRouteImport.update({
   path: '/developer/subscriptions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeveloperRunnerRoute = DeveloperRunnerRouteImport.update({
+  id: '/developer/runner',
+  path: '/developer/runner',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DeveloperLogsRoute = DeveloperLogsRouteImport.update({
   id: '/developer/logs',
   path: '/developer/logs',
@@ -254,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/api-docs': typeof ApiDocsRoute
   '/nodes': typeof NodesRoute
+  '/playground': typeof PlaygroundRoute
   '/stats': typeof StatsRoute
   '/account/$address': typeof AccountAddressRoute
   '/accounts/$address': typeof AccountsAddressRoute
@@ -264,6 +277,7 @@ export interface FileRoutesByFullPath {
   '/developer/keys': typeof DeveloperKeysRoute
   '/developer/login': typeof DeveloperLoginRoute
   '/developer/logs': typeof DeveloperLogsRoute
+  '/developer/runner': typeof DeveloperRunnerRoute
   '/developer/subscriptions': typeof DeveloperSubscriptionsRouteWithChildren
   '/key/$publicKey': typeof KeyPublicKeyRoute
   '/nfts/$nftType': typeof NftsNftTypeRouteWithChildren
@@ -295,6 +309,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/api-docs': typeof ApiDocsRoute
   '/nodes': typeof NodesRoute
+  '/playground': typeof PlaygroundRoute
   '/stats': typeof StatsRoute
   '/account/$address': typeof AccountAddressRoute
   '/accounts/$address': typeof AccountsAddressRoute
@@ -305,6 +320,7 @@ export interface FileRoutesByTo {
   '/developer/keys': typeof DeveloperKeysRoute
   '/developer/login': typeof DeveloperLoginRoute
   '/developer/logs': typeof DeveloperLogsRoute
+  '/developer/runner': typeof DeveloperRunnerRoute
   '/key/$publicKey': typeof KeyPublicKeyRoute
   '/tokens/$token': typeof TokensTokenRoute
   '/transactions/$txId': typeof TransactionsTxIdRoute
@@ -335,6 +351,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/api-docs': typeof ApiDocsRoute
   '/nodes': typeof NodesRoute
+  '/playground': typeof PlaygroundRoute
   '/stats': typeof StatsRoute
   '/account/$address': typeof AccountAddressRoute
   '/accounts/$address': typeof AccountsAddressRoute
@@ -345,6 +362,7 @@ export interface FileRoutesById {
   '/developer/keys': typeof DeveloperKeysRoute
   '/developer/login': typeof DeveloperLoginRoute
   '/developer/logs': typeof DeveloperLogsRoute
+  '/developer/runner': typeof DeveloperRunnerRoute
   '/developer/subscriptions': typeof DeveloperSubscriptionsRouteWithChildren
   '/key/$publicKey': typeof KeyPublicKeyRoute
   '/nfts/$nftType': typeof NftsNftTypeRouteWithChildren
@@ -378,6 +396,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/api-docs'
     | '/nodes'
+    | '/playground'
     | '/stats'
     | '/account/$address'
     | '/accounts/$address'
@@ -388,6 +407,7 @@ export interface FileRouteTypes {
     | '/developer/keys'
     | '/developer/login'
     | '/developer/logs'
+    | '/developer/runner'
     | '/developer/subscriptions'
     | '/key/$publicKey'
     | '/nfts/$nftType'
@@ -419,6 +439,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/api-docs'
     | '/nodes'
+    | '/playground'
     | '/stats'
     | '/account/$address'
     | '/accounts/$address'
@@ -429,6 +450,7 @@ export interface FileRouteTypes {
     | '/developer/keys'
     | '/developer/login'
     | '/developer/logs'
+    | '/developer/runner'
     | '/key/$publicKey'
     | '/tokens/$token'
     | '/transactions/$txId'
@@ -458,6 +480,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/api-docs'
     | '/nodes'
+    | '/playground'
     | '/stats'
     | '/account/$address'
     | '/accounts/$address'
@@ -468,6 +491,7 @@ export interface FileRouteTypes {
     | '/developer/keys'
     | '/developer/login'
     | '/developer/logs'
+    | '/developer/runner'
     | '/developer/subscriptions'
     | '/key/$publicKey'
     | '/nfts/$nftType'
@@ -500,6 +524,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ApiDocsRoute: typeof ApiDocsRoute
   NodesRoute: typeof NodesRoute
+  PlaygroundRoute: typeof PlaygroundRoute
   StatsRoute: typeof StatsRoute
   AccountAddressRoute: typeof AccountAddressRoute
   AccountsAddressRoute: typeof AccountsAddressRoute
@@ -510,6 +535,7 @@ export interface RootRouteChildren {
   DeveloperKeysRoute: typeof DeveloperKeysRoute
   DeveloperLoginRoute: typeof DeveloperLoginRoute
   DeveloperLogsRoute: typeof DeveloperLogsRoute
+  DeveloperRunnerRoute: typeof DeveloperRunnerRoute
   DeveloperSubscriptionsRoute: typeof DeveloperSubscriptionsRouteWithChildren
   KeyPublicKeyRoute: typeof KeyPublicKeyRoute
   NftsNftTypeRoute: typeof NftsNftTypeRouteWithChildren
@@ -538,6 +564,13 @@ declare module '@tanstack/react-router' {
       path: '/stats'
       fullPath: '/stats'
       preLoaderRoute: typeof StatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playground': {
+      id: '/playground'
+      path: '/playground'
+      fullPath: '/playground'
+      preLoaderRoute: typeof PlaygroundRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nodes': {
@@ -708,6 +741,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeveloperSubscriptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/developer/runner': {
+      id: '/developer/runner'
+      path: '/developer/runner'
+      fullPath: '/developer/runner'
+      preLoaderRoute: typeof DeveloperRunnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/developer/logs': {
       id: '/developer/logs'
       path: '/developer/logs'
@@ -846,6 +886,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ApiDocsRoute: ApiDocsRoute,
   NodesRoute: NodesRoute,
+  PlaygroundRoute: PlaygroundRoute,
   StatsRoute: StatsRoute,
   AccountAddressRoute: AccountAddressRoute,
   AccountsAddressRoute: AccountsAddressRoute,
@@ -856,6 +897,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeveloperKeysRoute: DeveloperKeysRoute,
   DeveloperLoginRoute: DeveloperLoginRoute,
   DeveloperLogsRoute: DeveloperLogsRoute,
+  DeveloperRunnerRoute: DeveloperRunnerRoute,
   DeveloperSubscriptionsRoute: DeveloperSubscriptionsRouteWithChildren,
   KeyPublicKeyRoute: KeyPublicKeyRoute,
   NftsNftTypeRoute: NftsNftTypeRouteWithChildren,

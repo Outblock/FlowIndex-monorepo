@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
-import { Home, Box, ArrowRightLeft, Users, FileText, Layers, Globe, ChevronLeft, ChevronRight, Sun, Moon, Coins, Image, Clock, BarChart3, Code2, Pin, PinOff } from 'lucide-react';
+import { Home, Box, ArrowRightLeft, Users, FileText, Layers, Globe, ChevronLeft, ChevronRight, Sun, Moon, Coins, Image, Clock, BarChart3, Code2, Pin, PinOff, Play } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMobileMenu } from '../contexts/MobileMenuContext';
 import { FlowIndexLogo } from './FlowIndexLogo';
@@ -48,6 +48,7 @@ export default function Sidebar() {
 
     const developerItems: NavItem[] = [
         { label: 'API Docs', path: '/api-docs', icon: FileText },
+        { label: 'Playground', path: '/playground', icon: Play },
         { label: 'Developer Portal', path: '/developer', icon: Code2 },
     ];
 
