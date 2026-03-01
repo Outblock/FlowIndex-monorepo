@@ -237,44 +237,47 @@ export default function Sidebar() {
                     </button>
 
                     {/* Collapse & Auto-collapse Controls */}
-                    <div className={`flex items-center ${effectiveCollapsed ? 'justify-center' : ''} gap-1`}>
-                        {!autoCollapse && (
-                            <button
-                                onClick={() => setIsCollapsed(!isCollapsed)}
-                                className={`flex-1 flex items-center ${effectiveCollapsed ? 'justify-center' : 'space-x-3 px-4'} py-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400 transition-colors`}
-                                title={effectiveCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-                            >
-                                {effectiveCollapsed ? <ChevronRight className="h-5 w-5 shrink-0" /> : <ChevronLeft className="h-5 w-5 shrink-0" />}
-                                {!effectiveCollapsed && (
-                                    <span className="text-sm font-medium">
-                                        Collapse
-                                    </span>
-                                )}
-                            </button>
-                        )}
-                        {autoCollapse && !effectiveCollapsed && (
-                            <div className="flex-1 flex items-center space-x-3 px-4 py-2 text-zinc-500 dark:text-zinc-500">
-                                <span className="text-sm font-medium text-zinc-400 dark:text-zinc-600">Auto-hide on</span>
-                            </div>
-                        )}
+                    {effectiveCollapsed ? (
                         <button
                             onClick={() => {
-                                setAutoCollapse(!autoCollapse);
-                                if (!autoCollapse) {
-                                    // Turning on: collapse immediately
-                                    setIsCollapsed(true);
-                                    setHoverExpanded(false);
+                                if (autoCollapse) {
+                                    setAutoCollapse(false);
                                 }
+                                setIsCollapsed(false);
                             }}
-                            className={`p-2 rounded-sm transition-colors ${autoCollapse
-                                ? 'text-nothing-green bg-nothing-green/10 hover:bg-nothing-green/20'
-                                : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-700 dark:hover:text-zinc-300'
-                            }`}
-                            title={autoCollapse ? "Disable auto-hide (pinned)" : "Enable auto-hide on hover"}
+                            className="w-full flex items-center justify-center py-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400 transition-colors"
+                            title="Expand Sidebar"
                         >
-                            {autoCollapse ? <PinOff className="h-4 w-4 shrink-0" /> : <Pin className="h-4 w-4 shrink-0" />}
+                            <ChevronRight className="h-5 w-5 shrink-0" />
                         </button>
-                    </div>
+                    ) : (
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => autoCollapse ? setAutoCollapse(false) : setIsCollapsed(true)}
+                                className="flex-1 flex items-center space-x-3 px-4 py-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400 transition-colors"
+                                title="Collapse Sidebar"
+                            >
+                                <ChevronLeft className="h-5 w-5 shrink-0" />
+                                <span className="text-sm font-medium">Collapse</span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setAutoCollapse(!autoCollapse);
+                                    if (!autoCollapse) {
+                                        setIsCollapsed(true);
+                                        setHoverExpanded(false);
+                                    }
+                                }}
+                                className={`p-2 rounded-sm transition-colors ${autoCollapse
+                                    ? 'text-nothing-green bg-nothing-green/10 hover:bg-nothing-green/20'
+                                    : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                }`}
+                                title={autoCollapse ? "Disable auto-hide" : "Enable auto-hide on hover"}
+                            >
+                                {autoCollapse ? <PinOff className="h-4 w-4 shrink-0" /> : <Pin className="h-4 w-4 shrink-0" />}
+                            </button>
+                        </div>
+                    )}
 
                     {!effectiveCollapsed && (
                         <div className="text-[10px] text-zinc-400 dark:text-zinc-600 uppercase tracking-widest text-center">
