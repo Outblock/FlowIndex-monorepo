@@ -7,7 +7,7 @@ import { resolveApiBaseUrl } from '../../api';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
 import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { ArrowLeft, Box, Code, FileText, Layers, Activity, GitCompare, ChevronDown, ChevronRight, Clock, Hash, Sparkles, Terminal, GitBranch } from 'lucide-react';
+import { ArrowLeft, Box, Code, FileText, Layers, Activity, GitCompare, ChevronDown, ChevronRight, Clock, Hash, Sparkles, Terminal, GitBranch, ExternalLink } from 'lucide-react';
 import { openAIChat } from '../../components/chat/openAIChat';
 import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -811,27 +811,52 @@ function ContractDetail() {
                                     </div>
 
                                     {/* Right panel - script code */}
-                                    <div className={`flex-1 overflow-auto ${theme === 'dark' ? 'bg-[#1e1e1e]' : 'bg-zinc-50'}`}>
+                                    <div className={`flex-1 flex flex-col overflow-hidden ${theme === 'dark' ? 'bg-[#1e1e1e]' : 'bg-zinc-50'}`}>
                                         {scriptTextLoading ? (
                                             <div className="flex items-center justify-center h-full">
                                                 <div className="w-6 h-6 border-2 border-dashed border-zinc-400 rounded-full animate-spin" />
                                             </div>
                                         ) : selectedScriptText ? (
-                                            <SyntaxHighlighter
-                                                language="swift"
-                                                style={syntaxTheme}
-                                                customStyle={{
-                                                    margin: 0,
-                                                    padding: '1.5rem',
-                                                    fontSize: '11px',
-                                                    lineHeight: '1.6',
-                                                    height: '100%',
-                                                }}
-                                                showLineNumbers={true}
-                                                lineNumberStyle={{ minWidth: "2em", paddingRight: "1em", color: theme === 'dark' ? "#555" : "#999", userSelect: "none", textAlign: "right" }}
-                                            >
-                                                {selectedScriptText}
-                                            </SyntaxHighlighter>
+                                            <>
+                                                {/* Toolbar */}
+                                                <div className={`flex items-center justify-between px-3 py-1.5 border-b shrink-0 ${theme === 'dark' ? 'border-zinc-700 bg-[#252526]' : 'border-zinc-200 bg-white'}`}>
+                                                    <span className={`text-[11px] font-medium truncate ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
+                                                        {scripts.find(s => s.script_hash === selectedScript)?.label || `${selectedScript?.slice(0, 16)}...`}
+                                                    </span>
+                                                    <a
+                                                        href={`${import.meta.env.VITE_RUNNER_URL || 'https://runner.flowindex.io'}?code=${btoa(selectedScriptText)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                                                            theme === 'dark'
+                                                                ? 'text-emerald-400 hover:bg-emerald-400/10'
+                                                                : 'text-emerald-600 hover:bg-emerald-50'
+                                                        }`}
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        Open in Runner
+                                                    </a>
+                                                </div>
+                                                {/* Code */}
+                                                <div className="flex-1 overflow-auto">
+                                                    <SyntaxHighlighter
+                                                        language="swift"
+                                                        style={syntaxTheme}
+                                                        customStyle={{
+                                                            margin: 0,
+                                                            padding: '1.5rem',
+                                                            fontSize: '11px',
+                                                            lineHeight: '1.6',
+                                                            height: '100%',
+                                                            background: 'transparent',
+                                                        }}
+                                                        showLineNumbers={true}
+                                                        lineNumberStyle={{ minWidth: "2em", paddingRight: "1em", color: theme === 'dark' ? "#555" : "#999", userSelect: "none", textAlign: "right" }}
+                                                    >
+                                                        {selectedScriptText}
+                                                    </SyntaxHighlighter>
+                                                </div>
+                                            </>
                                         ) : selectedScript ? (
                                             <div className="flex items-center justify-center h-full text-zinc-500 text-xs uppercase tracking-widest">
                                                 Select a script to view

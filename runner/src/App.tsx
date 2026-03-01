@@ -22,8 +22,22 @@ access(all) fun main(): String {
 `;
 
 export default function App() {
-  const [code, setCode] = useState(DEFAULT_CODE);
-  const [network, setNetwork] = useState<FlowNetwork>('mainnet');
+  const [code, setCode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const codeParam = params.get('code');
+    if (codeParam) {
+      try { return atob(codeParam); } catch { return codeParam; }
+    }
+    return localStorage.getItem('runner:code') || DEFAULT_CODE;
+  });
+
+  const [network, setNetwork] = useState<FlowNetwork>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const n = params.get('network');
+    if (n === 'mainnet' || n === 'testnet') return n;
+    return (localStorage.getItem('runner:network') as FlowNetwork) || 'mainnet';
+  });
+
   const [results, setResults] = useState<ExecutionResult[]>([]);
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -32,6 +46,15 @@ export default function App() {
   useEffect(() => {
     configureFcl(network);
   }, [network]);
+
+  // Persist code and network to localStorage (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      localStorage.setItem('runner:code', code);
+      localStorage.setItem('runner:network', network);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [code, network]);
 
   // Cadence type-checking via backend proxy
   useCadenceCheck(editorRef, code, network);

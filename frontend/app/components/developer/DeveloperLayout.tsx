@@ -7,6 +7,7 @@ import {
   Globe,
   GitBranch,
   FileText,
+  Play,
   LogOut,
   Loader2,
   ChevronDown,
@@ -25,6 +26,7 @@ const navItems: NavItem[] = [
   { label: 'Endpoints', path: '/developer/endpoints', icon: Globe },
   { label: 'Workflows', path: '/developer/subscriptions', icon: GitBranch },
   { label: 'Delivery Logs', path: '/developer/logs', icon: FileText },
+  { label: 'Runner', path: '/developer/runner', icon: Play },
 ]
 
 export default function DeveloperLayout({ children }: { children: React.ReactNode }) {
