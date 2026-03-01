@@ -20,8 +20,15 @@ import (
 // 2) JWT (ADMIN_JWT_SECRET or SUPABASE_JWT_SECRET) with role/team claims
 //
 // JWT authorization rules:
-// - ADMIN_ALLOWED_ROLES (csv, default: "admin") must match at least one role claim
+// - ADMIN_ALLOWED_ROLES (csv, default: "platform_admin,ops_admin,admin")
+//   must match at least one role claim
 // - ADMIN_ALLOWED_TEAMS (csv, optional) if set, must match at least one team claim
+//
+// Canonical role names used by FlowIndex:
+// - platform_admin: full platform administration (can access /admin)
+// - ops_admin: operational administration (can access /admin)
+// - team_admin: team-level admin (no /admin access by default)
+// - team_member: regular team member (no /admin access by default)
 func adminAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
@@ -60,7 +67,12 @@ func adminAuthMiddleware(next http.Handler) http.Handler {
 
 		allowedRoles := parseCSVSet(os.Getenv("ADMIN_ALLOWED_ROLES"))
 		if len(allowedRoles) == 0 {
-			allowedRoles = map[string]struct{}{"admin": {}}
+			allowedRoles = map[string]struct{}{
+				"platform_admin": {},
+				"ops_admin":      {},
+				// Backward compatibility for previously issued claims.
+				"admin": {},
+			}
 		}
 		roles := extractRoleClaims(claims)
 		if !hasAnyAllowedValue(roles, allowedRoles) {

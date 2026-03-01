@@ -24,6 +24,15 @@ Core:
 | `PORT` | `8080` | HTTP server port |
 | `START_BLOCK` | `0` | History backfill start height |
 
+Admin Auth:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ADMIN_TOKEN` | unset | Legacy static bearer token for `/admin/*` fallback access |
+| `ADMIN_JWT_SECRET` | fallback to `SUPABASE_JWT_SECRET` | HMAC secret used to verify JWT bearer token for `/admin/*` |
+| `ADMIN_ALLOWED_ROLES` | `platform_admin,ops_admin,admin` | CSV allowlist of JWT role claims for `/admin/*` |
+| `ADMIN_ALLOWED_TEAMS` | unset | Optional CSV allowlist of JWT team claims for `/admin/*` |
+| `SUPABASE_JWT_SECRET` | unset | Shared JWT secret used by Supabase/GoTrue (also used by admin JWT auth if `ADMIN_JWT_SECRET` not set) |
+
 Ingest / Worker:
 | Variable | Default | Purpose |
 | --- | --- | --- |
