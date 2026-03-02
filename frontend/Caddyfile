@@ -2,6 +2,10 @@ flowindex.io {
 	reverse_proxy localhost:8080
 }
 
+www.flowindex.io {
+	redir https://flowindex.io{uri} permanent
+}
+
 run.flowindex.io {
 	reverse_proxy localhost:8081
 }
