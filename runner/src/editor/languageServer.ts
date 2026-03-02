@@ -324,7 +324,7 @@ export function createWebSocketBridge(
         settled = true;
         reject(new Error('LSP server init timeout'));
       }
-    }, 10000);
+    }, 30000);
 
     ws.onopen = () => {
       // Bootstrap server-side session first; bridge resolves only after ready.
