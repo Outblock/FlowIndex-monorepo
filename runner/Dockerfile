@@ -7,22 +7,24 @@ ARG VITE_AI_CHAT_URL=https://ai.flowindex.io
 ENV VITE_AI_CHAT_URL=$VITE_AI_CHAT_URL
 RUN bun run build
 
-FROM node:20-alpine AS server-builder
+FROM oven/bun:1 AS server-builder
 WORKDIR /app/server
-COPY server/package.json server/package-lock.json* ./
-RUN npm ci
+COPY server/package.json server/bun.lock* ./
+RUN bun install --frozen-lockfile
 COPY server/ .
-RUN npm run build
+RUN bun run build
 
 FROM nginx:alpine
-# Install Node.js and supervisord
-RUN apk add --no-cache nodejs npm supervisor
+# Install Node.js runtime and supervisord
+RUN apk add --no-cache nodejs supervisor
 # Install Flow CLI
 RUN FLOW_CLI_VERSION=v2.2.6 \
     && wget -qO /tmp/flow-cli.tar.gz \
     "https://github.com/onflow/flow-cli/releases/download/${FLOW_CLI_VERSION}/flow-cli-${FLOW_CLI_VERSION}-linux-amd64.tar.gz" \
     && tar -xzf /tmp/flow-cli.tar.gz -C /tmp \
-    && mv /tmp/flow /usr/local/bin/flow \
+    && FLOW_BIN="$(find /tmp -maxdepth 2 -type f \( -name flow -o -name flow-cli \) | head -n 1)" \
+    && test -n "$FLOW_BIN" \
+    && mv "$FLOW_BIN" /usr/local/bin/flow \
     && chmod +x /usr/local/bin/flow \
     && rm -f /tmp/flow-cli.tar.gz
 # Copy frontend static files
