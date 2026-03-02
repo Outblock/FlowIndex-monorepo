@@ -564,6 +564,8 @@ function NFTThumbnailCard({ token, tokenId, displayName, ownerAddress, isMint, i
             {showModal && modalNft && (
                 <NFTDetailModal
                     nft={modalNft}
+                    nftType={token}
+                    nftId={String(tokenId)}
                     collectionId={token}
                     collectionName={displayName}
                     onClose={() => setShowModal(false)}

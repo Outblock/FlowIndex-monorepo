@@ -825,9 +825,10 @@ function TransactionDetail() {
                 // Cadence detail has: tokenId, name, thumbnail, rarity, serial, editions, traits, medias, externalURL
                 // NFTDetailContent expects { display: { name, thumbnail }, tokenId, ... }
                 const modalNft = detail.display?.name
-                    ? detail  // Already in cadence format
+                    ? { ...detail, owner: detail.owner || owner }  // Already in cadence format
                     : {
                         tokenId: detail.tokenId || tokenId,
+                        owner: owner || '',
                         display: {
                             name: detail.name || nt.nft_name || `#${tokenId}`,
                             description: detail.description || '',
@@ -845,6 +846,7 @@ function TransactionDetail() {
                 // Fallback: show what we have from the transfer data
                 setSelectedNft({
                     tokenId: tokenId,
+                    owner: owner || '',
                     display: {
                         name: nt.nft_name || `#${tokenId}`,
                         description: '',
@@ -2113,6 +2115,8 @@ function TransactionDetail() {
             {selectedNft && (
                 <NFTDetailModal
                     nft={selectedNft}
+                    nftType={selectedNftCollection.id}
+                    nftId={selectedNft?.tokenId}
                     collectionId={selectedNftCollection.id}
                     collectionName={selectedNftCollection.name}
                     onClose={() => setSelectedNft(null)}
