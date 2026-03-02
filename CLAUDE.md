@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## General Rules
+
+- When I ask to fix or change something, do NOT remove it entirely. Fix/improve the existing feature unless I explicitly say 'remove' or 'delete'.
+- When I report that something looks wrong or data is bad, trust my observation. Do not dismiss it as 'working fine' or 'real data' without evidence. Investigate thoroughly first.
+- When a debugging chain exceeds 3-4 failed attempts without clear progress, stop and provide a summary of what was tried, what was learned, and what the likely root cause is — so I can decide whether to continue or get external help.
+
+## Project Structure
+
+Always verify which server/project/directory a change should go in before starting work. Ask if ambiguous. Known projects: flowindex-frontend, flowindex-backend, Runner, MCP servers.
+
+## Pre-Commit Checklist
+
+After making changes, always run the build/lint check before committing. Fix any ESLint errors, TypeScript errors, or build failures before pushing. Never push code that doesn't build.
+
+## Git Workflow
+
+When pushing to main, always pull/rebase first to avoid non-fast-forward errors. Use `git pull --rebase origin main` before pushing.
+
 ## Project Overview
 
 FlowIndex is a high-performance blockchain explorer and indexer for the Flow blockchain with Flow-EVM support. It features a Go backend with concurrent block ingestion and a React frontend.
