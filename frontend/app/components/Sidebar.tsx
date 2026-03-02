@@ -133,8 +133,8 @@ export default function Sidebar() {
                                     {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                                     <span className="text-sm font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
                                 </button>
-                                {/* Mobile Font Selector */}
-                                <div>
+                                {/* Mobile Font Selector (hidden for now) */}
+                                <div className="hidden">
                                     <button
                                         onClick={() => setFontMenuOpen(!fontMenuOpen)}
                                         className="w-full flex items-center space-x-3 px-4 py-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400 transition-colors"
@@ -299,77 +299,7 @@ export default function Sidebar() {
                         )}
                     </button>
 
-                    {/* Font Selector */}
-                    {!effectiveCollapsed && (
-                        <div className="relative">
-                            <button
-                                onClick={() => setFontMenuOpen(!fontMenuOpen)}
-                                className="w-full flex items-center space-x-3 px-4 py-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400 transition-colors"
-                            >
-                                <Type className="h-5 w-5 shrink-0" />
-                                <span className="text-sm font-medium flex-1 text-left">
-                                    {fontFamily === 'mono' ? 'Mono' : fontFamily === 'sans' ? 'Sans' : `Pixel ${pixelVariant[0].toUpperCase() + pixelVariant.slice(1)}`}
-                                </span>
-                                <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${fontMenuOpen ? 'rotate-180' : ''}`} />
-                            </button>
-                            <AnimatePresence>
-                                {fontMenuOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="px-2 py-2 space-y-1">
-                                            {([['mono', 'Mono'], ['sans', 'Sans']] as [FontFamily, string][]).map(([key, label]) => (
-                                                <button
-                                                    key={key}
-                                                    onClick={() => { setFontFamily(key); if (key !== 'pixel') setFontMenuOpen(false); }}
-                                                    className={`w-full text-left px-3 py-1.5 rounded-sm text-xs transition-colors ${
-                                                        fontFamily === key
-                                                            ? 'text-nothing-green bg-nothing-green/10'
-                                                            : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                                                    }`}
-                                                    style={{ fontFamily: key === 'mono' ? 'Inconsolata, monospace' : 'Geist Sans, sans-serif' }}
-                                                >
-                                                    {label}
-                                                </button>
-                                            ))}
-                                            {/* Pixel section */}
-                                            <div className="pt-1 border-t border-white/5">
-                                                <span className="px-3 text-[9px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-600">Pixel</span>
-                                                <div className="mt-1 space-y-0.5">
-                                                    {(['square', 'grid', 'circle', 'triangle', 'line'] as PixelVariant[]).map((v) => (
-                                                        <button
-                                                            key={v}
-                                                            onClick={() => { setFontFamily('pixel'); setPixelVariant(v); setFontMenuOpen(false); }}
-                                                            className={`w-full text-left px-3 py-1.5 rounded-sm text-xs transition-colors ${
-                                                                fontFamily === 'pixel' && pixelVariant === v
-                                                                    ? 'text-nothing-green bg-nothing-green/10'
-                                                                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'
-                                                            }`}
-                                                            style={{ fontFamily: `Geist Pixel ${v[0].toUpperCase() + v.slice(1)}, monospace` }}
-                                                        >
-                                                            {v[0].toUpperCase() + v.slice(1)}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    )}
-                    {effectiveCollapsed && (
-                        <button
-                            onClick={() => { setFontMenuOpen(false); /* cycle: mono -> sans -> pixel */ const next: FontFamily = fontFamily === 'mono' ? 'sans' : fontFamily === 'sans' ? 'pixel' : 'mono'; setFontFamily(next); }}
-                            className="w-full flex items-center justify-center py-2 rounded-sm hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-600 dark:text-zinc-400 transition-colors"
-                            title={`Font: ${fontFamily === 'pixel' ? `Pixel ${pixelVariant}` : fontFamily}`}
-                        >
-                            <Type className="h-5 w-5 shrink-0" />
-                        </button>
-                    )}
+                    {/* Font Selector — hidden for now, re-enable later */}
 
                     {/* Collapse & Auto-collapse Controls */}
                     {effectiveCollapsed ? (
