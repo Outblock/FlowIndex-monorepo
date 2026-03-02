@@ -6,6 +6,7 @@
 import type * as Monaco from 'monaco-editor';
 import type { Message } from 'vscode-jsonrpc';
 import type { LSPBridge } from './languageServer';
+import { prefetchImports } from './languageServer';
 import { CADENCE_LANGUAGE_ID } from './cadenceLanguage';
 
 interface LSPDiagnostic {
@@ -528,27 +529,39 @@ export class MonacoLspAdapter {
     );
   }
 
-  /** Notify LSP that a document was opened */
+  /** Notify LSP that a document was opened.
+   *  Pre-fetches imported contracts asynchronously to warm the cache before
+   *  the WASM LSP tries to resolve them via synchronous XHR. */
   openDocument(uri: string, code: string) {
     const version = 1;
     documentVersions.set(uri, version);
-    sendNotification(this.bridge, DID_OPEN, {
-      textDocument: {
-        uri: fileUri(uri),
-        languageId: 'cadence',
-        version,
-        text: code,
-      },
+    const bridge = this.bridge;
+
+    // Pre-fetch imports, then notify LSP so cached data is available
+    prefetchImports(code).finally(() => {
+      sendNotification(bridge, DID_OPEN, {
+        textDocument: {
+          uri: fileUri(uri),
+          languageId: 'cadence',
+          version,
+          text: code,
+        },
+      });
     });
   }
 
-  /** Notify LSP that a document changed */
+  /** Notify LSP that a document changed.
+   *  Pre-fetches any new imported contracts before notifying the LSP. */
   changeDocument(uri: string, code: string) {
     const version = (documentVersions.get(uri) || 0) + 1;
     documentVersions.set(uri, version);
-    sendNotification(this.bridge, DID_CHANGE, {
-      textDocument: { uri: fileUri(uri), version },
-      contentChanges: [{ text: code }],
+    const bridge = this.bridge;
+
+    prefetchImports(code).finally(() => {
+      sendNotification(bridge, DID_CHANGE, {
+        textDocument: { uri: fileUri(uri), version },
+        contentChanges: [{ text: code }],
+      });
     });
   }
 
