@@ -11,7 +11,7 @@ function PlaygroundPage() {
         <div className="flex-1 -mb-16">
             <iframe
                 src={RUNNER_URL}
-                className="w-full h-[calc(100vh-5.5rem)] border-0"
+                className="w-full h-[calc(100vh-5.5rem)] border-0 bg-background"
                 allow="clipboard-write"
                 title="Cadence Runner"
             />
