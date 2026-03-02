@@ -32,6 +32,17 @@ interface LSPHoverResult {
   range?: { start: { line: number; character: number }; end: { line: number; character: number } };
 }
 
+interface MonacoLspAdapterOptions {
+  skipInitialize?: boolean;
+  resolveDocumentContent?: (uri: string) => string | undefined;
+}
+
+export interface DefinitionTarget {
+  uri: string;
+  line: number;
+  character: number;
+}
+
 // LSP method constants
 const DID_OPEN = 'textDocument/didOpen';
 const DID_CHANGE = 'textDocument/didChange';
@@ -125,12 +136,14 @@ function toMonacoCompletionKind(monaco: typeof Monaco, kind?: number): Monaco.la
 export class MonacoLspAdapter {
   private bridge: LSPBridge;
   private monaco: typeof Monaco;
+  private options: MonacoLspAdapterOptions;
   private disposables: Monaco.IDisposable[] = [];
   private initialized = false;
 
-  constructor(bridge: LSPBridge, monaco: typeof Monaco) {
+  constructor(bridge: LSPBridge, monaco: typeof Monaco, options: MonacoLspAdapterOptions = {}) {
     this.bridge = bridge;
     this.monaco = monaco;
+    this.options = options;
 
     // Handle messages from LSP server
     bridge.setMessageHandler(this.handleServerMessage.bind(this));
@@ -181,28 +194,207 @@ export class MonacoLspAdapter {
   async initialize() {
     if (this.initialized) return;
 
-    // Send initialize request
-    await sendRequest(this.bridge, INITIALIZE, {
-      processId: null,
-      capabilities: {
-        textDocument: {
-          completion: {
-            completionItem: { snippetSupport: true, documentationFormat: ['markdown', 'plaintext'] },
+    if (!this.options.skipInitialize) {
+      // Send initialize request
+      await sendRequest(this.bridge, INITIALIZE, {
+        processId: null,
+        capabilities: {
+          textDocument: {
+            completion: {
+              completionItem: { snippetSupport: true, documentationFormat: ['markdown', 'plaintext'] },
+            },
+            hover: { contentFormat: ['markdown', 'plaintext'] },
+            signatureHelp: { signatureInformation: { documentationFormat: ['markdown', 'plaintext'] } },
+            publishDiagnostics: { relatedInformation: true },
           },
-          hover: { contentFormat: ['markdown', 'plaintext'] },
-          signatureHelp: { signatureInformation: { documentationFormat: ['markdown', 'plaintext'] } },
-          publishDiagnostics: { relatedInformation: true },
         },
-      },
-      rootUri: 'file:///',
-    });
+        rootUri: 'file:///',
+      });
 
-    // Send initialized notification
-    sendNotification(this.bridge, INITIALIZED, {});
+      // Send initialized notification
+      sendNotification(this.bridge, INITIALIZED, {});
+    }
 
     // Register Monaco providers
     this.registerProviders();
     this.initialized = true;
+  }
+
+  private fallbackDependencyDefinition(
+    model: Monaco.editor.ITextModel,
+    position: Monaco.Position,
+  ): Monaco.languages.Location[] | null {
+    const m = this.monaco;
+    const symbol = model.getWordAtPosition(position)?.word;
+    if (!symbol || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(symbol)) return null;
+
+    // Prefer currently opened dependency models.
+    const openedDep = m.editor.getModels().find((depModel) =>
+      depModel.uri.path.endsWith(`/${symbol}.cdc`)
+    );
+    if (openedDep) {
+      return [{
+        uri: openedDep.uri,
+        range: new m.Range(1, 1, 1, 1),
+      }];
+    }
+
+    const source = model.getValue();
+
+    // Fallback for `import X from 0xADDR` if dependency model isn't opened yet.
+    const importsRe = /import\s+([\w,\s]+?)\s+from\s+0x([0-9a-fA-F]+)/g;
+    let match: RegExpExecArray | null;
+    while ((match = importsRe.exec(source)) !== null) {
+      const names = match[1].split(',').map((s) => s.trim()).filter(Boolean);
+      if (!names.includes(symbol)) continue;
+      const address = `0x${match[2]}`;
+      const depUri = `file:///deps/${address}/${symbol}.cdc`;
+      if (!this.ensureModelForUri(depUri)) return null;
+      return [{
+        uri: m.Uri.parse(depUri),
+        range: new m.Range(1, 1, 1, 1),
+      }];
+    }
+
+    // Search symbol inside imported dependency models (method/field/type definitions).
+    importsRe.lastIndex = 0;
+    while ((match = importsRe.exec(source)) !== null) {
+      const names = match[1].split(',').map((s) => s.trim()).filter(Boolean);
+      const address = `0x${match[2]}`;
+      for (const name of names) {
+        const depUri = `file:///deps/${address}/${name}.cdc`;
+        if (!this.ensureModelForUri(depUri)) continue;
+        const depModel = m.editor.getModel(m.Uri.parse(depUri));
+        if (!depModel) continue;
+        const range = this.findSymbolRangeInModel(depModel, symbol);
+        if (!range) continue;
+        return [{ uri: depModel.uri, range }];
+      }
+    }
+
+    // Last resort: scan any already-opened dependency model.
+    const anyDepModel = m.editor.getModels().find((depModel) => {
+      if (!depModel.uri.path.startsWith('/deps/')) return false;
+      return this.findSymbolRangeInModel(depModel, symbol) != null;
+    });
+    if (anyDepModel) {
+      const range = this.findSymbolRangeInModel(anyDepModel, symbol)!;
+      return [{ uri: anyDepModel.uri, range }];
+    }
+
+    return null;
+  }
+
+  private findSymbolRangeInModel(
+    model: Monaco.editor.ITextModel,
+    symbol: string,
+  ): Monaco.Range | null {
+    const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      new RegExp(`\\bfun\\s+${escaped}\\b`),
+      new RegExp(`\\b(?:let|var)\\s+${escaped}\\b`),
+      new RegExp(`\\b(?:entitlement|resource|struct|contract|interface|attachment|enum|event)\\s+${escaped}\\b`),
+      new RegExp(`\\b${escaped}\\b`),
+    ];
+
+    for (const re of patterns) {
+      for (let line = 1; line <= model.getLineCount(); line += 1) {
+        const lineText = model.getLineContent(line);
+        const hit = lineText.match(re);
+        if (!hit) continue;
+        const start = lineText.indexOf(symbol, hit.index ?? 0);
+        if (start < 0) continue;
+        return new this.monaco.Range(line, start + 1, line, start + symbol.length + 1);
+      }
+    }
+    return null;
+  }
+
+  private ensureModelForUri(uriString: string): boolean {
+    const m = this.monaco;
+    const uri = m.Uri.parse(uriString);
+    if (m.editor.getModel(uri)) return true;
+
+    const content = this.options.resolveDocumentContent?.(uri.toString());
+    if (typeof content !== 'string') return false;
+
+    try {
+      m.editor.createModel(content, CADENCE_LANGUAGE_ID, uri);
+    } catch {
+      // Ignore create race; re-check below.
+    }
+    return m.editor.getModel(uri) != null;
+  }
+
+  private async resolveDefinition(
+    model: Monaco.editor.ITextModel,
+    position: Monaco.Position,
+  ): Promise<Monaco.languages.Location[] | null> {
+    const m = this.monaco;
+    try {
+      const result = await sendRequest(this.bridge, DEFINITION, {
+        textDocument: { uri: model.uri.toString() },
+        position: { line: position.lineNumber - 1, character: position.column - 1 },
+      });
+      if (!result) return this.fallbackDependencyDefinition(model, position);
+      const locations = Array.isArray(result) ? result : [result];
+      const mapped = locations
+        .filter((loc: any) => {
+          const line = loc?.range?.start?.line;
+          return typeof line === 'number' && line >= 0 && line < 1_000_000;
+        })
+        .map((loc: any) => {
+          if (!this.ensureModelForUri(loc.uri)) return null;
+          return {
+            uri: m.Uri.parse(loc.uri),
+            range: new m.Range(
+              loc.range.start.line + 1,
+              loc.range.start.character + 1,
+              loc.range.end.line + 1,
+              loc.range.end.character + 1
+            ),
+          };
+        })
+        .filter(Boolean) as Monaco.languages.Location[];
+
+      if (mapped.length > 0) {
+        const symbol = model.getWordAtPosition(position)?.word;
+        const sourceLine = model.getLineContent(position.lineNumber);
+        if (symbol && sourceLine.includes(`.${symbol}`)) {
+          const adjusted = mapped.map((loc) => {
+            const targetModel = m.editor.getModel(loc.uri);
+            if (!targetModel) return loc;
+            const preferredRange = this.findSymbolRangeInModel(targetModel, symbol);
+            if (!preferredRange) return loc;
+            return { uri: loc.uri, range: preferredRange };
+          });
+          return adjusted;
+        }
+        return mapped;
+      }
+      return this.fallbackDependencyDefinition(model, position);
+    } catch {
+      return this.fallbackDependencyDefinition(model, position);
+    }
+  }
+
+  async findDefinition(uri: string, line: number, character: number): Promise<DefinitionTarget | null> {
+    const normalizedUri = uri.startsWith('file://') ? uri : fileUri(uri);
+    const modelUri = this.monaco.Uri.parse(normalizedUri);
+    this.ensureModelForUri(modelUri.toString());
+    const model = this.monaco.editor.getModel(modelUri);
+    if (!model) return null;
+
+    const position = new this.monaco.Position(line + 1, character + 1);
+    const locations = await this.resolveDefinition(model, position);
+    if (!locations || locations.length === 0) return null;
+
+    const target = locations[0];
+    return {
+      uri: target.uri.toString(),
+      line: target.range.startLineNumber - 1,
+      character: target.range.startColumn - 1,
+    };
   }
 
   private registerProviders() {
@@ -298,27 +490,7 @@ export class MonacoLspAdapter {
     // Definition provider
     this.disposables.push(
       m.languages.registerDefinitionProvider(CADENCE_LANGUAGE_ID, {
-        provideDefinition: async (model, position) => {
-          try {
-            const result = await sendRequest(self.bridge, DEFINITION, {
-              textDocument: { uri: model.uri.toString() },
-              position: { line: position.lineNumber - 1, character: position.column - 1 },
-            });
-            if (!result) return null;
-            const locations = Array.isArray(result) ? result : [result];
-            return locations.map((loc: any) => ({
-              uri: m.Uri.parse(loc.uri),
-              range: new m.Range(
-                loc.range.start.line + 1,
-                loc.range.start.character + 1,
-                loc.range.end.line + 1,
-                loc.range.end.character + 1
-              ),
-            }));
-          } catch {
-            return null;
-          }
-        },
+        provideDefinition: async (model, position) => self.resolveDefinition(model, position),
       })
     );
 

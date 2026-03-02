@@ -286,34 +286,100 @@ export function getLSPBridge(): LSPBridge | null {
 }
 
 /** Create an LSP bridge that communicates via WebSocket to a server-side LSP proxy. */
-export function createWebSocketBridge(url: string): Promise<LSPBridge> {
+export function createWebSocketBridge(
+  url: string,
+  network: 'mainnet' | 'testnet' | 'emulator' = 'mainnet',
+): Promise<LSPBridge> {
+  let normalizedUrl = url;
+  try {
+    const parsed = new URL(url, location.href);
+    if (!parsed.pathname || parsed.pathname === '/') {
+      parsed.pathname = '/lsp';
+      normalizedUrl = parsed.toString();
+    }
+  } catch {
+    // Keep original URL if parsing fails.
+  }
+
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(url);
+    const ws = new WebSocket(normalizedUrl);
     let messageHandler: ((msg: Message) => void) | null = null;
+    let settled = false;
+    let ready = false;
+
+    const bridge: LSPBridge = {
+      sendToServer: (msg: Message) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(msg));
+        }
+      },
+      setMessageHandler: (handler) => {
+        messageHandler = handler;
+      },
+      dispose: () => ws.close(),
+    };
+
+    const readyTimeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('LSP server init timeout'));
+      }
+    }, 10000);
 
     ws.onopen = () => {
-      resolve({
-        sendToServer: (msg: Message) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify(msg));
-          }
-        },
-        setMessageHandler: (handler) => {
-          messageHandler = handler;
-        },
-        dispose: () => ws.close(),
-      });
+      // Bootstrap server-side session first; bridge resolves only after ready.
+      ws.send(JSON.stringify({ type: 'init', network }));
     };
 
     ws.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data as string);
-        // Skip non-JSON-RPC control messages (type: "ready", "error")
+        if (data.type === 'ready') {
+          ready = true;
+          if (!settled) {
+            settled = true;
+            clearTimeout(readyTimeout);
+            resolve(bridge);
+          }
+          return;
+        }
+        if (data.type === 'error') {
+          if (!settled) {
+            settled = true;
+            clearTimeout(readyTimeout);
+            reject(new Error(data.message || 'LSP server init failed'));
+          }
+          return;
+        }
+        // Skip other control messages.
         if (data.type) return;
+        if (data.method === 'flow/dependencyResolved' && data.params) {
+          const address = data.params.address as string | undefined;
+          const contractName = data.params.contractName as string | undefined;
+          const code = data.params.code as string | undefined;
+          if (address && contractName && typeof code === 'string') {
+            depListener?.(address, contractName, code);
+          }
+          return;
+        }
         messageHandler?.(data as Message);
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => reject(new Error('WebSocket LSP connection failed'));
+    ws.onerror = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(readyTimeout);
+        reject(new Error('WebSocket LSP connection failed'));
+      }
+    };
+
+    ws.onclose = () => {
+      if (!settled && !ready) {
+        settled = true;
+        clearTimeout(readyTimeout);
+        reject(new Error('WebSocket LSP closed before ready'));
+      }
+    };
   });
 }
