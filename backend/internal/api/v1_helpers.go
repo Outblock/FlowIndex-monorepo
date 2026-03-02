@@ -892,6 +892,9 @@ func toNFTItemOutput(item models.NFTItem) map[string]interface{} {
 	if len(item.Traits) > 0 && string(item.Traits) != "null" {
 		out["traits"] = json.RawMessage(item.Traits)
 	}
+	if item.Owner != "" {
+		out["current_owner"] = formatAddressV1(item.Owner)
+	}
 	return out
 }
 

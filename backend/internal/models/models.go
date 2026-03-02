@@ -366,6 +366,7 @@ type NFTItem struct {
 	RarityScore      string    `json:"rarity_score,omitempty"`
 	RarityDescription string   `json:"rarity_description,omitempty"`
 	Traits           []byte    `json:"traits,omitempty"`
+	Owner            string    `json:"owner,omitempty"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
