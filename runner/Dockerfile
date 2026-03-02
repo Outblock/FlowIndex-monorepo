@@ -15,8 +15,8 @@ COPY server/ .
 RUN bun run build
 
 FROM nginx:alpine
-# Install Node.js runtime and supervisord
-RUN apk add --no-cache nodejs supervisor
+# Install Node.js runtime, supervisord, and glibc compatibility for Flow CLI
+RUN apk add --no-cache nodejs supervisor gcompat libc6-compat
 # Install Flow CLI
 RUN FLOW_CLI_VERSION=v2.2.6 \
     && wget -qO /tmp/flow-cli.tar.gz \
