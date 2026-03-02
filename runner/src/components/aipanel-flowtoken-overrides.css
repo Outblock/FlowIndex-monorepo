@@ -1,0 +1,8 @@
+@keyframes ft-colorTransition {
+  from {
+    color: #00ef8b;
+  }
+  to {
+    color: #d4d4d8;
+  }
+}

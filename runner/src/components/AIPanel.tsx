@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { AnimatedMarkdown } from 'flowtoken';
 import 'flowtoken/dist/styles.css';
+import './aipanel-flowtoken-overrides.css';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -27,8 +28,12 @@ const AI_CHAT_URL = import.meta.env.VITE_AI_CHAT_URL || 'https://ai.flowindex.io
 
 interface AIPanelProps {
   onInsertCode: (code: string) => void;
+  onApplyCodeToFile?: (path: string, code: string) => void;
+  onAutoApplyEdits?: (edits: { path?: string; code: string }[]) => void;
   onLoadTemplate: (template: Template) => void;
   editorCode?: string;
+  projectFiles?: { path: string; content: string; readOnly?: boolean }[];
+  activeFile?: string;
   network?: string;
   onClose?: () => void;
 }
@@ -209,7 +214,65 @@ function linkifyHex(text: string): React.ReactNode {
 
 /* ── Code Block with syntax highlighting, copy, and replace ── */
 
-function CodeBlock({ code, language, onInsertCode }: { code: string; language: string; onInsertCode?: (code: string) => void }) {
+function extractPathFromMeta(meta?: string): string | undefined {
+  if (!meta) return undefined;
+  const match = meta.match(/(?:^|\s)(?:path|file)\s*[:=]\s*(?:"([^"]+)"|'([^']+)'|([^\s]+))/i);
+  const raw = match?.[1] || match?.[2] || match?.[3];
+  if (!raw) return undefined;
+  return raw.trim();
+}
+
+function extractPathFromFirstLine(code: string): string | undefined {
+  const firstLine = code.split('\n', 1)[0]?.trim() || '';
+  const match = firstLine.match(/^\/\/\s*(?:path|file)\s*[:=]\s*(.+)$/i);
+  if (!match?.[1]) return undefined;
+  return match[1].trim().replace(/^['"`]/, '').replace(/['"`]$/, '');
+}
+
+function normalizePathCandidate(path?: string): string | undefined {
+  if (!path) return undefined;
+  const cleaned = path
+    .trim()
+    .replace(/^['"`]/, '')
+    .replace(/['"`]$/, '')
+    .replace(/^\.\//, '')
+    .replace(/\\/g, '/')
+    .replace(/\/{2,}/g, '/');
+  if (!cleaned || cleaned.startsWith('/')) return undefined;
+  if (cleaned.includes('..')) return undefined;
+  return cleaned;
+}
+
+function resolveTargetPath(meta: string | undefined, language: string, code: string): string | undefined {
+  const fromMeta = normalizePathCandidate(extractPathFromMeta(meta));
+  if (fromMeta) return fromMeta;
+
+  const fromComment = normalizePathCandidate(extractPathFromFirstLine(code));
+  if (fromComment) return fromComment;
+
+  const maybePathLang = normalizePathCandidate(language);
+  if (maybePathLang && maybePathLang.includes('/')) return maybePathLang;
+  return undefined;
+}
+
+function shortFileName(path: string): string {
+  const parts = path.split('/');
+  return parts[parts.length - 1] || path;
+}
+
+function CodeBlock({
+  code,
+  language,
+  meta,
+  onInsertCode,
+  onApplyCodeToFile,
+}: {
+  code: string;
+  language: string;
+  meta?: string;
+  onInsertCode?: (code: string) => void;
+  onApplyCodeToFile?: (path: string, code: string) => void;
+}) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
@@ -220,13 +283,33 @@ function CodeBlock({ code, language, onInsertCode }: { code: string; language: s
   const langMap: Record<string, string> = { cadence: 'swift', cdc: 'swift', sh: 'bash', zsh: 'bash', shell: 'bash', ts: 'typescript', js: 'javascript', py: 'python', yml: 'yaml' };
   const prismLang = langMap[language] || language || 'text';
   const isCadence = language === 'cadence' || language === 'cdc';
+  const targetPath = resolveTargetPath(meta, language, code);
+  const canApplyToFile = !!targetPath && !!onApplyCodeToFile;
+  const canReplaceActive = isCadence && !!onInsertCode;
 
   return (
     <div className="rounded border border-zinc-700 overflow-hidden my-2">
       <div className="flex items-center justify-between px-2.5 py-1.5 bg-zinc-800/80 border-b border-zinc-700">
-        <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">{language || 'code'}</span>
+        <div className="min-w-0 flex items-center gap-1.5">
+          <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">{language || 'code'}</span>
+          {targetPath && (
+            <span className="text-[10px] text-zinc-600 font-mono truncate max-w-[160px]" title={targetPath}>
+              {targetPath}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
-          {isCadence && onInsertCode && (
+          {canApplyToFile && targetPath && (
+            <button
+              onClick={() => onApplyCodeToFile(targetPath, code)}
+              className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors font-medium"
+              title={`Create/update ${targetPath}`}
+            >
+              <ReplaceAll className="w-3 h-3" />
+              Apply {shortFileName(targetPath)}
+            </button>
+          )}
+          {canReplaceActive && (
             <button
               onClick={() => onInsertCode(code)}
               className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors font-medium"
@@ -317,7 +400,10 @@ function CollapsibleCode({ code, language, label, icon }: { code: string; langua
 
 /* ── Markdown Components (dark theme, with Replace button) ── */
 
-function createMarkdownComponents(onInsertCode?: (code: string) => void): Components {
+function createMarkdownComponents(
+  onInsertCode?: (code: string) => void,
+  onApplyCodeToFile?: (path: string, code: string) => void,
+): Components {
   return {
     h1: ({ children }) => <h1 className="text-sm font-bold text-white mt-3 mb-1">{children}</h1>,
     h2: ({ children }) => <h2 className="text-[13px] font-bold text-white mt-3 mb-1">{children}</h2>,
@@ -353,13 +439,24 @@ function createMarkdownComponents(onInsertCode?: (code: string) => void): Compon
     td: ({ children }) => (
       <td className="px-2 py-1.5 text-zinc-300 border-b border-zinc-800 font-mono"><AutoLinkText>{children}</AutoLinkText></td>
     ),
-    code: ({ className, children }) => {
+    code: ({ node, className, children }) => {
       const match = /language-(\w+)/.exec(className || '');
       const lang = match ? match[1] : '';
       const codeString = String(children).replace(/\n$/, '');
+      const meta = typeof (node as { meta?: unknown } | undefined)?.meta === 'string'
+        ? String((node as { meta?: string }).meta)
+        : undefined;
 
       if (lang || codeString.includes('\n')) {
-        return <CodeBlock code={codeString} language={lang || 'text'} onInsertCode={onInsertCode} />;
+        return (
+          <CodeBlock
+            code={codeString}
+            language={lang || 'text'}
+            meta={meta}
+            onInsertCode={onInsertCode}
+            onApplyCodeToFile={onApplyCodeToFile}
+          />
+        );
       }
 
       if (/^0x[0-9a-fA-F]{16,64}$/.test(codeString)) {
@@ -386,7 +483,10 @@ function createMarkdownComponents(onInsertCode?: (code: string) => void): Compon
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function createAnimatedMarkdownComponents(onInsertCode?: (code: string) => void): Record<string, any> {
+function createAnimatedMarkdownComponents(
+  onInsertCode?: (code: string) => void,
+  onApplyCodeToFile?: (path: string, code: string) => void,
+): Record<string, any> {
   return {
     h1: ({ animateText, children }: any) => <h1 className="text-sm font-bold text-white mt-3 mb-1">{animateText(children)}</h1>,
     h2: ({ animateText, children }: any) => <h2 className="text-[13px] font-bold text-white mt-3 mb-1">{animateText(children)}</h2>,
@@ -422,12 +522,21 @@ function createAnimatedMarkdownComponents(onInsertCode?: (code: string) => void)
     td: ({ animateText, children }: any) => (
       <td className="px-2 py-1.5 text-zinc-300 border-b border-zinc-800 font-mono"><AutoLinkText>{animateText(children)}</AutoLinkText></td>
     ),
-    code: ({ className, children }: any) => {
+    code: ({ node, className, children }: any) => {
       const match = /language-(\w+)/.exec(className || '');
       const lang = match ? match[1] : '';
       const codeString = String(children).replace(/\n$/, '');
+      const meta = typeof node?.meta === 'string' ? node.meta : undefined;
       if (lang || codeString.includes('\n')) {
-        return <CodeBlock code={codeString} language={lang || 'text'} onInsertCode={onInsertCode} />;
+        return (
+          <CodeBlock
+            code={codeString}
+            language={lang || 'text'}
+            meta={meta}
+            onInsertCode={onInsertCode}
+            onApplyCodeToFile={onApplyCodeToFile}
+          />
+        );
       }
       return (
         <code className="text-[11px] bg-zinc-700/60 px-1 py-0.5 rounded font-mono text-purple-400">{children}</code>
@@ -438,8 +547,19 @@ function createAnimatedMarkdownComponents(onInsertCode?: (code: string) => void)
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-function MarkdownContent({ text, onInsertCode }: { text: string; onInsertCode?: (code: string) => void }) {
-  const components = useMemo(() => createMarkdownComponents(onInsertCode), [onInsertCode]);
+function MarkdownContent({
+  text,
+  onInsertCode,
+  onApplyCodeToFile,
+}: {
+  text: string;
+  onInsertCode?: (code: string) => void;
+  onApplyCodeToFile?: (path: string, code: string) => void;
+}) {
+  const components = useMemo(
+    () => createMarkdownComponents(onInsertCode, onApplyCodeToFile),
+    [onInsertCode, onApplyCodeToFile],
+  );
   if (!text) return null;
   return <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{text}</ReactMarkdown>;
 }
@@ -490,27 +610,66 @@ function SqlToolPart({ part }: { part: any }) {
   );
 }
 
-function CadenceToolPart({ part }: { part: any }) {
+function CadenceToolPart({
+  part,
+  onInsertCode,
+  onApplyCodeToFile,
+}: {
+  part: any;
+  onInsertCode?: (code: string) => void;
+  onApplyCodeToFile?: (path: string, code: string) => void;
+}) {
   const isDone = part.state === 'output-available' || part.state === 'result';
   const isError = part.state === 'output-error';
   const result = isDone ? part.output : null;
   const hasError = isError || result?.error;
   const script: string | undefined = part.input?.script ?? part.args?.script ?? part.input?.code ?? part.args?.code;
+  const explicitPath = normalizePathCandidate(part.input?.path ?? part.args?.path);
+  const parsedPath = script ? resolveTargetPath(undefined, 'cadence', script) : undefined;
+  const targetPath = explicitPath || parsedPath;
+  const canReplace = !!script && !!onInsertCode;
+  const canApplyToFile = !!script && !!targetPath && !!onApplyCodeToFile;
 
   return (
     <div className="space-y-1">
       {script && (
-        <CollapsibleCode
-          code={script}
-          language="cadence"
-          label="Cadence"
-          icon={
-            <>
-              <Sparkles size={11} className="text-purple-400" />
-              {!isDone && !isError && <Loader2 size={10} className="animate-spin text-zinc-400" />}
-            </>
-          }
-        />
+        <>
+          {(canReplace || canApplyToFile) && (
+            <div className="flex items-center gap-1.5 pb-1">
+              {canApplyToFile && targetPath && (
+                <button
+                  onClick={() => onApplyCodeToFile(targetPath, script)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors font-medium"
+                  title={`Create/update ${targetPath}`}
+                >
+                  <ReplaceAll className="w-3 h-3" />
+                  Apply {shortFileName(targetPath)}
+                </button>
+              )}
+              {canReplace && (
+                <button
+                  onClick={() => onInsertCode(script)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors font-medium"
+                  title="Replace editor content"
+                >
+                  <ReplaceAll className="w-3 h-3" />
+                  Replace
+                </button>
+              )}
+            </div>
+          )}
+          <CollapsibleCode
+            code={script}
+            language="cadence"
+            label="Cadence"
+            icon={
+              <>
+                <Sparkles size={11} className="text-purple-400" />
+                {!isDone && !isError && <Loader2 size={10} className="animate-spin text-zinc-400" />}
+              </>
+            }
+          />
+        </>
       )}
       {!script && !isDone && !isError && (
         <div className="flex items-center gap-2 py-1">
@@ -696,13 +855,17 @@ function ChartToolPart({ part }: { part: any }) {
 /* ── Chat Message ── */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function ChatMessage({ message, hideTools, isStreamingMsg, onInsertCode }: {
+function ChatMessage({ message, hideTools, isStreamingMsg, onInsertCode, onApplyCodeToFile }: {
   message: UIMessage;
   hideTools?: boolean;
   isStreamingMsg?: boolean;
   onInsertCode?: (code: string) => void;
+  onApplyCodeToFile?: (path: string, code: string) => void;
 }) {
-  const animatedComponents = useMemo(() => createAnimatedMarkdownComponents(onInsertCode), [onInsertCode]);
+  const animatedComponents = useMemo(
+    () => createAnimatedMarkdownComponents(onInsertCode, onApplyCodeToFile),
+    [onInsertCode, onApplyCodeToFile],
+  );
 
   if (message.role === 'user') {
     const textContent = message.parts
@@ -745,7 +908,11 @@ function ChatMessage({ message, hideTools, isStreamingMsg, onInsertCode }: {
                       customComponents={animatedComponents}
                     />
                   ) : (
-                    <MarkdownContent text={(part as any).text} onInsertCode={onInsertCode} />
+                    <MarkdownContent
+                      text={(part as any).text}
+                      onInsertCode={onInsertCode}
+                      onApplyCodeToFile={onApplyCodeToFile}
+                    />
                   )}
                 </div>
               );
@@ -776,7 +943,14 @@ function ChatMessage({ message, hideTools, isStreamingMsg, onInsertCode }: {
               if (name === 'run_cadence' || name === 'cadence_check' || name === 'cadence_hover'
                 || name === 'cadence_definition' || name === 'cadence_symbols'
                 || name === 'cadence_security_scan') {
-                return <CadenceToolPart key={i} part={toolPart} />;
+                return (
+                  <CadenceToolPart
+                    key={i}
+                    part={toolPart}
+                    onInsertCode={onInsertCode}
+                    onApplyCodeToFile={onApplyCodeToFile}
+                  />
+                );
               }
               // SQL tools
               if (name === 'run_sql' || name === 'runSQL' || name === 'run_flowindex_sql' || name === 'run_evm_sql') {
@@ -891,6 +1065,7 @@ const CHAT_MODES: { key: ChatMode; label: string; icon: typeof Zap; desc: string
   { key: 'deep', label: 'Deep', icon: Brain, desc: 'Extended thinking', model: 'Opus' },
 ];
 const MODE_STORAGE_KEY = 'runner-chat-mode';
+const AUTO_APPLY_STORAGE_KEY = 'runner-ai-auto-apply';
 
 function getStoredMode(): ChatMode {
   try {
@@ -899,6 +1074,96 @@ function getStoredMode(): ChatMode {
   } catch { /* noop */ }
   return 'balanced';
 }
+
+function getStoredAutoApply(): boolean {
+  try {
+    const v = localStorage.getItem(AUTO_APPLY_STORAGE_KEY);
+    if (v === null) return true;
+    return v !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function parseFenceInfo(infoRaw: string): { language: string; meta?: string } {
+  const info = infoRaw.trim();
+  if (!info) return { language: '' };
+  const tokens = info.split(/\s+/);
+  const first = tokens[0];
+  if (first.includes('=') || first.includes(':')) {
+    return { language: '', meta: info };
+  }
+  return {
+    language: first.toLowerCase(),
+    meta: tokens.slice(1).join(' ') || undefined,
+  };
+}
+
+function extractEditsFromText(text: string): { path?: string; code: string }[] {
+  const edits: { path?: string; code: string }[] = [];
+  const fenceRe = /```([^\n`]*)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRe.exec(text)) !== null) {
+    const { language, meta } = parseFenceInfo(match[1] || '');
+    const code = (match[2] || '').replace(/\n$/, '');
+    if (!code.trim()) continue;
+
+    const maybePath = resolveTargetPath(meta, language, code);
+    const path = normalizePathCandidate(maybePath);
+    if (path) {
+      edits.push({ path, code });
+      continue;
+    }
+
+    if (language === 'cadence' || language === 'cdc') {
+      edits.push({ code });
+    }
+  }
+
+  return edits;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function extractEditsFromAssistantMessage(message: UIMessage): { path?: string; code: string }[] {
+  const raw: { path?: string; code: string }[] = [];
+
+  for (const part of message.parts as any[]) {
+    if (part.type === 'text') {
+      raw.push(...extractEditsFromText(part.text || ''));
+      continue;
+    }
+
+    if (part.type === 'tool-invocation' || String(part.type || '').startsWith('tool-') || part.type === 'dynamic-tool') {
+      const toolName = part.toolName ?? String(part.type || '').split('-').slice(1).join('-');
+      const isCadenceTool =
+        toolName === 'run_cadence' ||
+        toolName === 'cadence_check' ||
+        toolName === 'cadence_hover' ||
+        toolName === 'cadence_definition' ||
+        toolName === 'cadence_symbols' ||
+        toolName === 'cadence_security_scan';
+      if (!isCadenceTool) continue;
+
+      const script: string | undefined =
+        part.input?.script ?? part.args?.script ?? part.input?.code ?? part.args?.code;
+      if (!script || !script.trim()) continue;
+
+      const explicitPath = normalizePathCandidate(part.input?.path ?? part.args?.path);
+      const inferredPath = resolveTargetPath(undefined, 'cadence', script);
+      const path = explicitPath || normalizePathCandidate(inferredPath);
+      raw.push(path ? { path, code: script } : { code: script });
+    }
+  }
+
+  // Keep only the latest edit per target (file path or active file)
+  const deduped = new Map<string, { path?: string; code: string }>();
+  for (const edit of raw) {
+    deduped.set(edit.path || '__active__', edit);
+  }
+  return Array.from(deduped.values());
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /* ── Mode Dropdown (custom, no shadcn) ── */
 
@@ -964,14 +1229,26 @@ function ModeSelector({ mode, onChange }: { mode: ChatMode; onChange: (m: ChatMo
 
 /* ── Main Component ── */
 
-export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, network, onClose }: AIPanelProps) {
+export default function AIPanel({
+  onInsertCode,
+  onApplyCodeToFile,
+  onAutoApplyEdits,
+  onLoadTemplate,
+  editorCode,
+  projectFiles,
+  activeFile,
+  network,
+  onClose,
+}: AIPanelProps) {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<ChatMode>(getStoredMode);
+  const [autoApply, setAutoApply] = useState<boolean>(getStoredAutoApply);
   const [hideTools, setHideTools] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const stoppedAtRef = useRef(0);
+  const processedAssistantIdsRef = useRef<Set<string>>(new Set());
 
   const handleModeChange = useCallback((m: ChatMode) => {
     setChatMode(m);
@@ -983,6 +1260,10 @@ export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, netw
   chatModeRef.current = chatMode;
   const editorCodeRef = useRef(editorCode);
   editorCodeRef.current = editorCode;
+  const projectFilesRef = useRef(projectFiles);
+  projectFilesRef.current = projectFiles;
+  const activeFileRef = useRef(activeFile);
+  activeFileRef.current = activeFile;
   const networkRef = useRef(network);
   networkRef.current = network;
 
@@ -998,6 +1279,10 @@ export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, netw
         parsed.mode = chatModeRef.current;
         parsed.editorCode = editorCodeRef.current || '';
         parsed.network = networkRef.current || 'mainnet';
+        parsed.activeFile = activeFileRef.current || '';
+        parsed.projectFiles = (projectFilesRef.current || [])
+          .filter((f) => !f.readOnly)
+          .map((f) => ({ path: f.path, content: f.content }));
         init = { ...init, body: JSON.stringify(parsed) };
       } catch { /* not JSON, skip */ }
     }
@@ -1037,6 +1322,26 @@ export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, netw
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  useEffect(() => {
+    try { localStorage.setItem(AUTO_APPLY_STORAGE_KEY, String(autoApply)); } catch { /* noop */ }
+  }, [autoApply]);
+
+  useEffect(() => {
+    if (!autoApply) return;
+    if (status !== 'ready') return;
+    if (!onAutoApplyEdits) return;
+
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    if (processedAssistantIdsRef.current.has(last.id)) return;
+    processedAssistantIdsRef.current.add(last.id);
+
+    const edits = extractEditsFromAssistantMessage(last);
+    if (edits.length > 0) {
+      onAutoApplyEdits(edits);
+    }
+  }, [messages, status, autoApply, onAutoApplyEdits]);
+
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || isStreaming) return;
     if (Date.now() - stoppedAtRef.current < 300) return;
@@ -1052,7 +1357,10 @@ export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, netw
     }
   };
 
-  const handleClear = () => setMessages([]);
+  const handleClear = () => {
+    processedAssistantIdsRef.current.clear();
+    setMessages([]);
+  };
 
   return (
     <div className="flex flex-col h-full bg-zinc-900 min-w-0">
@@ -1144,6 +1452,7 @@ export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, netw
                 hideTools={hideTools}
                 isStreamingMsg={isStreaming && idx === messages.length - 1 && msg.role === 'assistant'}
                 onInsertCode={onInsertCode}
+                onApplyCodeToFile={onApplyCodeToFile}
               />
             ))}
             {isStreaming && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
@@ -1216,6 +1525,19 @@ export default function AIPanel({ onInsertCode, onLoadTemplate, editorCode, netw
           >
             {hideTools ? <EyeOff size={10} /> : <Eye size={10} />}
             Tools
+          </button>
+          <button
+            type="button"
+            onClick={() => setAutoApply((v) => !v)}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] uppercase tracking-widest font-bold transition-all ${
+              autoApply
+                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                : 'text-zinc-500 hover:text-zinc-300 border border-transparent hover:border-zinc-700'
+            }`}
+            title={autoApply ? 'Auto apply AI edits is on' : 'Auto apply AI edits is off'}
+          >
+            <ReplaceAll size={10} />
+            Auto Apply
           </button>
           {/* MCP indicator */}
           <div className="relative group/mcp">
