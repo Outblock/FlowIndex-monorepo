@@ -98,10 +98,11 @@ func (s *Server) fetchAndEnrichNFTItems(ctx context.Context, contractAddr, contr
 		log.Printf("[nft_metadata_fetch] failed to cache items: %v", err)
 	}
 
-	// Merge fetched data into stubs.
+	// Merge fetched data into stubs, preserving Owner from ownership.
 	result := make([]models.NFTItem, 0, len(stubs))
 	for _, stub := range stubs {
 		if enriched, ok := fetched[stub.NFTID]; ok {
+			enriched.Owner = stub.Owner
 			result = append(result, enriched)
 		} else {
 			result = append(result, stub)
