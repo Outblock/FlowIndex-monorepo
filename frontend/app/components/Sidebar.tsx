@@ -10,14 +10,14 @@ export default function Sidebar() {
     const routerState = useRouterState();
     const location = routerState.location;
     const { theme, toggleTheme } = useTheme();
-    const [isCollapsed, setIsCollapsed] = useState(() => location.pathname.startsWith('/developer'));
+    const [isCollapsed, setIsCollapsed] = useState(() => location.pathname.startsWith('/developer') || location.pathname.startsWith('/playground'));
     const [autoCollapse, setAutoCollapse] = useState(false);
     const [hoverExpanded, setHoverExpanded] = useState(false);
     const { isOpen: isMobileOpen, close: closeMobileMenu } = useMobileMenu();
 
-    // Auto-collapse when entering Developer Portal, auto-expand when leaving
+    // Auto-collapse when entering Developer Portal or Playground, auto-expand when leaving
     useEffect(() => {
-        if (location.pathname.startsWith('/developer')) {
+        if (location.pathname.startsWith('/developer') || location.pathname.startsWith('/playground')) {
             setIsCollapsed(true);
         }
     }, [location.pathname]);

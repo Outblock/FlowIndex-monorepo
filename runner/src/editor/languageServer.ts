@@ -194,6 +194,11 @@ export async function prefetchDependencies(
   }
 }
 
+/** Convenience wrapper: prefetch imports for the current access node. */
+export async function prefetchImports(code: string): Promise<void> {
+  return prefetchDependencies(code, currentAccessNode, depListener ?? undefined);
+}
+
 export function setAccessNode(node: string) {
   currentAccessNode = node;
 }
