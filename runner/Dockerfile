@@ -18,7 +18,7 @@ FROM nginx:alpine
 # Install Node.js runtime, supervisord, and glibc compatibility for Flow CLI
 RUN apk add --no-cache nodejs supervisor gcompat libc6-compat
 # Install Flow CLI
-RUN FLOW_CLI_VERSION=v2.2.6 \
+RUN FLOW_CLI_VERSION=v2.14.3 \
     && wget -qO /tmp/flow-cli.tar.gz \
     "https://github.com/onflow/flow-cli/releases/download/${FLOW_CLI_VERSION}/flow-cli-${FLOW_CLI_VERSION}-linux-amd64.tar.gz" \
     && tar -xzf /tmp/flow-cli.tar.gz -C /tmp \

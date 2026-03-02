@@ -16,7 +16,6 @@ export class DepsWorkspace {
   private network: FlowNetwork;
   private installedContracts = new Set<string>();
   private installingContracts = new Map<string, Promise<void>>();
-  private rewrittenOnce = false;
   private rewritePromise: Promise<void> | null = null;
 
   constructor(flowCommand: string, network: FlowNetwork) {
@@ -59,8 +58,8 @@ export class DepsWorkspace {
     const installs = imports.map((dep) => this.ensureDepInstalled(dep));
     await Promise.all(installs);
 
-    // Ensure existing cached deps (from older runs) also get rewritten once.
-    await this.ensureImportsRewrittenOnce();
+    // Always rewrite cached imports after installs, so newly added deps are normalized too.
+    await this.rewriteInstalledImports();
   }
 
   private ensureDepInstalled(dep: { name: string; address: string }): Promise<void> {
@@ -96,15 +95,13 @@ export class DepsWorkspace {
     return installPromise;
   }
 
-  private async ensureImportsRewrittenOnce(): Promise<void> {
-    if (this.rewrittenOnce) return;
+  private async rewriteInstalledImports(): Promise<void> {
     if (!this.rewritePromise) {
       this.rewritePromise = this.rewriteInstalledAddressImports()
         .catch((error) => {
           console.error('[deps] Failed to rewrite installed imports:', error);
         })
         .finally(() => {
-          this.rewrittenOnce = true;
           this.rewritePromise = null;
         });
     }
