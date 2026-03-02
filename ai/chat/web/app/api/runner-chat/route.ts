@@ -27,6 +27,7 @@ const MODE_CONFIG = {
 } as const;
 
 type ChatMode = keyof typeof MODE_CONFIG;
+type RunnerProjectFile = { path: string; content: string };
 
 async function safeMcpTools(
   url: string
@@ -44,49 +45,104 @@ async function safeMcpTools(
   }
 }
 
-const SYSTEM_PROMPT = `You are a Cadence programming assistant embedded in a code editor (Cadence Runner).
-Your primary job is to help users write, edit, and debug Cadence smart contract code for the Flow blockchain.
+const SYSTEM_PROMPT = `You are a Cadence programming assistant embedded in Cadence Runner.
+Your primary job is to help users write, edit, and debug Cadence smart contract code for Flow.
 
-## How you work
+## Response format for code changes
 
-The user's current editor code is provided as context with each message. When they ask you to modify, fix, or write code:
+When the user asks for code creation/modification, output complete file contents (never partial snippets or unified diff).
+Use one fenced block per file with a relative path in metadata:
 
-1. **Always return the COMPLETE updated code** wrapped in a single \`\`\`cadence code block
-2. The code block will have a "Replace" button the user can click to replace their editor content
-3. If the user asks a question (not a code change), respond conversationally without a code block
+\`\`\`cadence path=contracts/MyToken.cdc
+// complete file content
+\`\`\`
 
-## Code guidelines
+Rules:
+- Always include \`path=\` (or \`file=\`) for each code block when changing code.
+- Paths must be relative (no leading \`/\`, no \`..\`, no \`deps/\`).
+- If only one file is changed, still include path metadata.
+- If the user asks a pure question (no code changes), respond normally without code blocks.
 
-- Write modern Cadence 1.0 syntax (access(all), not pub)
-- Use proper entitlements and capabilities
-- Scripts must have \`access(all) fun main()\` entry point
-- Transactions need \`transaction { prepare(signer: auth(Storage) &Account) { } execute { } }\`
-- Import core contracts using mainnet addresses:
+## Cadence guidelines
+
+- Write modern Cadence 1.0 syntax (\`access(all)\`, not \`pub\`)
+- Use correct entitlements/capabilities
+- Scripts should use \`access(all) fun main(...)\`
+- Transactions should use \`transaction { prepare(...) { ... } execute { ... } }\`
+- Default imports (mainnet):
   - FungibleToken: 0xf233dcee88fe0abe
   - NonFungibleToken: 0x1d7e57aa55817448
   - MetadataViews: 0x1d7e57aa55817448
   - FlowToken: 0x1654653399040a61
   - FUSD: 0x3c5959b568896393
 
-## When fixing errors
+Keep responses concise and implementation-focused.`;
 
-The user may paste error messages. Analyze the error, explain what went wrong briefly, then provide the corrected complete code in a cadence code block.
+function sanitizeProjectFiles(files?: RunnerProjectFile[]): RunnerProjectFile[] {
+  if (!Array.isArray(files)) return [];
+  return files
+    .filter((f) => typeof f?.path === "string" && typeof f?.content === "string")
+    .map((f) => ({
+      path: f.path.trim(),
+      content: f.content,
+    }))
+    .filter((f) => f.path.length > 0)
+    .slice(0, 24);
+}
 
-## When writing new code
+function buildProjectContext({
+  network,
+  activeFile,
+  editorCode,
+  projectFiles,
+}: {
+  network?: string;
+  activeFile?: string;
+  editorCode?: string;
+  projectFiles: RunnerProjectFile[];
+}): string {
+  const header = [`## Runner context`, `Network: ${network || "mainnet"}`];
+  if (activeFile) header.push(`Active file: ${activeFile}`);
 
-If the user asks to write something from scratch, provide the complete runnable code. Add brief comments explaining key parts.
+  if (projectFiles.length === 0) {
+    if (!editorCode) return header.join("\n");
+    return `${header.join("\n")}\n\n## Current editor code\n\`\`\`cadence\n${editorCode}\n\`\`\``;
+  }
 
-Keep responses concise. Prioritize working code over long explanations.`;
+  const list = ["## Editable files", ...projectFiles.map((f) => `- ${f.path}`)];
+
+  const fileBlocks: string[] = [];
+  let totalChars = 0;
+  const MAX_TOTAL_CHARS = 50_000;
+  for (const file of projectFiles) {
+    if (totalChars >= MAX_TOTAL_CHARS) break;
+    const remaining = MAX_TOTAL_CHARS - totalChars;
+    const content =
+      file.content.length > remaining
+        ? `${file.content.slice(0, remaining)}\n// [truncated]`
+        : file.content;
+    totalChars += content.length;
+    fileBlocks.push(
+      `### ${file.path}${activeFile && file.path === activeFile ? " (active)" : ""}\n\`\`\`cadence\n${content}\n\`\`\``
+    );
+  }
+
+  return `${header.join("\n")}\n\n${list.join("\n")}\n\n## File contents\n${fileBlocks.join("\n\n")}`;
+}
 
 export async function POST(req: Request) {
   const {
     messages,
     editorCode,
+    projectFiles,
+    activeFile,
     network,
     mode: rawMode,
   }: {
     messages: UIMessage[];
     editorCode?: string;
+    projectFiles?: RunnerProjectFile[];
+    activeFile?: string;
     network?: string;
     mode?: string;
   } = await req.json();
@@ -95,10 +151,12 @@ export async function POST(req: Request) {
     rawMode && rawMode in MODE_CONFIG ? (rawMode as ChatMode) : "balanced";
   const cfg = MODE_CONFIG[mode];
 
-  // Prepend editor context to the conversation
-  const systemWithContext = editorCode
-    ? `${SYSTEM_PROMPT}\n\n## Current editor code (${network || "mainnet"}):\n\`\`\`cadence\n${editorCode}\n\`\`\``
-    : SYSTEM_PROMPT;
+  const systemWithContext = `${SYSTEM_PROMPT}\n\n${buildProjectContext({
+    network,
+    activeFile,
+    editorCode,
+    projectFiles: sanitizeProjectFiles(projectFiles),
+  })}`;
 
   const cadenceMcp = await safeMcpTools(CADENCE_MCP_URL);
 

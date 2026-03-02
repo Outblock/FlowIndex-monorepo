@@ -15,7 +15,7 @@ import type { ExecutionResult } from './flow/execute';
 import type { FlowNetwork } from './flow/networks';
 import {
   loadProject, saveProject, updateFileContent, createFile, deleteFile,
-  openFile, closeFile, getFileContent, addDependencyFile,
+  openFile, closeFile, getFileContent, addDependencyFile, getUserFiles,
   TEMPLATES,
   type ProjectState, type Template,
 } from './fs/fileSystem';
@@ -114,6 +114,38 @@ function DragBar({ direction, onMouseDown }: { direction: 'horizontal' | 'vertic
   );
 }
 
+function normalizeEditablePath(path: string): string | null {
+  const normalized = path
+    .trim()
+    .replace(/^['"`]/, '')
+    .replace(/['"`]$/, '')
+    .replace(/^\.\//, '')
+    .replace(/\\/g, '/')
+    .replace(/\/{2,}/g, '/');
+
+  if (!normalized) return null;
+  if (normalized.startsWith('/')) return null;
+  if (normalized.includes('..')) return null;
+  if (normalized.startsWith('deps/')) return null;
+
+  return normalized;
+}
+
+function applyCodeToPath(state: ProjectState, path: string, newCode: string): ProjectState {
+  const normalizedPath = normalizeEditablePath(path);
+  if (!normalizedPath) return state;
+
+  const existing = state.files.find((f) => f.path === normalizedPath);
+  if (existing) {
+    if (existing.readOnly) return state;
+    const updated = updateFileContent(state, normalizedPath, newCode);
+    return openFile(updated, normalizedPath);
+  }
+
+  const created = createFile(state, normalizedPath, newCode);
+  return openFile(created, normalizedPath);
+}
+
 export default function App() {
   const [project, setProject] = useState<ProjectState>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -142,10 +174,19 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [showExplorer, setShowExplorer] = useState(!isIframe);
   const [showAI, setShowAI] = useState(true);
+  const [pendingAiRevert, setPendingAiRevert] = useState<{
+    previous: ProjectState;
+    editCount: number;
+  } | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const pendingDefinitionRef = useRef<{ path: string; line: number; column: number } | null>(null);
+  const projectRef = useRef(project);
+
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
 
   // Resize hooks
   const explorer = useHorizontalResize(220, 150, 400, 'left');
@@ -211,6 +252,46 @@ export default function App() {
   const handleInsertCode = useCallback((newCode: string) => {
     setProject((prev) => updateFileContent(prev, prev.activeFile, newCode));
   }, []);
+
+  const handleApplyCodeToFile = useCallback((path: string, newCode: string) => {
+    setProject((prev) => applyCodeToPath(prev, path, newCode));
+  }, []);
+
+  const handleAutoApplyEdits = useCallback((edits: { path?: string; code: string }[]) => {
+    if (!Array.isArray(edits) || edits.length === 0) return;
+
+    const sanitized = edits.filter((e) => typeof e?.code === 'string' && e.code.trim().length > 0);
+    if (sanitized.length === 0) return;
+
+    const base = projectRef.current;
+    let next = base;
+
+    for (const edit of sanitized) {
+      if (edit.path) {
+        next = applyCodeToPath(next, edit.path, edit.code);
+      } else {
+        next = updateFileContent(next, next.activeFile, edit.code);
+      }
+    }
+
+    if (next === base) return;
+
+    setPendingAiRevert({
+      previous: base,
+      editCount: sanitized.length,
+    });
+    setProject(next);
+  }, []);
+
+  const handleKeepAiEdits = useCallback(() => {
+    setPendingAiRevert(null);
+  }, []);
+
+  const handleRevertAiEdits = useCallback(() => {
+    if (!pendingAiRevert) return;
+    setProject(pendingAiRevert.previous);
+    setPendingAiRevert(null);
+  }, [pendingAiRevert]);
 
   const handleLoadTemplate = useCallback((template: Template) => {
     setProject({
@@ -397,6 +478,28 @@ export default function App() {
         </div>
       </header>
 
+      {pendingAiRevert && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-amber-500/30 bg-amber-500/10">
+          <span className="text-[11px] text-amber-200">
+            AI 已自动应用 {pendingAiRevert.editCount} 处修改。确认保留还是回滚？
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRevertAiEdits}
+              className="px-2.5 py-1 text-[11px] rounded border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors"
+            >
+              Revert
+            </button>
+            <button
+              onClick={handleKeepAiEdits}
+              className="px-2.5 py-1 text-[11px] rounded border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition-colors"
+            >
+              Keep
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main layout */}
       <div className="flex flex-1 min-h-0">
         {/* File Explorer */}
@@ -468,8 +571,12 @@ export default function App() {
             <div className="shrink-0 overflow-hidden" style={{ width: aiPanel.width }}>
               <AIPanel
                 onInsertCode={handleInsertCode}
+                onApplyCodeToFile={handleApplyCodeToFile}
+                onAutoApplyEdits={handleAutoApplyEdits}
                 onLoadTemplate={handleLoadTemplate}
                 editorCode={activeCode}
+                projectFiles={getUserFiles(project)}
+                activeFile={project.activeFile}
                 network={network}
                 onClose={() => setShowAI(false)}
               />
