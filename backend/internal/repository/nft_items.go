@@ -227,18 +227,14 @@ func (r *Repository) ListNFTItems(ctx context.Context, contractAddr, contractNam
 		return nil, false, err
 	}
 	defer rows.Close()
-	type ownershipRow struct {
-		item  models.NFTItem
-		owner string
-	}
-	var stubs []ownershipRow
+	var stubs []models.NFTItem
 	for rows.Next() {
-		var r ownershipRow
-		if err := rows.Scan(&r.item.ContractAddress, &r.item.ContractName, &r.item.NFTID, &r.owner, &r.item.UpdatedAt); err != nil {
+		var item models.NFTItem
+		if err := rows.Scan(&item.ContractAddress, &item.ContractName, &item.NFTID, &item.Owner, &item.UpdatedAt); err != nil {
 			return nil, false, err
 		}
-		r.item.Name = contractName + " #" + r.item.NFTID
-		stubs = append(stubs, r)
+		item.Name = contractName + " #" + item.NFTID
+		stubs = append(stubs, item)
 	}
 	hasMore := len(stubs) > limit
 	if hasMore {
@@ -251,25 +247,22 @@ func (r *Repository) ListNFTItems(ctx context.Context, contractAddr, contractNam
 	// 2. Batch-lookup metadata from nft_items for these IDs.
 	nftIDs := make([]string, len(stubs))
 	for i, s := range stubs {
-		nftIDs[i] = s.item.NFTID
+		nftIDs[i] = s.NFTID
 	}
 	metaMap, err := r.getNFTItemsMetadataByIDs(ctx, contractAddr, contractName, nftIDs)
 	if err != nil {
 		// Non-fatal: return stubs without metadata.
-		out := make([]models.NFTItem, len(stubs))
-		for i, s := range stubs {
-			out[i] = s.item
-		}
-		return out, hasMore, nil
+		return stubs, hasMore, nil
 	}
 
-	// 3. Merge: use metadata where available, otherwise use stub.
+	// 3. Merge: use metadata where available, preserve owner from ownership.
 	out := make([]models.NFTItem, len(stubs))
 	for i, s := range stubs {
-		if meta, ok := metaMap[s.item.NFTID]; ok {
+		if meta, ok := metaMap[s.NFTID]; ok {
+			meta.Owner = s.Owner
 			out[i] = meta
 		} else {
-			out[i] = s.item
+			out[i] = s
 		}
 	}
 	return out, hasMore, nil

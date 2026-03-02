@@ -171,14 +171,14 @@ function NFTItemInner() {
         <div className="min-h-[400px]">
           {/* Detail Tab */}
           {activeTab === 'detail' && (
-            <GlassCard>
+            <GlassCard className="p-6">
               <NFTMetadata nft={nft} collectionName={collectionName} hideHeader />
             </GlassCard>
           )}
 
           {/* History Tab */}
           {activeTab === 'history' && (
-            <GlassCard>
+            <GlassCard className="p-6">
               <NFTTimeline
                 transfers={transfers}
                 currentOwner={owner || undefined}
