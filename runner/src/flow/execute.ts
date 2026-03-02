@@ -77,3 +77,50 @@ export async function executeTransaction(
     onResult({ type: 'error', data: extractError(err) });
   }
 }
+
+export async function executeCustodialTransaction(
+  code: string,
+  paramValues: Record<string, string>,
+  signerAddress: string,
+  keyIndex: number,
+  signFn: (message: string) => Promise<string>,
+  onResult: (result: ExecutionResult) => void,
+): Promise<void> {
+  try {
+    const params = parseMainParams(code);
+    const args = params.length > 0 ? buildFclArgs(params, paramValues) : undefined;
+
+    // Custom FCL authorization function using custodial key
+    const authz = (account: any) => ({
+      ...account,
+      addr: fcl.sansPrefix(signerAddress),
+      keyId: keyIndex,
+      signingFunction: async (signable: { message: string }) => ({
+        addr: fcl.sansPrefix(signerAddress),
+        keyId: keyIndex,
+        signature: await signFn(signable.message),
+      }),
+    });
+
+    const txId = await fcl.mutate({
+      cadence: code,
+      args,
+      proposer: authz,
+      payer: authz,
+      authorizations: [authz],
+      limit: 9999,
+    });
+
+    onResult({ type: 'tx_submitted', data: txId, txId });
+
+    const result = await fcl.tx(txId).onceSealed();
+    onResult({
+      type: 'tx_sealed',
+      data: result,
+      events: result.events || [],
+      txId,
+    });
+  } catch (err) {
+    onResult({ type: 'error', data: extractError(err) });
+  }
+}
