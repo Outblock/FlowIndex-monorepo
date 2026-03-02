@@ -145,6 +145,7 @@ export default function App() {
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const pendingDefinitionRef = useRef<{ path: string; line: number; column: number } | null>(null);
 
   // Resize hooks
   const explorer = useHorizontalResize(220, 150, 400, 'left');
@@ -180,7 +181,7 @@ export default function App() {
     setProject((prev) => addDependencyFile(prev, address, contractName, code));
   }, []);
 
-  const { notifyChange, loadingDeps } = useLsp(monacoInstance, project, network, handleDependency);
+  const { notifyChange, goToDefinition, loadingDeps } = useLsp(monacoInstance, project, network, handleDependency);
 
   const scriptParams = useMemo(() => parseMainParams(activeCode), [activeCode]);
   const codeType = useMemo(() => detectCodeType(activeCode), [activeCode]);
@@ -243,6 +244,111 @@ export default function App() {
   const handleMonacoReady = useCallback((monaco: typeof MonacoNS) => {
     setMonacoInstance(monaco);
   }, []);
+
+  const handleOpenCodeEditor = useCallback(async (
+    uri: string,
+    selection?: {
+      startLineNumber: number;
+      startColumn: number;
+      endLineNumber: number;
+      endColumn: number;
+    }
+  ) => {
+    if (!uri.startsWith('file://')) return false;
+    let targetPath = '';
+    try {
+      targetPath = decodeURIComponent(new URL(uri).pathname.replace(/^\/+/, ''));
+    } catch {
+      return false;
+    }
+    if (!project.files.some((file) => file.path === targetPath)) {
+      const depsIndex = targetPath.indexOf('deps/');
+      if (depsIndex >= 0) {
+        targetPath = targetPath.slice(depsIndex);
+      }
+    }
+    if (!project.files.some((file) => file.path === targetPath)) {
+      return false;
+    }
+    if (!targetPath) return false;
+
+    const targetLine = selection?.startLineNumber ?? 1;
+    const targetColumn = selection?.startColumn ?? 1;
+
+    if (project.activeFile === targetPath) {
+      editorRef.current?.setPosition({ lineNumber: targetLine, column: targetColumn });
+      editorRef.current?.revealPositionInCenter({ lineNumber: targetLine, column: targetColumn });
+      editorRef.current?.focus();
+      return true;
+    }
+
+    pendingDefinitionRef.current = { path: targetPath, line: targetLine, column: targetColumn };
+    setProject((prev) => openFile(prev, targetPath));
+    return true;
+  }, [project.activeFile, project.files]);
+
+  const handleGoToDefinition = useCallback(async (path: string, line: number, column: number) => {
+    const target = await goToDefinition(path, line, column);
+    if (!target) return false;
+    return handleOpenCodeEditor(target.uri, {
+      startLineNumber: target.line + 1,
+      startColumn: target.character + 1,
+      endLineNumber: target.line + 1,
+      endColumn: target.character + 1,
+    });
+  }, [goToDefinition, handleOpenCodeEditor]);
+
+  useEffect(() => {
+    if (!monacoInstance) return;
+
+    const disposable = monacoInstance.editor.registerEditorOpener({
+      openCodeEditor: async (_source, resource, selectionOrPosition) => {
+        let selection:
+          | {
+              startLineNumber: number;
+              startColumn: number;
+              endLineNumber: number;
+              endColumn: number;
+            }
+          | undefined;
+
+        if (selectionOrPosition && 'startLineNumber' in selectionOrPosition) {
+          selection = {
+            startLineNumber: selectionOrPosition.startLineNumber,
+            startColumn: selectionOrPosition.startColumn,
+            endLineNumber: selectionOrPosition.endLineNumber,
+            endColumn: selectionOrPosition.endColumn,
+          };
+        } else if (selectionOrPosition && 'lineNumber' in selectionOrPosition) {
+          selection = {
+            startLineNumber: selectionOrPosition.lineNumber,
+            startColumn: selectionOrPosition.column,
+            endLineNumber: selectionOrPosition.lineNumber,
+            endColumn: selectionOrPosition.column,
+          };
+        }
+
+        return await handleOpenCodeEditor(resource.toString(), selection);
+      },
+    });
+
+    return () => disposable.dispose();
+  }, [monacoInstance, handleOpenCodeEditor]);
+
+  useEffect(() => {
+    const pending = pendingDefinitionRef.current;
+    if (!pending || pending.path !== project.activeFile) return;
+
+    const raf = requestAnimationFrame(() => {
+      if (!editorRef.current) return;
+      editorRef.current.setPosition({ lineNumber: pending.line, column: pending.column });
+      editorRef.current.revealPositionInCenter({ lineNumber: pending.line, column: pending.column });
+      editorRef.current.focus();
+    });
+
+    pendingDefinitionRef.current = null;
+    return () => cancelAnimationFrame(raf);
+  }, [project.activeFile, activeCode]);
 
   const hasBottomPanel = scriptParams.length > 0 || results.length > 0 || loading;
 
@@ -334,6 +440,7 @@ export default function App() {
                 readOnly={activeFileEntry?.readOnly}
                 externalEditorRef={editorRef}
                 onMonacoReady={handleMonacoReady}
+                onGoToDefinition={handleGoToDefinition}
               />
             </div>
           </div>

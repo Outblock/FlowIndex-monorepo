@@ -8,6 +8,7 @@ interface CadenceEditorProps {
   code: string;
   onChange: (value: string) => void;
   onRun?: () => void;
+  onGoToDefinition?: (path: string, line: number, column: number) => Promise<boolean> | boolean;
   darkMode?: boolean;
   /** File path — used as Monaco model key. Switching path preserves cursor/undo per file. */
   path?: string;
@@ -17,7 +18,7 @@ interface CadenceEditorProps {
 }
 
 export default function CadenceEditor({
-  code, onChange, onRun, darkMode = true, path, readOnly,
+  code, onChange, onRun, onGoToDefinition, darkMode = true, path, readOnly,
   externalEditorRef, onMonacoReady,
 }: CadenceEditorProps) {
   const internalRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -33,6 +34,27 @@ export default function CadenceEditor({
     (editor, monaco) => {
       editorRef.current = editor;
 
+      const goToDefinitionAt = async (position: { lineNumber: number; column: number } | null | undefined) => {
+        if (!position || !onGoToDefinition) return;
+        const model = editor.getModel();
+        if (!model) return;
+
+        const filePath = decodeURIComponent(model.uri.path.replace(/^\/+/, ''));
+        const attempts = new Set<number>([position.column - 1]);
+        const word = model.getWordAtPosition(position);
+        if (word) {
+          attempts.add(word.startColumn - 1);
+          attempts.add(word.endColumn - 2);
+        } else if (position.column > 1) {
+          attempts.add(position.column - 2);
+        }
+
+        for (const column of attempts) {
+          const handled = await onGoToDefinition(filePath, position.lineNumber - 1, Math.max(0, column));
+          if (handled) return;
+        }
+      };
+
       // Ctrl/Cmd+Enter to run
       editor.addAction({
         id: 'cadence-run',
@@ -43,9 +65,23 @@ export default function CadenceEditor({
         },
       });
 
+      editor.addCommand(monaco.KeyCode.F12, () => {
+        void goToDefinitionAt(editor.getPosition());
+      });
+
+      editor.onMouseDown((e) => {
+        if (!(e.event.metaKey || e.event.ctrlKey)) return;
+        if (!e.target.position) return;
+        if (e.target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT) return;
+
+        e.event.preventDefault();
+        e.event.stopPropagation();
+        void goToDefinitionAt(e.target.position);
+      });
+
       editor.focus();
     },
-    [onRun]
+    [onRun, onGoToDefinition]
   );
 
   const handleChange = useCallback(
@@ -77,6 +113,15 @@ export default function CadenceEditor({
         renderLineHighlight: 'line',
         bracketPairColorization: { enabled: true },
         tabSize: 2,
+        // Force Cmd/Ctrl+Click and F12 to jump directly instead of opening peek UI.
+        definitionLinkOpensInPeek: false,
+        gotoLocation: {
+          multipleDefinitions: 'goto',
+          multipleTypeDefinitions: 'goto',
+          multipleDeclarations: 'goto',
+          multipleImplementations: 'goto',
+          multipleReferences: 'goto',
+        },
         readOnly,
       }}
     />

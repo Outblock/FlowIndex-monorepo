@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
-import { writeFile, readFile, access, mkdir } from 'node:fs/promises';
+import { writeFile, readFile, access, mkdir, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { hasAddressImports, rewriteToStringImports } from './importUtils.js';
 
 export type FlowNetwork = 'mainnet' | 'testnet' | 'emulator';
 
@@ -14,6 +15,7 @@ export class DepsWorkspace {
   private flowCommand: string;
   private network: FlowNetwork;
   private installedContracts = new Set<string>();
+  private rewrittenOnce = false;
 
   constructor(flowCommand: string, network: FlowNetwork) {
     this.flowCommand = flowCommand;
@@ -53,7 +55,6 @@ export class DepsWorkspace {
   /** Install dependencies for contracts not yet cached */
   async installDeps(imports: { name: string; address: string }[]): Promise<void> {
     const missing = imports.filter((i) => !this.installedContracts.has(i.name));
-    if (missing.length === 0) return;
 
     for (const dep of missing) {
       const depSpec = `${this.network}://0x${dep.address}.${dep.name}`;
@@ -73,5 +74,64 @@ export class DepsWorkspace {
         );
       });
     }
+
+    // Ensure existing cached deps (from older runs) also get rewritten once.
+    if (!this.rewrittenOnce) {
+      await this.rewriteInstalledAddressImports();
+      this.rewrittenOnce = true;
+    }
+  }
+
+  async getDependencyCode(address: string, contractName: string): Promise<string | null> {
+    const noPrefix = address.replace(/^0x/i, '').toLowerCase();
+    const candidates = [
+      noPrefix,
+      `0x${noPrefix}`,
+    ];
+
+    for (const dirName of candidates) {
+      const depPath = join(this.dir, 'imports', dirName, `${contractName}.cdc`);
+      try {
+        return await readFile(depPath, 'utf-8');
+      } catch {
+        // Try next candidate path.
+      }
+    }
+
+    return null;
+  }
+
+  private async rewriteInstalledAddressImports(): Promise<void> {
+    const files = await this.collectCadenceFiles(this.dir);
+    for (const filePath of files) {
+      try {
+        const source = await readFile(filePath, 'utf-8');
+        if (!hasAddressImports(source)) continue;
+        const rewritten = rewriteToStringImports(source);
+        if (rewritten !== source) {
+          await writeFile(filePath, rewritten, 'utf-8');
+        }
+      } catch (error) {
+        console.error(`[deps] Failed to rewrite imports in ${filePath}:`, error);
+      }
+    }
+  }
+
+  private async collectCadenceFiles(dir: string): Promise<string[]> {
+    const entries = await readdir(dir, { withFileTypes: true });
+    const files: string[] = [];
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        files.push(...await this.collectCadenceFiles(fullPath));
+        continue;
+      }
+      if (entry.isFile() && fullPath.endsWith('.cdc')) {
+        files.push(fullPath);
+      }
+    }
+
+    return files;
   }
 }

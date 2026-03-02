@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { pathToFileURL } from 'node:url';
 
 interface PendingRequest {
   resolve: (value: any) => void;
@@ -20,6 +21,7 @@ export class CadenceLSPClient extends EventEmitter {
   private buffer = Buffer.alloc(0);
   private initialized = false;
   private initPromise: Promise<void> | null = null;
+  private initResult: any = null;
   private flowCommand: string;
   private network: string;
   private cwd?: string;
@@ -74,7 +76,7 @@ export class CadenceLSPClient extends EventEmitter {
       this.pendingRequests.clear();
     });
 
-    await this.request('initialize', {
+    const initResult = await this.request('initialize', {
       processId: process.pid,
       capabilities: {
         textDocument: {
@@ -89,7 +91,7 @@ export class CadenceLSPClient extends EventEmitter {
           publishDiagnostics: {},
         },
       },
-      rootUri: this.cwd ? `file://${this.cwd}` : null,
+      rootUri: this.cwd ? pathToFileURL(this.cwd).toString() : null,
       workspaceFolders: null,
       initializationOptions: {
         accessCheckMode: 'strict',
@@ -97,6 +99,7 @@ export class CadenceLSPClient extends EventEmitter {
     });
 
     this.notify('initialized', {});
+    this.initResult = initResult;
     this.initialized = true;
   }
 
@@ -146,11 +149,28 @@ export class CadenceLSPClient extends EventEmitter {
       return;
     }
 
+    // Request from server to client (e.g. client/registerCapability)
+    // Flow CLI can send these during startup. Auto-ack to avoid deadlock.
+    if ('id' in message && message.id !== undefined && message.method) {
+      try {
+        this.send({ jsonrpc: '2.0', id: message.id, result: null });
+      } catch (e) {
+        console.error('[LSP] Failed to reply to server request:', e);
+      }
+      this.emit('notification', message.method, message.params);
+      this.emit(message.method, message.params);
+      return;
+    }
+
     // Notification from server
     if (message.method) {
       this.emit('notification', message.method, message.params);
       this.emit(message.method, message.params);
     }
+  }
+
+  getInitializeResult(): any {
+    return this.initResult;
   }
 
   async request(method: string, params: any, timeoutMs = 30000): Promise<any> {

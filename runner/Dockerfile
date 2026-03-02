@@ -18,9 +18,13 @@ FROM nginx:alpine
 # Install Node.js and supervisord
 RUN apk add --no-cache nodejs npm supervisor
 # Install Flow CLI
-RUN wget -qO /usr/local/bin/flow \
-    "https://github.com/onflow/flow-cli/releases/download/v2.2.6/flow-x86_64-linux" \
-    && chmod +x /usr/local/bin/flow
+RUN FLOW_CLI_VERSION=v2.2.6 \
+    && wget -qO /tmp/flow-cli.tar.gz \
+    "https://github.com/onflow/flow-cli/releases/download/${FLOW_CLI_VERSION}/flow-cli-${FLOW_CLI_VERSION}-linux-amd64.tar.gz" \
+    && tar -xzf /tmp/flow-cli.tar.gz -C /tmp \
+    && mv /tmp/flow /usr/local/bin/flow \
+    && chmod +x /usr/local/bin/flow \
+    && rm -f /tmp/flow-cli.tar.gz
 # Copy frontend static files
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 # Copy server

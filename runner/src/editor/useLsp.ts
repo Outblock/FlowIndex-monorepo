@@ -5,7 +5,7 @@ import {
   onDependencyResolved, preloadCacheFromFiles, prefetchDependencies,
   type LSPBridge,
 } from './languageServer';
-import { MonacoLspAdapter } from './monacoLspAdapter';
+import { MonacoLspAdapter, type DefinitionTarget } from './monacoLspAdapter';
 import type { ProjectState } from '../fs/fileSystem';
 import type { FlowNetwork } from '../flow/networks';
 
@@ -21,8 +21,13 @@ export function useLsp(
   const adapterRef = useRef<MonacoLspAdapter | null>(null);
   const initializingRef = useRef(false);
   const openDocsRef = useRef<Set<string>>(new Set());
+  const projectRef = useRef(project);
   const [isReady, setIsReady] = useState(false);
   const [loadingDeps, setLoadingDeps] = useState(false);
+
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
 
   // Update access node when network changes
   useEffect(() => {
@@ -66,11 +71,7 @@ export function useLsp(
       // Try server-side LSP first (via WebSocket)
       try {
         console.log('[LSP] Trying server-side LSP...');
-        bridge = await createWebSocketBridge(lspWsUrl);
-        // Send init message with network
-        bridge.sendToServer({ type: 'init', network } as any);
-        // Wait for "ready" confirmation — the WebSocket bridge skips type messages,
-        // so we just proceed. The server will start handling JSON-RPC after init.
+        bridge = await createWebSocketBridge(lspWsUrl, network);
         useServerLsp = true;
         console.log('[LSP] Connected to server-side LSP');
       } catch {
@@ -106,15 +107,15 @@ export function useLsp(
       }
 
       try {
-        const adapter = new MonacoLspAdapter(bridge!, monacoInstance);
-
-        // Server-side LSP already has its own initialize — only send from client for WASM
-        if (!useServerLsp) {
-          await adapter.initialize();
-        } else {
-          // For server LSP, just register providers (server already initialized the LSP)
-          await adapter.initialize();
-        }
+        const adapter = new MonacoLspAdapter(bridge!, monacoInstance, {
+          skipInitialize: useServerLsp,
+          resolveDocumentContent: (uri: string) => {
+            if (!uri.startsWith('file:///')) return undefined;
+            const path = decodeURIComponent(uri.slice('file:///'.length));
+            return projectRef.current.files.find((f) => f.path === path)?.content;
+          },
+        });
+        await adapter.initialize();
 
         adapterRef.current = adapter;
         setIsReady(true);
@@ -169,5 +170,20 @@ export function useLsp(
     }
   }, []);
 
-  return { notifyChange, isReady, loadingDeps };
+  const goToDefinition = useCallback(async (
+    path: string,
+    line: number,
+    column: number,
+  ): Promise<DefinitionTarget | null> => {
+    const adapter = adapterRef.current;
+    if (!adapter) return null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const target = await adapter.findDefinition(`file:///${path}`, line, column);
+      if (target) return target;
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    return null;
+  }, []);
+
+  return { notifyChange, goToDefinition, isReady, loadingDeps };
 }
