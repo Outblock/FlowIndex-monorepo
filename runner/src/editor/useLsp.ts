@@ -9,6 +9,23 @@ import { MonacoLspAdapter, type DefinitionTarget } from './monacoLspAdapter';
 import type { ProjectState } from '../fs/fileSystem';
 import type { FlowNetwork } from '../flow/networks';
 
+function buildDependencyKey(code: string): string {
+  const re = /import\s+([\w,\s]+?)\s+from\s+(0x[0-9a-fA-F]+)/g;
+  const keys = new Set<string>();
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(code)) !== null) {
+    const names = m[1].split(',').map((n) => n.trim()).filter(Boolean);
+    const address = m[2].toLowerCase();
+    for (const name of names) {
+      keys.add(`${address}.${name}`);
+    }
+  }
+
+  if (keys.size === 0) return '';
+  return Array.from(keys).sort().join('|');
+}
+
 /** Hook that manages the Cadence WASM LSP lifecycle.
  * Initializes after Monaco is ready, syncs open documents with the LSP.
  * Pre-fetches dependencies asynchronously to avoid blocking the main thread. */
@@ -22,8 +39,42 @@ export function useLsp(
   const initializingRef = useRef(false);
   const openDocsRef = useRef<Set<string>>(new Set());
   const projectRef = useRef(project);
+  const prefetchedDepsKeyRef = useRef('');
+  const prefetchPromiseRef = useRef<Promise<void> | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [loadingDeps, setLoadingDeps] = useState(false);
+
+  const prefetchForCode = useCallback(async (code: string) => {
+    const depKey = buildDependencyKey(code);
+    if (!depKey) return;
+
+    const scopedKey = `${network}:${depKey}`;
+    if (prefetchedDepsKeyRef.current === scopedKey) return;
+
+    // Serialize prefetch calls to avoid duplicate REST requests during rapid edits.
+    if (prefetchPromiseRef.current) {
+      await prefetchPromiseRef.current;
+      if (prefetchedDepsKeyRef.current === scopedKey) return;
+    }
+
+    const accessNode = network === 'mainnet'
+      ? 'https://rest-mainnet.onflow.org'
+      : 'https://rest-testnet.onflow.org';
+
+    setLoadingDeps(true);
+    const task = (async () => {
+      await prefetchDependencies(code, accessNode, onDependency);
+      prefetchedDepsKeyRef.current = scopedKey;
+    })().finally(() => {
+      if (prefetchPromiseRef.current === task) {
+        prefetchPromiseRef.current = null;
+      }
+      setLoadingDeps(false);
+    });
+
+    prefetchPromiseRef.current = task;
+    await task;
+  }, [network, onDependency]);
 
   useEffect(() => {
     projectRef.current = project;
@@ -82,20 +133,13 @@ export function useLsp(
           // Pre-populate cache from existing dependency files
           preloadCacheFromFiles(project.files);
 
-          // Async pre-fetch all dependencies for editable files
-          const accessNode = network === 'mainnet'
-            ? 'https://rest-mainnet.onflow.org'
-            : 'https://rest-testnet.onflow.org';
-
           const editableFiles = project.files.filter((f) => !f.readOnly);
           const allCode = editableFiles.map((f) => f.content).join('\n');
 
           if (allCode.includes('import ')) {
-            setLoadingDeps(true);
             console.log('[LSP] Pre-fetching dependencies...');
-            await prefetchDependencies(allCode, accessNode, onDependency);
+            await prefetchForCode(allCode);
             console.log('[LSP] Dependencies pre-fetched');
-            setLoadingDeps(false);
           }
 
           bridge = await createLSPBridge(() => {});
@@ -132,7 +176,16 @@ export function useLsp(
         initializingRef.current = false;
       }
     })();
-  }, [monacoInstance]);
+  }, [monacoInstance, network, onDependency, prefetchForCode, project.files, lspWsUrl]);
+
+  // Pre-fetch dependencies in server-side mode as well, so fallback definition can use deps models quickly.
+  useEffect(() => {
+    if (!isReady) return;
+    const editableFiles = project.files.filter((f) => !f.readOnly);
+    const allCode = editableFiles.map((f) => f.content).join('\n');
+    if (!allCode.includes('import ')) return;
+    void prefetchForCode(allCode);
+  }, [isReady, project.files, prefetchForCode]);
 
   // Sync documents with LSP when project files change (after init)
   useEffect(() => {
