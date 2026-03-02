@@ -47,6 +47,7 @@ interface ConnectionState {
   clientToServerUri: Map<string, string>;
   serverToClientUri: Map<string, string>;
   emittedDeps: Set<string>;
+  pendingDeps: Set<string>;
   importAddressByName: Map<string, string>;
   notificationHandler: (method: string, params: any) => void;
 }
@@ -158,6 +159,47 @@ function isInvalidDefinitionResult(result: any): boolean {
     if (line < 0 || line > 1_000_000) return true;
   }
   return false;
+}
+
+function sendDependencyResolved(
+  socket: WebSocket,
+  dep: { name: string; address: string },
+  depCode: string,
+): void {
+  if (socket.readyState !== socket.OPEN) return;
+  socket.send(JSON.stringify({
+    jsonrpc: '2.0',
+    method: 'flow/dependencyResolved',
+    params: {
+      address: dep.address.startsWith('0x') ? dep.address : `0x${dep.address}`,
+      contractName: dep.name,
+      code: depCode,
+    },
+  }));
+}
+
+function queueDependencyInstall(
+  dep: { name: string; address: string },
+  state: ConnectionState,
+  socket: WebSocket,
+): void {
+  const depKey = `${dep.address.toLowerCase()}.${dep.name}`;
+  if (state.emittedDeps.has(depKey) || state.pendingDeps.has(depKey)) return;
+
+  state.pendingDeps.add(depKey);
+  void state.workspace.installDeps([dep])
+    .then(async () => {
+      const depCode = await state.workspace.getDependencyCode(dep.address, dep.name);
+      if (!depCode) return;
+      state.emittedDeps.add(depKey);
+      sendDependencyResolved(socket, dep, depCode);
+    })
+    .catch((error) => {
+      console.error(`[LSP Server] Failed to resolve dependency ${depKey}:`, error);
+    })
+    .finally(() => {
+      state.pendingDeps.delete(depKey);
+    });
 }
 
 async function loadDependencySource(
@@ -364,6 +406,7 @@ wss.on('connection', (socket: WebSocket) => {
           clientToServerUri: new Map(),
           serverToClientUri: new Map(),
           emittedDeps: new Set(),
+          pendingDeps: new Set(),
           importAddressByName: new Map(),
           notificationHandler: () => {},
         };
@@ -394,7 +437,7 @@ wss.on('connection', (socket: WebSocket) => {
       return;
     }
 
-    const { client, workspace } = state;
+    const { client } = state;
 
     // Intercept didOpen and didChange to install deps + rewrite imports
     if (typeof msg.method === 'string' && msg.method.startsWith('textDocument/')) {
@@ -411,28 +454,7 @@ wss.on('connection', (socket: WebSocket) => {
         const imports = extractAddressImports(code);
         for (const dep of imports) {
           state.importAddressByName.set(dep.name, `0x${dep.address.toLowerCase()}`);
-        }
-        // Install deps (non-blocking for subsequent messages, but we await here)
-        await workspace.installDeps(imports);
-
-        // Push resolved dependency source to the frontend so deps tree/files stay in sync.
-        for (const dep of imports) {
-          const depKey = `${dep.address.toLowerCase()}.${dep.name}`;
-          if (state.emittedDeps.has(depKey)) continue;
-          const depCode = await workspace.getDependencyCode(dep.address, dep.name);
-          if (!depCode) continue;
-          state.emittedDeps.add(depKey);
-          if (socket.readyState === socket.OPEN) {
-            socket.send(JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'flow/dependencyResolved',
-              params: {
-                address: dep.address.startsWith('0x') ? dep.address : `0x${dep.address}`,
-                contractName: dep.name,
-                code: depCode,
-              },
-            }));
-          }
+          queueDependencyInstall(dep, state, socket);
         }
 
         // Rewrite imports in the code

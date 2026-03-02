@@ -15,7 +15,9 @@ export class DepsWorkspace {
   private flowCommand: string;
   private network: FlowNetwork;
   private installedContracts = new Set<string>();
+  private installingContracts = new Map<string, Promise<void>>();
   private rewrittenOnce = false;
+  private rewritePromise: Promise<void> | null = null;
 
   constructor(flowCommand: string, network: FlowNetwork) {
     this.flowCommand = flowCommand;
@@ -54,32 +56,59 @@ export class DepsWorkspace {
 
   /** Install dependencies for contracts not yet cached */
   async installDeps(imports: { name: string; address: string }[]): Promise<void> {
-    const missing = imports.filter((i) => !this.installedContracts.has(i.name));
-
-    for (const dep of missing) {
-      const depSpec = `${this.network}://0x${dep.address}.${dep.name}`;
-      await new Promise<void>((resolve) => {
-        execFile(
-          this.flowCommand,
-          ['dependencies', 'install', depSpec],
-          { cwd: this.dir, timeout: 60000 },
-          (error, _stdout, stderr) => {
-            if (!error) {
-              this.installedContracts.add(dep.name);
-            } else {
-              console.error(`[deps] Failed to install ${dep.name}: ${stderr}`);
-            }
-            resolve();
-          },
-        );
-      });
-    }
+    const installs = imports.map((dep) => this.ensureDepInstalled(dep));
+    await Promise.all(installs);
 
     // Ensure existing cached deps (from older runs) also get rewritten once.
-    if (!this.rewrittenOnce) {
-      await this.rewriteInstalledAddressImports();
-      this.rewrittenOnce = true;
+    await this.ensureImportsRewrittenOnce();
+  }
+
+  private ensureDepInstalled(dep: { name: string; address: string }): Promise<void> {
+    if (this.installedContracts.has(dep.name)) {
+      return Promise.resolve();
     }
+
+    const inFlight = this.installingContracts.get(dep.name);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const depSpec = `${this.network}://0x${dep.address}.${dep.name}`;
+    const installPromise = new Promise<void>((resolve) => {
+      execFile(
+        this.flowCommand,
+        ['dependencies', 'install', depSpec],
+        { cwd: this.dir, timeout: 120000 },
+        (error, _stdout, stderr) => {
+          if (!error) {
+            this.installedContracts.add(dep.name);
+          } else {
+            console.error(`[deps] Failed to install ${dep.name}: ${stderr}`);
+          }
+          resolve();
+        },
+      );
+    }).finally(() => {
+      this.installingContracts.delete(dep.name);
+    });
+
+    this.installingContracts.set(dep.name, installPromise);
+    return installPromise;
+  }
+
+  private async ensureImportsRewrittenOnce(): Promise<void> {
+    if (this.rewrittenOnce) return;
+    if (!this.rewritePromise) {
+      this.rewritePromise = this.rewriteInstalledAddressImports()
+        .catch((error) => {
+          console.error('[deps] Failed to rewrite installed imports:', error);
+        })
+        .finally(() => {
+          this.rewrittenOnce = true;
+          this.rewritePromise = null;
+        });
+    }
+    await this.rewritePromise;
   }
 
   async getDependencyCode(address: string, contractName: string): Promise<string | null> {
