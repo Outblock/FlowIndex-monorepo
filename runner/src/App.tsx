@@ -10,16 +10,20 @@ import FileExplorer from './components/FileExplorer';
 import TabBar from './components/TabBar';
 import { configureFcl } from './flow/fclConfig';
 import { parseMainParams } from './flow/cadenceParams';
-import { detectCodeType, executeScript, executeTransaction } from './flow/execute';
+import { detectCodeType, executeScript, executeTransaction, executeCustodialTransaction } from './flow/execute';
 import type { ExecutionResult } from './flow/execute';
 import type { FlowNetwork } from './flow/networks';
+import { useAuth } from './auth/AuthContext';
+import { useKeys } from './auth/useKeys';
+import KeyManager from './components/KeyManager';
+import SignerSelector, { type SignerOption } from './components/SignerSelector';
 import {
   loadProject, saveProject, updateFileContent, createFile, createFolder, deleteFile,
   openFile, closeFile, getFileContent, addDependencyFile, getUserFiles,
   TEMPLATES,
   type ProjectState, type Template,
 } from './fs/fileSystem';
-import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft } from 'lucide-react';
+import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn } from 'lucide-react';
 
 /* ── Detect if we're in an iframe ── */
 let isIframe = false;
@@ -180,6 +184,10 @@ export default function App() {
     editCount: number;
     assistantId?: string;
   } | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const { keys, signMessage } = useKeys();
+  const [showKeyManager, setShowKeyManager] = useState(false);
+  const [selectedSigner, setSelectedSigner] = useState<SignerOption>({ type: 'fcl' });
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -237,14 +245,27 @@ export default function App() {
     if (codeType === 'script') {
       const result = await executeScript(activeCode, paramValues);
       setResults([result]);
-    } else {
+    } else if (selectedSigner.type === 'fcl') {
       await executeTransaction(activeCode, paramValues, (result) => {
         setResults((prev) => [...prev, result]);
       });
+    } else {
+      // Custodial signer
+      const key = selectedSigner.key;
+      await executeCustodialTransaction(
+        activeCode,
+        paramValues,
+        key.flow_address,
+        key.key_index,
+        (message) => signMessage(key.id, message),
+        (result) => {
+          setResults((prev) => [...prev, result]);
+        },
+      );
     }
 
     setLoading(false);
-  }, [activeCode, codeType, paramValues, loading]);
+  }, [activeCode, codeType, paramValues, loading, selectedSigner, signMessage]);
 
   const handleInsertCode = useCallback((newCode: string) => {
     setProject((prev) => updateFileContent(prev, prev.activeFile, newCode));
@@ -491,7 +512,43 @@ export default function App() {
             <option value="testnet">Testnet</option>
           </select>
 
+          {/* Signer selector - show when there are custodial keys and code is transaction */}
+          {codeType === 'transaction' && keys.length > 0 && (
+            <SignerSelector
+              keys={keys}
+              selected={selectedSigner}
+              onSelect={setSelectedSigner}
+            />
+          )}
+
           <WalletButton />
+
+          {/* Key manager toggle - show when authenticated */}
+          {user && (
+            <button
+              onClick={() => setShowKeyManager(!showKeyManager)}
+              className={`p-1.5 rounded transition-colors ${
+                showKeyManager ? 'bg-emerald-600/20 text-emerald-400' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800'
+              }`}
+              title="Manage Keys"
+            >
+              <KeyIcon className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Auth hint for unauthenticated users */}
+          {!user && !authLoading && (
+            <a
+              href="https://developer.flowindex.io/developer/login"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-[10px] transition-colors"
+              title="Sign in to manage custodial keys"
+            >
+              <LogIn className="w-3 h-3" />
+              <span>Sign in</span>
+            </a>
+          )}
 
           <button
             onClick={handleRun}
@@ -637,6 +694,16 @@ export default function App() {
           </button>
         )}
       </div>
+
+      {/* Key Manager Panel (overlay) */}
+      {showKeyManager && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="bg-black/50 flex-1" onClick={() => setShowKeyManager(false)} />
+          <div className="w-80 bg-zinc-900 border-l border-zinc-700 overflow-y-auto">
+            <KeyManager onClose={() => setShowKeyManager(false)} network={network} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
