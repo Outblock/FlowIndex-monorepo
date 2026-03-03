@@ -39,6 +39,11 @@ import { EvaluatorBlock } from '@/blocks/blocks/evaluator'
 import { ExaBlock } from '@/blocks/blocks/exa'
 import { FileBlock, FileV2Block, FileV3Block } from '@/blocks/blocks/file'
 import { FirecrawlBlock } from '@/blocks/blocks/firecrawl'
+import { FlowGetAccountBlock } from '@/blocks/blocks/flow_get_account'
+import { FlowGetFtHoldingsBlock } from '@/blocks/blocks/flow_get_ft_holdings'
+import { FlowGetNftBlock } from '@/blocks/blocks/flow_get_nft'
+import { FlowGetNftInventoryBlock } from '@/blocks/blocks/flow_get_nft_inventory'
+import { FlowResolveNameBlock } from '@/blocks/blocks/flow_resolve_name'
 import { FirefliesBlock, FirefliesV2Block } from '@/blocks/blocks/fireflies'
 import { FunctionBlock } from '@/blocks/blocks/function'
 import { GammaBlock } from '@/blocks/blocks/gamma'
@@ -237,6 +242,11 @@ export const registry: Record<string, BlockConfig> = {
   firecrawl: FirecrawlBlock,
   fireflies: FirefliesBlock,
   fireflies_v2: FirefliesV2Block,
+  flow_get_account: FlowGetAccountBlock,
+  flow_get_ft_holdings: FlowGetFtHoldingsBlock,
+  flow_get_nft: FlowGetNftBlock,
+  flow_get_nft_inventory: FlowGetNftInventoryBlock,
+  flow_resolve_name: FlowResolveNameBlock,
   function: FunctionBlock,
   gamma: GammaBlock,
   generic_webhook: GenericWebhookBlock,

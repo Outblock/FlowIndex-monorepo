@@ -422,6 +422,13 @@ import {
 } from '@/tools/exa'
 import { fileParserV2Tool, fileParserV3Tool, fileParseTool } from '@/tools/file'
 import {
+  flowGetAccountTool,
+  flowGetFtHoldingsTool,
+  flowGetNftTool,
+  flowGetNftInventoryTool,
+  flowResolveNameTool,
+} from '@/tools/flow'
+import {
   firecrawlAgentTool,
   firecrawlCrawlTool,
   firecrawlExtractTool,
@@ -2309,6 +2316,11 @@ export const tools: Record<string, ToolConfig> = {
   webhook_request: webhookRequestTool,
   huggingface_chat: huggingfaceChatTool,
   llm_chat: llmChatTool,
+  flow_get_account: flowGetAccountTool,
+  flow_get_ft_holdings: flowGetFtHoldingsTool,
+  flow_get_nft: flowGetNftTool,
+  flow_get_nft_inventory: flowGetNftInventoryTool,
+  flow_resolve_name: flowResolveNameTool,
   function_execute: functionExecuteTool,
   gamma_generate: gammaGenerateTool,
   gamma_generate_from_template: gammaGenerateFromTemplateTool,
