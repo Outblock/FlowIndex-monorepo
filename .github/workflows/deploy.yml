@@ -672,6 +672,7 @@ jobs:
               }
           }
           NGINXEOF
+          gcloud compute ssh flowindex-backend --zone=us-central1-a --command='rm -f /tmp/sim-studio-auth.conf'
           gcloud compute scp /tmp/sim-studio-auth.conf flowindex-backend:/tmp/sim-studio-auth.conf --zone=us-central1-a
           gcloud compute ssh flowindex-backend --zone=us-central1-a --command='
             docker stop sim-studio-auth 2>/dev/null || true; docker rm sim-studio-auth 2>/dev/null || true
