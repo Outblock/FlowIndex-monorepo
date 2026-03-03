@@ -711,6 +711,19 @@ jobs:
       group: build-sim-workflow-images-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: app
+            dockerfile: docker/app.Dockerfile
+            image: simstudio-fork
+          - name: realtime
+            dockerfile: docker/realtime.Dockerfile
+            image: simstudio-fork-realtime
+          - name: migrations
+            dockerfile: docker/db.Dockerfile
+            image: simstudio-fork-migrations
     permissions:
       contents: read
       id-token: write
@@ -727,42 +740,21 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      - name: Build & push Sim Workflow images (from /sim-workflow)
-        run: |
-          set -euo pipefail
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          SRC_DIR="$GITHUB_WORKSPACE/sim-workflow"
-          if [ ! -d "$SRC_DIR" ]; then
-            echo "sim-workflow directory is missing"
-            exit 1
-          fi
-          cd "$SRC_DIR"
-
-          APP_IMAGE="${{ env.REGISTRY }}/simstudio-fork"
-          REALTIME_IMAGE="${{ env.REGISTRY }}/simstudio-fork-realtime"
-          MIGRATIONS_IMAGE="${{ env.REGISTRY }}/simstudio-fork-migrations"
-
-          docker build -f docker/app.Dockerfile \
-            -t "${APP_IMAGE}:${{ github.sha }}" \
-            -t "${APP_IMAGE}:latest" \
-            .
-
-          docker build -f docker/realtime.Dockerfile \
-            -t "${REALTIME_IMAGE}:${{ github.sha }}" \
-            -t "${REALTIME_IMAGE}:latest" \
-            .
-
-          docker build -f docker/db.Dockerfile \
-            -t "${MIGRATIONS_IMAGE}:${{ github.sha }}" \
-            -t "${MIGRATIONS_IMAGE}:latest" \
-            .
-
-          docker push "${APP_IMAGE}:${{ github.sha }}"
-          docker push "${APP_IMAGE}:latest"
-          docker push "${REALTIME_IMAGE}:${{ github.sha }}"
-          docker push "${REALTIME_IMAGE}:latest"
-          docker push "${MIGRATIONS_IMAGE}:${{ github.sha }}"
-          docker push "${MIGRATIONS_IMAGE}:latest"
+      - name: Build & push ${{ matrix.name }} image (cached)
+        uses: docker/build-push-action@v6
+        with:
+          context: sim-workflow
+          file: sim-workflow/${{ matrix.dockerfile }}
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.image }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ matrix.image }}:latest
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/cache-${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/cache-${{ matrix.image }}:buildcache,mode=max
 
   build-sim-studio:
     needs: [changes, build-sim-workflow-images]
