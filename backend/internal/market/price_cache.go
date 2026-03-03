@@ -92,6 +92,24 @@ func (c *PriceCache) GetLatestPrice(asset string) (float64, bool) {
 	return ps[len(ps)-1].Price, true
 }
 
+// GetLatestPriceWithChange returns the latest price and 24h change percentage.
+func (c *PriceCache) GetLatestPriceWithChange(asset string) (price float64, change float64, ok bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ps := c.prices[strings.ToUpper(asset)]
+	if len(ps) == 0 {
+		return 0, 0, false
+	}
+	price = ps[len(ps)-1].Price
+	if len(ps) >= 2 {
+		prev := ps[len(ps)-2].Price
+		if prev > 0 {
+			change = ((price - prev) / prev) * 100
+		}
+	}
+	return price, change, true
+}
+
 // GetRecentPrices returns up to `days` most recent daily prices for an asset.
 func (c *PriceCache) GetRecentPrices(asset string, days int) []DailyPrice {
 	c.mu.RLock()
