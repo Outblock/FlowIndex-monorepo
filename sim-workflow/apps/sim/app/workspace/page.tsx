@@ -7,6 +7,23 @@ import { useSession } from '@/lib/auth/auth-client'
 import { useReferralAttribution } from '@/hooks/use-referral-attribution'
 
 const logger = createLogger('WorkspacePage')
+const SESSION_LOAD_TIMEOUT_MS = 12000
+const API_REQUEST_TIMEOUT_MS = 12000
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = API_REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    globalThis.clearTimeout(timeoutId)
+  }
+}
 
 export default function WorkspacePage() {
   const router = useRouter()
@@ -14,6 +31,7 @@ export default function WorkspacePage() {
   useReferralAttribution()
   const [redirectState, setRedirectState] = useState<'idle' | 'working' | 'failed'>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [sessionTimedOut, setSessionTimedOut] = useState(false)
 
   const isWorkspaceRootPath = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -21,9 +39,26 @@ export default function WorkspacePage() {
   }, [])
 
   useEffect(() => {
+    if (!isWorkspaceRootPath) return
+
+    if (!isPending) {
+      setSessionTimedOut(false)
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSessionTimedOut(true)
+      setRedirectState('failed')
+      setErrorMessage('登录态校验超时，请刷新后重试。')
+    }, SESSION_LOAD_TIMEOUT_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isPending, isWorkspaceRootPath])
+
+  useEffect(() => {
     const redirectToFirstWorkspace = async () => {
       // Wait for session to load
-      if (isPending) {
+      if (isPending || sessionTimedOut) {
         return
       }
 
@@ -33,6 +68,7 @@ export default function WorkspacePage() {
       // If user is not authenticated, redirect to login
       if (!session?.user) {
         logger.info('User not authenticated, redirecting to login')
+        setRedirectState('idle')
         router.replace('/login')
         return
       }
@@ -45,7 +81,7 @@ export default function WorkspacePage() {
         if (redirectWorkflowId) {
           // Try to get the workspace for this workflow
           try {
-            const workflowResponse = await fetch(`/api/workflows/${redirectWorkflowId}`)
+            const workflowResponse = await fetchWithTimeout(`/api/workflows/${redirectWorkflowId}`)
             if (workflowResponse.ok) {
               const workflowData = await workflowResponse.json()
               const workspaceId = workflowData.data?.workspaceId
@@ -64,7 +100,7 @@ export default function WorkspacePage() {
         }
 
         // Fetch user's workspaces
-        const response = await fetch('/api/workspaces')
+        const response = await fetchWithTimeout('/api/workspaces')
 
         if (!response.ok) {
           throw new Error('Failed to fetch workspaces')
@@ -77,7 +113,7 @@ export default function WorkspacePage() {
           logger.warn('No workspaces found for user, creating default workspace')
 
           try {
-            const createResponse = await fetch('/api/workspaces', {
+            const createResponse = await fetchWithTimeout('/api/workspaces', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -118,7 +154,11 @@ export default function WorkspacePage() {
       } catch (error) {
         logger.error('Error fetching workspaces for redirect:', error)
         setRedirectState('failed')
-        setErrorMessage('获取 workspace 失败，请刷新重试。')
+        setErrorMessage(
+          error instanceof Error && error.name === 'AbortError'
+            ? 'workspace 请求超时，请刷新重试。'
+            : '获取 workspace 失败，请刷新重试。'
+        )
       }
     }
 
@@ -127,9 +167,9 @@ export default function WorkspacePage() {
     if (isWorkspaceRootPath) {
       redirectToFirstWorkspace()
     }
-  }, [session, isPending, router, isWorkspaceRootPath])
+  }, [session, isPending, router, isWorkspaceRootPath, sessionTimedOut])
 
-  const showLoading = isPending || redirectState === 'working'
+  const showLoading = (!sessionTimedOut && isPending) || redirectState === 'working'
 
   // Show loading state while we determine where to redirect
   if (showLoading) {
