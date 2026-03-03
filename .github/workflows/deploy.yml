@@ -583,21 +583,24 @@ jobs:
             # Pull images
             docker pull ghcr.io/simstudioai/simstudio:latest
             docker pull ghcr.io/simstudioai/realtime:latest
+            docker pull ghcr.io/simstudioai/migrations:latest
 
-            # Run migrations — use sh -c to run inside the container workdir
-            # where prisma schema files exist
-            echo "Running Prisma migrations..."
+            # Run Drizzle migrations (Sim Studio uses Drizzle, not Prisma)
+            echo "Running Sim Studio Drizzle migrations..."
             docker run --rm --network=host \
               -e DATABASE_URL="$SIM_DB_URL" \
-              --entrypoint sh \
-              ghcr.io/simstudioai/simstudio:latest \
-              -c "cd /app && npx prisma db push --accept-data-loss" || \
-            docker run --rm --network=host \
-              -e DATABASE_URL="$SIM_DB_URL" \
-              --entrypoint sh \
-              ghcr.io/simstudioai/simstudio:latest \
-              -c "cd /app && npx prisma migrate deploy" || true
-            echo "Migrations step complete"
+              ghcr.io/simstudioai/migrations:latest \
+              run db:migrate
+            echo "Migrations applied"
+
+            # Verify critical auth tables exist before starting app containers
+            USER_TABLE_OK=$(run_psql -d simstudio -tAc "SELECT to_regclass(\$\$public.\"user\"\$\$) IS NOT NULL;" | tr -d "[:space:]")
+            SESSION_TABLE_OK=$(run_psql -d simstudio -tAc "SELECT to_regclass(\$\$public.session\$\$) IS NOT NULL;" | tr -d "[:space:]")
+            USER_STATS_TABLE_OK=$(run_psql -d simstudio -tAc "SELECT to_regclass(\$\$public.user_stats\$\$) IS NOT NULL;" | tr -d "[:space:]")
+            if [ "$USER_TABLE_OK" != "t" ] || [ "$SESSION_TABLE_OK" != "t" ] || [ "$USER_STATS_TABLE_OK" != "t" ]; then
+              echo "Required Sim Studio auth tables missing (user/session/user_stats); aborting deploy"
+              exit 1
+            fi
 
             # Stop existing containers
             docker stop sim-studio sim-studio-realtime 2>/dev/null || true
