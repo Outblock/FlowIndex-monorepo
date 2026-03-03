@@ -2,7 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { AddressLink } from '../../components/AddressLink';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Coins, Info, Search, X, Loader2, DollarSign, ArrowLeftRight, AlertTriangle, SlidersHorizontal, Check } from 'lucide-react';
+import { Coins, Info, Search, X, Loader2, DollarSign, ArrowLeftRight, AlertTriangle, ListFilter, Check } from 'lucide-react';
 import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
 import { EVMBridgeBadge } from '../../components/ui/EVMBridgeBadge';
 import { ensureHeyApiConfigured, getBaseURL } from '../../api/heyapi';
@@ -374,7 +374,7 @@ function Tokens() {
                 : 'bg-white dark:bg-nothing-dark border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'
             }`}
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <ListFilter className="h-4 w-4" />
             {activeFilters.length > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-nothing-green text-[10px] font-bold text-black flex items-center justify-center">
                 {activeFilters.length}
@@ -440,6 +440,7 @@ function Tokens() {
               <tr className="border-b border-zinc-200 dark:border-white/5 bg-zinc-50/50 dark:bg-white/5">
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono">Token</th>
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-right">Price</th>
+                <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-right">24h</th>
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-center">30d</th>
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-right">Deployed</th>
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-right">
@@ -457,7 +458,7 @@ function Tokens() {
               <AnimatePresence mode="popLayout">
                 {tokens.length === 0 && !isLoading && (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400 font-mono">
+                    <td colSpan={6} className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400 font-mono">
                       {currentSearch ? `No tokens matching "${currentSearch}"` : 'No tokens found'}
                     </td>
                   </tr>
@@ -475,6 +476,7 @@ function Tokens() {
                   const deployedAt = t?.deployed_at;
                   const marketSymbol = String(t?.market_symbol || '');
                   const currentPrice = t?.current_price as number | undefined;
+                  const priceChange24h = t?.price_change_24h as number | undefined;
                   const priceData = marketSymbol ? prices[marketSymbol.toUpperCase()] : undefined;
 
                   return (
@@ -517,6 +519,15 @@ function Tokens() {
                         {currentPrice ? (
                           <span className="font-mono text-sm text-zinc-900 dark:text-white">
                             {formatPrice(currentPrice)}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-zinc-400">-</span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right">
+                        {priceChange24h != null && currentPrice ? (
+                          <span className={`font-mono text-xs ${priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(1)}%
                           </span>
                         ) : (
                           <span className="font-mono text-xs text-zinc-400">-</span>

@@ -457,7 +457,8 @@ func (r *Repository) ListFTTokens(ctx context.Context, limit, offset int, filter
 		) latest_ver ON true
 		LEFT JOIN raw.blocks b ON b.height = latest_ver.block_height
 		`+where+`
-		ORDER BY COALESCE(h.holder_count, 0) DESC, ft.contract_address ASC
+		ORDER BY CASE WHEN COALESCE(ft.market_symbol, '') != '' THEN 0 ELSE 1 END,
+		         COALESCE(h.holder_count, 0) DESC, ft.contract_address ASC
 		LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
 		return nil, err

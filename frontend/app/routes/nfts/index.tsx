@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { AddressLink } from '../../components/AddressLink';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Image, LayoutGrid, LayoutList, Users, Search, X, Loader2, ArrowLeftRight, AlertTriangle, SlidersHorizontal, Check } from 'lucide-react';
+import { Image, LayoutGrid, LayoutList, Users, Search, X, Loader2, ArrowLeftRight, AlertTriangle, ListFilter, Check } from 'lucide-react';
 import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
 import { EVMBridgeBadge } from '../../components/ui/EVMBridgeBadge';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -351,7 +351,7 @@ function NFTs() {
                 : 'bg-white dark:bg-nothing-dark border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:border-zinc-300 dark:hover:border-white/20'
             }`}
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <ListFilter className="h-4 w-4" />
             {activeFilters.length > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-nothing-green text-[10px] font-bold text-black flex items-center justify-center">
                 {activeFilters.length}

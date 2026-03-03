@@ -108,8 +108,9 @@ func (s *Server) handleFlowListFTTokens(w http.ResponseWriter, r *http.Request) 
 	for _, t := range tokens {
 		m := toFTListOutput(t)
 		if t.MarketSymbol != "" {
-			if price, ok := s.priceCache.GetLatestPrice(t.MarketSymbol); ok {
+			if price, change, ok := s.priceCache.GetLatestPriceWithChange(t.MarketSymbol); ok {
 				m["current_price"] = price
+				m["price_change_24h"] = change
 			}
 		}
 		out = append(out, m)
