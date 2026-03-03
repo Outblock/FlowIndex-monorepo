@@ -53,6 +53,8 @@ import { FlowGetCollectionMetadataBlock } from '@/blocks/blocks/flow_get_collect
 import { FlowGetContractCodeBlock } from '@/blocks/blocks/flow_get_contract_code'
 import { FlowGetDefiPositionsBlock } from '@/blocks/blocks/flow_get_defi_positions'
 import { FlowGetStakingInfoBlock } from '@/blocks/blocks/flow_get_staking_info'
+import { FlowExecuteScriptBlock } from '@/blocks/blocks/flow_execute_script'
+import { FlowSendTransactionBlock } from '@/blocks/blocks/flow_send_transaction'
 import { FunctionBlock } from '@/blocks/blocks/function'
 import { GammaBlock } from '@/blocks/blocks/gamma'
 import { GenericWebhookBlock } from '@/blocks/blocks/generic_webhook'
@@ -256,6 +258,7 @@ export const registry: Record<string, BlockConfig> = {
   flow_get_collection_metadata: FlowGetCollectionMetadataBlock,
   flow_get_contract_code: FlowGetContractCodeBlock,
   flow_get_defi_positions: FlowGetDefiPositionsBlock,
+  flow_execute_script: FlowExecuteScriptBlock,
   flow_get_events: FlowGetEventsBlock,
   flow_get_ft_holdings: FlowGetFtHoldingsBlock,
   flow_get_nft: FlowGetNftBlock,
@@ -263,6 +266,7 @@ export const registry: Record<string, BlockConfig> = {
   flow_get_staking_info: FlowGetStakingInfoBlock,
   flow_get_transaction: FlowGetTransactionBlock,
   flow_resolve_name: FlowResolveNameBlock,
+  flow_send_transaction: FlowSendTransactionBlock,
   function: FunctionBlock,
   gamma: GammaBlock,
   generic_webhook: GenericWebhookBlock,

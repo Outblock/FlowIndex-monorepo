@@ -28,7 +28,6 @@ export const env = createEnv({
     FLOWINDEX_LOGIN_URL:                   z.string().url().optional(),            // External FlowIndex login URL used when auth is delegated
     FLOWINDEX_API_URL:                     z.string().url().optional(),            // FlowIndex Go backend REST API base URL (default: http://127.0.0.1:8080)
     FLOWINDEX_APP_URL:                     z.string().url().optional(),            // Public app URL used for login redirect callback generation
-    FLOWINDEX_API_URL:                     z.string().url().optional(),            // FlowIndex Go backend REST API base URL
     ALLOWED_LOGIN_EMAILS:                  z.string().optional(),                  // Comma-separated list of allowed email addresses for login
     ALLOWED_LOGIN_DOMAINS:                 z.string().optional(),                  // Comma-separated list of allowed email domains for login
     ENCRYPTION_KEY:                        z.string().min(32),                     // Key for encrypting sensitive data

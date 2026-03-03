@@ -39,6 +39,6 @@ export const FlowGetNftBlock: BlockConfig = {
     content: { type: 'string', description: 'NFT summary' },
     nftType: { type: 'string', description: 'NFT collection type' },
     nftId: { type: 'string', description: 'NFT item ID' },
-    metadata: { type: 'object', description: 'NFT metadata' },
+    metadata: { type: 'json', description: 'NFT metadata' },
   },
 }
