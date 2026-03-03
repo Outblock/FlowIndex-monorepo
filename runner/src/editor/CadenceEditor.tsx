@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import Editor, { type OnMount, type BeforeMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { registerCadenceLanguage, CADENCE_LANGUAGE_ID } from './cadenceLanguage';
@@ -23,6 +23,10 @@ export default function CadenceEditor({
 }: CadenceEditorProps) {
   const internalRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorRef = externalEditorRef || internalRef;
+
+  // Keep a stable ref to onRun so the Monaco action always calls the latest version
+  const onRunRef = useRef(onRun);
+  useEffect(() => { onRunRef.current = onRun; }, [onRun]);
 
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
     registerCadenceLanguage(monaco);
@@ -55,13 +59,13 @@ export default function CadenceEditor({
         }
       };
 
-      // Ctrl/Cmd+Enter to run
+      // Ctrl/Cmd+Enter to run — use ref to always call the latest onRun
       editor.addAction({
         id: 'cadence-run',
         label: 'Run Cadence',
         keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
         run: () => {
-          onRun?.();
+          onRunRef.current?.();
         },
       });
 
@@ -81,7 +85,7 @@ export default function CadenceEditor({
 
       editor.focus();
     },
-    [onRun, onGoToDefinition]
+    [onGoToDefinition]
   );
 
   const handleChange = useCallback(
