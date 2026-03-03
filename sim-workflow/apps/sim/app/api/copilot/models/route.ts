@@ -29,11 +29,13 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  if (!env.COPILOT_API_KEY) {
+    return NextResponse.json({ success: true, models: [] })
+  }
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-  }
-  if (env.COPILOT_API_KEY) {
-    headers['x-api-key'] = env.COPILOT_API_KEY
+    'x-api-key': env.COPILOT_API_KEY,
   }
 
   try {
