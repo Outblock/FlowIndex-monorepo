@@ -195,7 +195,10 @@ export async function proxy(request: NextRequest) {
   const hasFlowIndexSession = isFlowIndexSupabaseCookieAuth
     ? await hasValidFlowIndexAccessTokenFromCookieHeader(request.headers.get('cookie'))
     : false
-  const hasActiveSession = isAuthDisabled || !!sessionCookie || hasFlowIndexSession
+  const hasBetterAuthSession = !!sessionCookie
+  const hasActiveSession = isAuthDisabled || (
+    isFlowIndexSupabaseCookieAuth ? hasFlowIndexSession : hasBetterAuthSession
+  )
 
   const redirect = handleRootPathRedirects(request, hasActiveSession)
   if (redirect) return redirect
