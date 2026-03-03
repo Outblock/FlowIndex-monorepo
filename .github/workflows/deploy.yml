@@ -708,7 +708,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.sim-studio == 'true'
     concurrency:
-      group: build-sim-workflow-images-${{ github.ref }}
+      group: build-sim-workflow-images-${{ github.ref }}-${{ matrix.name }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
