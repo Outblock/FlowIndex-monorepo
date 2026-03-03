@@ -144,14 +144,23 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build & push backend
-        run: |
-          docker build -f backend/Dockerfile \
-            --build-arg GIT_COMMIT=${{ github.sha }} \
-            -t ${{ env.REGISTRY }}/backend:latest \
-            -t ${{ env.REGISTRY }}/backend:${{ github.sha }} \
-            .
-          docker push ${{ env.REGISTRY }}/backend --all-tags
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/backend:latest
+            ${{ env.REGISTRY }}/backend:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
 
       - name: Deploy backend (zero-downtime)
         run: |
@@ -197,17 +206,26 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build & push frontend
-        run: |
-          docker build -f frontend/Dockerfile \
-            --build-arg VITE_API_URL=/api \
-            --build-arg VITE_GOTRUE_URL=/auth \
-            --build-arg VITE_SIM_STUDIO_URL=https://studio.flowindex.io \
-            --build-arg VITE_GIT_COMMIT=${{ github.sha }} \
-            -t ${{ env.REGISTRY }}/frontend:latest \
-            -t ${{ env.REGISTRY }}/frontend:${{ github.sha }} \
-            .
-          docker push ${{ env.REGISTRY }}/frontend --all-tags
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            VITE_API_URL=/api
+            VITE_GOTRUE_URL=/auth
+            VITE_SIM_STUDIO_URL=https://studio.flowindex.io
+            VITE_GIT_COMMIT=${{ github.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/frontend:latest
+            ${{ env.REGISTRY }}/frontend:${{ github.sha }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
 
       - name: Deploy frontend (pull & restart on GCE)
         run: |
@@ -259,6 +277,9 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Generate Supabase anon key
         id: supabase-keys
         env:
@@ -276,16 +297,22 @@ jobs:
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
 
       - name: Build & push runner
-        run: |
-          docker build -f runner/Dockerfile \
-            --build-arg VITE_AI_CHAT_URL=https://ai.flowindex.io \
-            --build-arg VITE_SUPABASE_URL=https://run.flowindex.io \
-            --build-arg VITE_SUPABASE_ANON_KEY=${{ steps.supabase-keys.outputs.anon_key }} \
-            --build-arg VITE_GOTRUE_URL=/auth \
-            -t ${{ env.REGISTRY }}/runner:latest \
-            -t ${{ env.REGISTRY }}/runner:${{ github.sha }} \
-            runner
-          docker push ${{ env.REGISTRY }}/runner --all-tags
+        uses: docker/build-push-action@v6
+        with:
+          context: runner
+          file: runner/Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            VITE_AI_CHAT_URL=https://ai.flowindex.io
+            VITE_SUPABASE_URL=https://run.flowindex.io
+            VITE_SUPABASE_ANON_KEY=${{ steps.supabase-keys.outputs.anon_key }}
+            VITE_GOTRUE_URL=/auth
+          tags: |
+            ${{ env.REGISTRY }}/runner:latest
+            ${{ env.REGISTRY }}/runner:${{ github.sha }}
+          cache-from: type=gha,scope=runner
+          cache-to: type=gha,scope=runner,mode=max
 
       - name: Deploy runner (pull & restart on GCE)
         run: |
@@ -492,13 +519,21 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build & push docs
-        run: |
-          docker build -f devportal/Dockerfile \
-            -t ${{ env.REGISTRY }}/docs:latest \
-            -t ${{ env.REGISTRY }}/docs:${{ github.sha }} \
-            .
-          docker push ${{ env.REGISTRY }}/docs --all-tags
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: devportal/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/docs:latest
+            ${{ env.REGISTRY }}/docs:${{ github.sha }}
+          cache-from: type=gha,scope=docs
+          cache-to: type=gha,scope=docs,mode=max
 
       - name: Deploy docs to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
@@ -530,15 +565,24 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build & push ai-chat
-        run: |
-          docker build -f ai/chat/Dockerfile \
-            --build-arg NEXT_PUBLIC_SUPABASE_URL=${{ secrets.AI_CHAT_SUPABASE_URL }} \
-            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.AI_CHAT_SUPABASE_ANON_KEY }} \
-            -t ${{ env.REGISTRY }}/ai-chat:latest \
-            -t ${{ env.REGISTRY }}/ai-chat:${{ github.sha }} \
-            ai/chat
-          docker push ${{ env.REGISTRY }}/ai-chat --all-tags
+        uses: docker/build-push-action@v6
+        with:
+          context: ai/chat
+          file: ai/chat/Dockerfile
+          push: true
+          provenance: false
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.AI_CHAT_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.AI_CHAT_SUPABASE_ANON_KEY }}
+          tags: |
+            ${{ env.REGISTRY }}/ai-chat:latest
+            ${{ env.REGISTRY }}/ai-chat:${{ github.sha }}
+          cache-from: type=gha,scope=ai-chat
+          cache-to: type=gha,scope=ai-chat,mode=max
 
       - name: Deploy ai-chat (pull & restart on GCE)
         run: |
@@ -576,13 +620,21 @@ jobs:
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build & push studio
-        run: |
-          docker build -f studio/Dockerfile \
-            -t ${{ env.REGISTRY }}/studio:latest \
-            -t ${{ env.REGISTRY }}/studio:${{ github.sha }} \
-            studio
-          docker push ${{ env.REGISTRY }}/studio --all-tags
+        uses: docker/build-push-action@v6
+        with:
+          context: studio
+          file: studio/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/studio:latest
+            ${{ env.REGISTRY }}/studio:${{ github.sha }}
+          cache-from: type=gha,scope=studio-auth-proxy
+          cache-to: type=gha,scope=studio-auth-proxy,mode=max
 
       - name: Create deploy script
         run: |
