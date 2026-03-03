@@ -40,6 +40,10 @@ import { ExaBlock } from '@/blocks/blocks/exa'
 import { FileBlock, FileV2Block, FileV3Block } from '@/blocks/blocks/file'
 import { FirecrawlBlock } from '@/blocks/blocks/firecrawl'
 import { FirefliesBlock, FirefliesV2Block } from '@/blocks/blocks/fireflies'
+import { FlowGetCollectionMetadataBlock } from '@/blocks/blocks/flow_get_collection_metadata'
+import { FlowGetContractCodeBlock } from '@/blocks/blocks/flow_get_contract_code'
+import { FlowGetDefiPositionsBlock } from '@/blocks/blocks/flow_get_defi_positions'
+import { FlowGetStakingInfoBlock } from '@/blocks/blocks/flow_get_staking_info'
 import { FunctionBlock } from '@/blocks/blocks/function'
 import { GammaBlock } from '@/blocks/blocks/gamma'
 import { GenericWebhookBlock } from '@/blocks/blocks/generic_webhook'
@@ -237,6 +241,10 @@ export const registry: Record<string, BlockConfig> = {
   firecrawl: FirecrawlBlock,
   fireflies: FirefliesBlock,
   fireflies_v2: FirefliesV2Block,
+  flow_get_collection_metadata: FlowGetCollectionMetadataBlock,
+  flow_get_contract_code: FlowGetContractCodeBlock,
+  flow_get_defi_positions: FlowGetDefiPositionsBlock,
+  flow_get_staking_info: FlowGetStakingInfoBlock,
   function: FunctionBlock,
   gamma: GammaBlock,
   generic_webhook: GenericWebhookBlock,
