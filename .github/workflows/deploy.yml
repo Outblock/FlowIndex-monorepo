@@ -566,12 +566,19 @@ jobs:
 
             SIM_DB_URL="postgresql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/simstudio"
 
+            # Helper: run psql via docker (no psql binary on the VM)
+            run_psql() {
+              docker run --rm --network=host \
+                -e PGPASSWORD="$DB_PASS" \
+                postgres:16-alpine \
+                psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$@"
+            }
+
             # Ensure simstudio database exists with pgvector
-            PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
-              -tc "SELECT 1 FROM pg_database WHERE datname = '"'"'simstudio'"'"'" | grep -q 1 || \
-              PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
-              -c "CREATE DATABASE simstudio"
-            PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d simstudio \
+            run_psql -d postgres \
+              -tc "SELECT 1 FROM pg_database WHERE datname = 'simstudio'" | grep -q 1 || \
+              run_psql -d postgres -c "CREATE DATABASE simstudio"
+            run_psql -d simstudio \
               -c "CREATE EXTENSION IF NOT EXISTS vector" 2>/dev/null || true
             echo "Database simstudio ready"
 
@@ -619,3 +626,13 @@ jobs:
             echo "Sim Studio deployed (web: 3200, realtime: 3202)"
             docker ps --filter name=sim-studio --format "table {{.Names}}\t{{.Status}}"
           '
+
+      - name: Update Caddy config for studio.flowindex.io TLS
+        run: |
+          gcloud compute ssh flowindex-frontend --zone=us-central1-a --command="
+            sudo tee /tmp/Caddyfile > /dev/null <<'CADDYEOF'
+          $(cat frontend/Caddyfile)
+          CADDYEOF
+            docker cp /tmp/Caddyfile caddy:/etc/caddy/Caddyfile
+            docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+          "
