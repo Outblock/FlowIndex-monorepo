@@ -1605,9 +1605,9 @@ docker run -d --name supabase-auth \
   -e GOTRUE_API_PORT=9999 \
   -e API_EXTERNAL_URL=http://localhost:9999 \
   -e GOTRUE_DB_DRIVER=postgres \
-  -e GOTRUE_DB_DATABASE_URL="postgres://supabase_auth_admin:supabase-secret-prod-2026@localhost:5433/supabase" \
+  -e GOTRUE_DB_DATABASE_URL="postgres://supabase_auth_admin:${SUPABASE_DB_PASSWORD}@localhost:5433/supabase" \
   -e GOTRUE_SITE_URL=https://flowindex.io \
-  -e GOTRUE_JWT_SECRET=FYO8sf7LzurUbgjlMVqUwgHwD6ex76bGE597AkcWucRdgRu6eQ3N/rJJbn3QU9bJ \
+  -e GOTRUE_JWT_SECRET=${SUPABASE_JWT_SECRET} \
   -e GOTRUE_JWT_EXP=3600 \
   -e GOTRUE_DISABLE_SIGNUP=false \
   -e GOTRUE_EXTERNAL_EMAIL_ENABLED=true \
@@ -1615,7 +1615,7 @@ docker run -d --name supabase-auth \
   -e GOTRUE_SMTP_HOST=smtp.resend.com \
   -e GOTRUE_SMTP_PORT=465 \
   -e GOTRUE_SMTP_USER=resend \
-  -e GOTRUE_SMTP_PASS=re_D8V7i1NZ_K9fC2gCociLMWpnznmKZkQ19 \
+  -e GOTRUE_SMTP_PASS=${GOTRUE_SMTP_PASS} \
   -e GOTRUE_SMTP_SENDER_NAME=FlowIndex \
   -e GOTRUE_SMTP_ADMIN_EMAIL=noreply@flowindex.io \
   -e GOTRUE_MAILER_URLPATHS_CONFIRMATION=/developer/callback \
@@ -1632,7 +1632,7 @@ railway variables set \
   GOTRUE_SMTP_HOST=smtp.resend.com \
   GOTRUE_SMTP_PORT=465 \
   GOTRUE_SMTP_USER=resend \
-  GOTRUE_SMTP_PASS=re_D8V7i1NZ_K9fC2gCociLMWpnznmKZkQ19 \
+  GOTRUE_SMTP_PASS=${GOTRUE_SMTP_PASS} \
   GOTRUE_SMTP_SENDER_NAME=FlowIndex \
   GOTRUE_SMTP_ADMIN_EMAIL=noreply@flowindex.io \
   GOTRUE_MAILER_URLPATHS_CONFIRMATION=/developer/callback \
