@@ -26,7 +26,8 @@ import {
 } from './fs/fileSystem';
 import { useProjects, type CloudProject, type CloudProjectFull } from './auth/useProjects';
 import ProjectSelector from './components/ProjectSelector';
-import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn } from 'lucide-react';
+import ShareModal from './components/ShareModal';
+import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn, Share2 } from 'lucide-react';
 
 /* ── Detect if we're in an iframe ── */
 let isIframe = false;
@@ -208,6 +209,7 @@ export default function App() {
   }>({ name: 'Untitled' });
   const autoCreatingRef = useRef(false);
   const [viewingShared, setViewingShared] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
@@ -607,6 +609,16 @@ export default function App() {
           <h1 className="text-sm font-semibold tracking-tight">Cadence Runner</h1>
         </div>
         <div className="flex items-center gap-3">
+          {user && cloudMeta.id && cloudMeta.id !== '_dismissed' && (
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded border border-zinc-700 transition-colors"
+              title="Share project"
+            >
+              <Share2 className="w-3 h-3" />
+              <span>Share</span>
+            </button>
+          )}
           <select
             value={network}
             onChange={(e) => setNetwork(e.target.value as FlowNetwork)}
@@ -755,11 +767,7 @@ export default function App() {
                       await cloudSave(project, { ...cloudMeta, id, name });
                       await fetchProjects();
                     }}
-                    onTogglePublic={async (id, isPublic) => {
-                      setCloudMeta(prev => ({ ...prev, is_public: isPublic }));
-                      await cloudSave(project, { ...cloudMeta, id, is_public: isPublic });
-                      await fetchProjects();
-                    }}
+                    onShare={() => setShowShareModal(true)}
                     onDelete={async (id) => {
                       await cloudDelete(id);
                       setCloudMeta({ name: 'Untitled' });
@@ -906,6 +914,22 @@ export default function App() {
           </button>
         )}
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && cloudMeta.id && cloudMeta.slug && (
+        <ShareModal
+          projectName={cloudMeta.name}
+          projectId={cloudMeta.id}
+          slug={cloudMeta.slug}
+          isPublic={cloudMeta.is_public ?? false}
+          onTogglePublic={async (id, isPublic) => {
+            setCloudMeta(prev => ({ ...prev, is_public: isPublic }));
+            await cloudSave(project, { ...cloudMeta, id, is_public: isPublic });
+            await fetchProjects();
+          }}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
 
       {/* Key Manager Panel (overlay) */}
       {showKeyManager && (
