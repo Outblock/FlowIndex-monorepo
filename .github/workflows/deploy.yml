@@ -769,8 +769,12 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ matrix.image }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ matrix.image }}:latest
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/cache-${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/cache-${{ matrix.image }}:buildcache,mode=max
+          cache-from: |
+            type=gha,scope=${{ matrix.image }}
+            type=registry,ref=${{ env.REGISTRY }}/cache-${{ matrix.image }}:buildcache
+          cache-to: |
+            type=gha,scope=${{ matrix.image }},mode=max
+            type=registry,ref=${{ env.REGISTRY }}/cache-${{ matrix.image }}:buildcache,mode=max
 
   build-sim-studio:
     needs: [changes, build-sim-workflow-images]

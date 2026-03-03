@@ -29,8 +29,8 @@ COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 # Use --linker=hoisted for flat node_modules layout (required for Docker multi-stage builds)
 RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
     --mount=type=cache,id=npm-cache,target=/root/.npm \
-    bun install -g turbo && \
     HUSKY=0 bun install --omit=dev --ignore-scripts --linker=hoisted && \
+    HUSKY=0 bun install sharp --linker=hoisted && \
     cd node_modules/isolated-vm && npx node-gyp rebuild --release
 
 # ========================================
@@ -38,10 +38,6 @@ RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
 # ========================================
 FROM base AS builder
 WORKDIR /app
-
-# Install turbo globally (cached for fast reinstall)
-RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
-    bun install -g turbo
 
 # Copy node_modules from deps stage (cached if dependencies don't change)
 COPY --from=deps /app/node_modules ./node_modules
@@ -63,11 +59,6 @@ COPY apps/sim/postcss.config.mjs ./apps/sim/postcss.config.mjs
 COPY apps/sim ./apps/sim
 COPY packages ./packages
 
-# Required for standalone nextjs build
-WORKDIR /app/apps/sim
-RUN --mount=type=cache,id=bun-cache,target=/root/.bun/install/cache \
-    HUSKY=0 bun install sharp --linker=hoisted
-
 ENV NEXT_TELEMETRY_DISABLED=1 \
     VERCEL_TELEMETRY_DISABLED=1 \
     DOCKER_BUILD=1
@@ -84,7 +75,8 @@ ENV DATABASE_URL=${DATABASE_URL}
 ARG NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
-RUN bun run build
+RUN --mount=type=cache,id=next-cache,target=/app/apps/sim/.next/cache \
+    bun --cwd apps/sim run build
 
 # ========================================
 # Runner Stage: Run the actual app
