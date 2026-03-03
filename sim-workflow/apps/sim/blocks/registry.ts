@@ -43,7 +43,11 @@ import { FlowGetAccountBlock } from '@/blocks/blocks/flow_get_account'
 import { FlowGetBalanceBlock } from '@/blocks/blocks/flow_get_balance'
 import { FlowGetBlockBlock } from '@/blocks/blocks/flow_get_block'
 import { FlowGetEventsBlock } from '@/blocks/blocks/flow_get_events'
+import { FlowGetFtHoldingsBlock } from '@/blocks/blocks/flow_get_ft_holdings'
+import { FlowGetNftBlock } from '@/blocks/blocks/flow_get_nft'
+import { FlowGetNftInventoryBlock } from '@/blocks/blocks/flow_get_nft_inventory'
 import { FlowGetTransactionBlock } from '@/blocks/blocks/flow_get_transaction'
+import { FlowResolveNameBlock } from '@/blocks/blocks/flow_resolve_name'
 import { FirefliesBlock, FirefliesV2Block } from '@/blocks/blocks/fireflies'
 import { FunctionBlock } from '@/blocks/blocks/function'
 import { GammaBlock } from '@/blocks/blocks/gamma'
@@ -243,13 +247,14 @@ export const registry: Record<string, BlockConfig> = {
   fireflies: FirefliesBlock,
   fireflies_v2: FirefliesV2Block,
   flow_get_account: FlowGetAccountBlock,
-<<<<<<< HEAD
-=======
   flow_get_balance: FlowGetBalanceBlock,
   flow_get_block: FlowGetBlockBlock,
   flow_get_events: FlowGetEventsBlock,
+  flow_get_ft_holdings: FlowGetFtHoldingsBlock,
+  flow_get_nft: FlowGetNftBlock,
+  flow_get_nft_inventory: FlowGetNftInventoryBlock,
   flow_get_transaction: FlowGetTransactionBlock,
->>>>>>> worktree-agent-ac6e6ba7
+  flow_resolve_name: FlowResolveNameBlock,
   function: FunctionBlock,
   gamma: GammaBlock,
   generic_webhook: GenericWebhookBlock,

@@ -123,3 +123,24 @@ export interface FlowSendTransactionParams {
   signerPrivateKey: string
   network?: string
 }
+
+/** Parameters for get_nft tool */
+export interface FlowGetNftParams {
+  nftType: string
+  nftId: string
+}
+
+/** Parameters for resolve_name tool */
+export interface FlowResolveNameParams {
+  name: string
+}
+
+/** Parameters for get_ft_holdings tool */
+export interface FlowGetFtHoldingsParams {
+  address: string
+}
+
+/** Parameters for get_nft_inventory tool */
+export interface FlowGetNftInventoryParams {
+  address: string
+}

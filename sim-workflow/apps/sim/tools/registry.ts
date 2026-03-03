@@ -430,6 +430,13 @@ import {
   flowGetEventsTool,
 } from '@/tools/flow'
 import {
+  flowGetAccountTool,
+  flowGetFtHoldingsTool,
+  flowGetNftTool,
+  flowGetNftInventoryTool,
+  flowResolveNameTool,
+} from '@/tools/flow'
+import {
   firecrawlAgentTool,
   firecrawlCrawlTool,
   firecrawlExtractTool,
@@ -2321,7 +2328,11 @@ export const tools: Record<string, ToolConfig> = {
   flow_get_balance: flowGetBalanceTool,
   flow_get_block: flowGetBlockTool,
   flow_get_events: flowGetEventsTool,
+  flow_get_ft_holdings: flowGetFtHoldingsTool,
+  flow_get_nft: flowGetNftTool,
+  flow_get_nft_inventory: flowGetNftInventoryTool,
   flow_get_transaction: flowGetTransactionTool,
+  flow_resolve_name: flowResolveNameTool,
   function_execute: functionExecuteTool,
   gamma_generate: gammaGenerateTool,
   gamma_generate_from_template: gammaGenerateFromTemplateTool,
