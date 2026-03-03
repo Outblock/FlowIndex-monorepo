@@ -504,6 +504,9 @@ export default function App() {
               <Play className="w-3.5 h-3.5" />
             )}
             {codeType === 'script' ? 'Run Script' : 'Send Transaction'}
+            <kbd className="ml-1 px-1 py-0.5 text-[9px] font-mono leading-none bg-emerald-700/60 rounded opacity-70">
+              {navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}↵
+            </kbd>
           </button>
         </div>
       </header>
