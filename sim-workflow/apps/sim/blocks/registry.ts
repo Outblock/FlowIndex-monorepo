@@ -49,6 +49,10 @@ import { FlowGetNftInventoryBlock } from '@/blocks/blocks/flow_get_nft_inventory
 import { FlowGetTransactionBlock } from '@/blocks/blocks/flow_get_transaction'
 import { FlowResolveNameBlock } from '@/blocks/blocks/flow_resolve_name'
 import { FirefliesBlock, FirefliesV2Block } from '@/blocks/blocks/fireflies'
+import { FlowGetCollectionMetadataBlock } from '@/blocks/blocks/flow_get_collection_metadata'
+import { FlowGetContractCodeBlock } from '@/blocks/blocks/flow_get_contract_code'
+import { FlowGetDefiPositionsBlock } from '@/blocks/blocks/flow_get_defi_positions'
+import { FlowGetStakingInfoBlock } from '@/blocks/blocks/flow_get_staking_info'
 import { FunctionBlock } from '@/blocks/blocks/function'
 import { GammaBlock } from '@/blocks/blocks/gamma'
 import { GenericWebhookBlock } from '@/blocks/blocks/generic_webhook'
@@ -249,10 +253,14 @@ export const registry: Record<string, BlockConfig> = {
   flow_get_account: FlowGetAccountBlock,
   flow_get_balance: FlowGetBalanceBlock,
   flow_get_block: FlowGetBlockBlock,
+  flow_get_collection_metadata: FlowGetCollectionMetadataBlock,
+  flow_get_contract_code: FlowGetContractCodeBlock,
+  flow_get_defi_positions: FlowGetDefiPositionsBlock,
   flow_get_events: FlowGetEventsBlock,
   flow_get_ft_holdings: FlowGetFtHoldingsBlock,
   flow_get_nft: FlowGetNftBlock,
   flow_get_nft_inventory: FlowGetNftInventoryBlock,
+  flow_get_staking_info: FlowGetStakingInfoBlock,
   flow_get_transaction: FlowGetTransactionBlock,
   flow_resolve_name: FlowResolveNameBlock,
   function: FunctionBlock,

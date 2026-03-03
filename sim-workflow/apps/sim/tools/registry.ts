@@ -456,6 +456,12 @@ import {
   firefliesListUsersTool,
   firefliesUploadAudioTool,
 } from '@/tools/fireflies'
+import {
+  flowGetCollectionMetadataTool,
+  flowGetContractCodeTool,
+  flowGetDefiPositionsTool,
+  flowGetStakingInfoTool,
+} from '@/tools/flow'
 import { functionExecuteTool } from '@/tools/function'
 import {
   gammaCheckStatusTool,
@@ -2360,6 +2366,10 @@ export const tools: Record<string, ToolConfig> = {
   fireflies_create_bite: firefliesCreateBiteTool,
   fireflies_list_bites: firefliesListBitesTool,
   fireflies_list_contacts: firefliesListContactsTool,
+  flow_get_collection_metadata: flowGetCollectionMetadataTool,
+  flow_get_contract_code: flowGetContractCodeTool,
+  flow_get_defi_positions: flowGetDefiPositionsTool,
+  flow_get_staking_info: flowGetStakingInfoTool,
   gong_list_calls: gongListCallsTool,
   gong_get_call: gongGetCallTool,
   gong_get_call_transcript: gongGetCallTranscriptTool,

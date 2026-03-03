@@ -144,3 +144,24 @@ export interface FlowGetFtHoldingsParams {
 export interface FlowGetNftInventoryParams {
   address: string
 }
+
+/** Parameters for get_contract_code tool */
+export interface FlowGetContractCodeParams {
+  address: string
+  contractName: string
+}
+
+/** Parameters for get_staking_info tool */
+export interface FlowGetStakingInfoParams {
+  address: string
+}
+
+/** Parameters for get_defi_positions tool */
+export interface FlowGetDefiPositionsParams {
+  address: string
+}
+
+/** Parameters for get_collection_metadata tool */
+export interface FlowGetCollectionMetadataParams {
+  nftType: string
+}
