@@ -439,8 +439,12 @@ func (r *Repository) ListFTTokens(ctx context.Context, limit, offset int) ([]mod
 			FROM app.ft_holdings WHERE balance > 0
 			GROUP BY contract_address, contract_name
 		) h ON h.contract_address = ft.contract_address AND h.contract_name = ft.contract_name
-		LEFT JOIN app.smart_contracts sc ON sc.address = ft.contract_address AND sc.name = ft.contract_name
-		LEFT JOIN raw.blocks b ON b.height = sc.first_seen_height
+		LEFT JOIN LATERAL (
+			SELECT cv.block_height FROM app.contract_versions cv
+			WHERE cv.address = ft.contract_address AND cv.name = ft.contract_name
+			ORDER BY cv.version DESC LIMIT 1
+		) latest_ver ON true
+		LEFT JOIN raw.blocks b ON b.height = latest_ver.block_height
 		ORDER BY COALESCE(h.holder_count, 0) DESC, ft.contract_address ASC
 		LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
