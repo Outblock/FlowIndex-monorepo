@@ -421,20 +421,22 @@ import {
   exaSearchTool,
 } from '@/tools/exa'
 import { fileParserV2Tool, fileParserV3Tool, fileParseTool } from '@/tools/file'
-import { flowGetAccountTool } from '@/tools/flow'
 import {
   flowGetAccountTool,
   flowGetBalanceTool,
   flowGetBlockTool,
-  flowGetTransactionTool,
+  flowGetCollectionMetadataTool,
+  flowGetContractCodeTool,
+  flowGetDefiPositionsTool,
   flowGetEventsTool,
-} from '@/tools/flow'
-import {
-  flowGetAccountTool,
   flowGetFtHoldingsTool,
   flowGetNftTool,
   flowGetNftInventoryTool,
+  flowGetStakingInfoTool,
+  flowGetTransactionTool,
   flowResolveNameTool,
+  flowExecuteScriptTool,
+  flowSendTransactionTool,
 } from '@/tools/flow'
 import {
   firecrawlAgentTool,
@@ -456,12 +458,6 @@ import {
   firefliesListUsersTool,
   firefliesUploadAudioTool,
 } from '@/tools/fireflies'
-import {
-  flowGetCollectionMetadataTool,
-  flowGetContractCodeTool,
-  flowGetDefiPositionsTool,
-  flowGetStakingInfoTool,
-} from '@/tools/flow'
 import { functionExecuteTool } from '@/tools/function'
 import {
   gammaCheckStatusTool,
@@ -2370,6 +2366,8 @@ export const tools: Record<string, ToolConfig> = {
   flow_get_contract_code: flowGetContractCodeTool,
   flow_get_defi_positions: flowGetDefiPositionsTool,
   flow_get_staking_info: flowGetStakingInfoTool,
+  flow_execute_script: flowExecuteScriptTool,
+  flow_send_transaction: flowSendTransactionTool,
   gong_list_calls: gongListCallsTool,
   gong_get_call: gongGetCallTool,
   gong_get_call_transcript: gongGetCallTranscriptTool,
