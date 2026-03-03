@@ -4,6 +4,7 @@ set -eu
 STUDIO_USER="${STUDIO_USER:-admin}"
 STUDIO_PASSWORD="${STUDIO_PASSWORD:-changeme}"
 STUDIO_UPSTREAM="${STUDIO_UPSTREAM:-http://127.0.0.1:3100}"
+LISTEN_PORT="${LISTEN_PORT:-8000}"
 SUPABASE_SERVICE_KEY="${SUPABASE_SERVICE_KEY:-}"
 TEMPLATE_PATH="/etc/nginx/templates/default.conf.template"
 OUTPUT_PATH="/etc/nginx/conf.d/default.conf"
@@ -33,8 +34,8 @@ if [ ! -f "$TEMPLATE_PATH" ]; then
 fi
 
 if [ -z "$SUPABASE_SERVICE_KEY" ]; then
-  echo "SUPABASE_SERVICE_KEY is required for auth admin mutations proxy" >&2
-  exit 1
+  echo "WARN: SUPABASE_SERVICE_KEY not set, auth admin mutations proxy disabled" >&2
+  SUPABASE_SERVICE_KEY="not-configured"
 fi
 
 STUDIO_SESSION_TOKEN="$(hash_sha256 "${STUDIO_USER}:${STUDIO_PASSWORD}")"
@@ -42,11 +43,13 @@ STUDIO_SESSION_TOKEN="$(hash_sha256 "${STUDIO_USER}:${STUDIO_PASSWORD}")"
 escaped_upstream="$(escape_sed_replacement "$STUDIO_UPSTREAM")"
 escaped_token="$(escape_sed_replacement "$STUDIO_SESSION_TOKEN")"
 escaped_service_key="$(escape_sed_replacement "$SUPABASE_SERVICE_KEY")"
+escaped_port="$(escape_sed_replacement "$LISTEN_PORT")"
 
 sed \
   -e "s|\${STUDIO_UPSTREAM}|$escaped_upstream|g" \
   -e "s|\${STUDIO_SESSION_TOKEN}|$escaped_token|g" \
   -e "s|\${SUPABASE_SERVICE_KEY}|$escaped_service_key|g" \
+  -e "s|\${LISTEN_PORT}|$escaped_port|g" \
   "$TEMPLATE_PATH" > "$OUTPUT_PATH"
 
 nginx -t

@@ -57,7 +57,7 @@ jobs:
               - 'studio/**'
               - '.github/workflows/deploy.yml'
             sim-studio:
-              - 'sim-studio/**'
+              - 'studio/**'
               - '.github/workflows/deploy.yml'
       - name: Resolve outputs
         id: result
@@ -623,7 +623,18 @@ jobs:
               -e INTERNAL_API_SECRET="${INTERNAL_API_SECRET}" \
               ghcr.io/simstudioai/realtime:latest
 
-            echo "Sim Studio deployed (web: 3200, realtime: 3202)"
+            # Run sim-studio-auth proxy (port 8001) — same image as studio-auth
+            docker pull ${{ env.REGISTRY }}/studio:latest 2>/dev/null || true
+            docker stop sim-studio-auth 2>/dev/null || true; docker rm sim-studio-auth 2>/dev/null || true
+            docker run -d --restart=always --name sim-studio-auth \
+              --network=host \
+              -e LISTEN_PORT=8001 \
+              -e STUDIO_USER="${STUDIO_USER:-admin}" \
+              -e STUDIO_PASSWORD="${STUDIO_PASSWORD:-changeme}" \
+              -e STUDIO_UPSTREAM=http://127.0.0.1:3200 \
+              ${{ env.REGISTRY }}/studio:latest
+
+            echo "Sim Studio deployed (web: 3200, realtime: 3202, auth: 8001)"
             docker ps --filter name=sim-studio --format "table {{.Names}}\t{{.Status}}"
           '
 
