@@ -20,16 +20,22 @@ The deployment is ready for these fork-side env vars:
 
 Your fork should read `fi_auth` cookie, verify JWT with `SUPABASE_JWT_SECRET`, and map user identity to Sim session.
 
+Fork patches are managed in [`studio/fork`](./fork/README.md).
+
 ## Deploy configuration
 
 Set these in `/mnt/stateful_partition/pgdata/sim-studio.env` on `flowindex-backend`:
 
 - `SIM_STUDIO_IMAGE` (default: `us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork:latest`)
-- `SIM_STUDIO_REALTIME_IMAGE` (default: `ghcr.io/simstudioai/realtime:latest`)
-- `SIM_STUDIO_MIGRATIONS_IMAGE` (default: `ghcr.io/simstudioai/migrations:latest`)
+- `SIM_STUDIO_REALTIME_IMAGE` (default: `us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork-realtime:latest`)
+- `SIM_STUDIO_MIGRATIONS_IMAGE` (default: `us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork-migrations:latest`)
 - `FLOWINDEX_AUTH_MODE` (default: `supabase_cookie`)
 
-The workflow uploads and applies [`studio/seed/simstudio_seed.sql`](./seed/simstudio_seed.sql) on each deploy (idempotent).
+Deploy flow now does:
+
+1. Build/push forked Sim Studio images from pinned upstream commit + local patches.
+2. Upload/apply [`studio/seed/simstudio_seed.sql`](./seed/simstudio_seed.sql) (idempotent).
+3. Deploy app + realtime containers from fork images.
 
 ## Notes
 

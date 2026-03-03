@@ -511,9 +511,83 @@ jobs:
             bash /tmp/deploy-studio.sh ${{ env.REGISTRY }}/studio:${{ github.sha }}
           '
 
-  build-sim-studio:
+  build-simstudio-fork-image:
     needs: changes
     if: needs.changes.outputs.sim-studio == 'true'
+    concurrency:
+      group: build-simstudio-fork-image-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Build & push Sim Studio fork images
+        run: |
+          set -euo pipefail
+
+          UPSTREAM_REF="$(tr -d '\n' < studio/fork/upstream.ref)"
+          if [ -z "$UPSTREAM_REF" ]; then
+            echo "studio/fork/upstream.ref is empty"
+            exit 1
+          fi
+
+          SRC_DIR="$RUNNER_TEMP/simstudio-src"
+          git clone --filter=blob:none https://github.com/simstudioai/sim.git "$SRC_DIR"
+          cd "$SRC_DIR"
+          git checkout "$UPSTREAM_REF"
+
+          for patch in "$GITHUB_WORKSPACE"/studio/fork/patches/*.patch; do
+            if [ -f "$patch" ]; then
+              echo "Applying patch: $patch"
+              git am "$patch"
+            fi
+          done
+
+          APP_IMAGE="${{ env.REGISTRY }}/simstudio-fork"
+          REALTIME_IMAGE="${{ env.REGISTRY }}/simstudio-fork-realtime"
+          MIGRATIONS_IMAGE="${{ env.REGISTRY }}/simstudio-fork-migrations"
+
+          docker build -f docker/app.Dockerfile \
+            -t "${APP_IMAGE}:${{ github.sha }}" \
+            -t "${APP_IMAGE}:latest" \
+            .
+
+          docker build -f docker/realtime.Dockerfile \
+            -t "${REALTIME_IMAGE}:${{ github.sha }}" \
+            -t "${REALTIME_IMAGE}:latest" \
+            .
+
+          docker build -f docker/db.Dockerfile \
+            -t "${MIGRATIONS_IMAGE}:${{ github.sha }}" \
+            -t "${MIGRATIONS_IMAGE}:latest" \
+            .
+
+          docker push "${APP_IMAGE}:${{ github.sha }}"
+          docker push "${APP_IMAGE}:latest"
+          docker push "${REALTIME_IMAGE}:${{ github.sha }}"
+          docker push "${REALTIME_IMAGE}:latest"
+          docker push "${MIGRATIONS_IMAGE}:${{ github.sha }}"
+          docker push "${MIGRATIONS_IMAGE}:latest"
+
+  build-sim-studio:
+    needs: [changes, build-simstudio-fork-image]
+    if: |
+      always() &&
+      needs.changes.outputs.sim-studio == 'true' &&
+      (needs.build-simstudio-fork-image.result == 'success' || needs.build-simstudio-fork-image.result == 'skipped')
     concurrency:
       group: deploy-sim-studio-${{ github.ref }}
       cancel-in-progress: true
@@ -558,8 +632,8 @@ jobs:
           ENCRYPTION_KEY=$(openssl rand -hex 32)
           INTERNAL_API_SECRET=$(openssl rand -hex 32)
           SIM_STUDIO_IMAGE=us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork:latest
-          SIM_STUDIO_REALTIME_IMAGE=ghcr.io/simstudioai/realtime:latest
-          SIM_STUDIO_MIGRATIONS_IMAGE=ghcr.io/simstudioai/migrations:latest
+          SIM_STUDIO_REALTIME_IMAGE=us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork-realtime:latest
+          SIM_STUDIO_MIGRATIONS_IMAGE=us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork-migrations:latest
           FLOWINDEX_AUTH_MODE=supabase_cookie
           ENVEOF
               echo "Created $SIM_ENV with generated secrets"
@@ -567,8 +641,8 @@ jobs:
             load_env "$SIM_ENV"
 
             SIM_STUDIO_IMAGE="${SIM_STUDIO_IMAGE:-us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork:latest}"
-            SIM_STUDIO_REALTIME_IMAGE="${SIM_STUDIO_REALTIME_IMAGE:-ghcr.io/simstudioai/realtime:latest}"
-            SIM_STUDIO_MIGRATIONS_IMAGE="${SIM_STUDIO_MIGRATIONS_IMAGE:-ghcr.io/simstudioai/migrations:latest}"
+            SIM_STUDIO_REALTIME_IMAGE="${SIM_STUDIO_REALTIME_IMAGE:-us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork-realtime:latest}"
+            SIM_STUDIO_MIGRATIONS_IMAGE="${SIM_STUDIO_MIGRATIONS_IMAGE:-us-central1-docker.pkg.dev/flowindex-mainnet/flowindex/simstudio-fork-migrations:latest}"
             FLOWINDEX_AUTH_MODE="${FLOWINDEX_AUTH_MODE:-supabase_cookie}"
 
             # Parse DB connection from SUPABASE_DB_URL
