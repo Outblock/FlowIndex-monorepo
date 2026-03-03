@@ -45,7 +45,7 @@
     "dagre": "^0.8.5",
     "date-fns": "^4.1.0",
     "diff": "^8.0.3",
-    "flowtoken": "^1.0.40",
+    "@flowindex/flowtoken": "file:packages/flowtoken",
     "framer-motion": "^11.0.0",
     "geist": "^1.7.0",
     "input-otp": "^1.4.2",

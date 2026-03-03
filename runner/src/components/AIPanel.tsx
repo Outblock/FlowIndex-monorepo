@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { AnimatedMarkdown } from 'flowtoken';
-import 'flowtoken/dist/styles.css';
+import { AnimatedMarkdown } from '@flowindex/flowtoken';
+import '@flowindex/flowtoken/styles.css';
 import './aipanel-flowtoken-overrides.css';
 import remarkGfm from 'remark-gfm';
 import type { Components } from 'react-markdown';
@@ -971,7 +971,7 @@ function ChatMessage({ message, hideTools, isStreamingMsg, onInsertCode, onApply
                   {isStreamingMsg ? (
                     <AnimatedMarkdown
                       content={(part as any).text}
-                      animation="colorTransition"
+                      animation={["colorTransition", "blurIn"]}
                       animationDuration="0.6s"
                       animationTimingFunction="ease-out"
                       sep="word"
