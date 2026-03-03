@@ -966,11 +966,11 @@ jobs:
             }
 
             # Ensure pgvector is available and visible for migrations.
-            VECTOR_SCHEMA=$(run_psql -d "$SIM_DB_NAME" -tAc "SELECT n.nspname FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE t.typname='vector' LIMIT 1;" | tr -d '[:space:]')
+            VECTOR_SCHEMA=$(run_psql -d "$SIM_DB_NAME" -tAc "SELECT n.nspname FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE t.typname=\$\$vector\$\$ LIMIT 1;" | tr -d '[:space:]')
             if [ -z "$VECTOR_SCHEMA" ]; then
               run_psql -d "$SIM_DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS extensions;"
               run_psql -d "$SIM_DB_NAME" -c "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;"
-              VECTOR_SCHEMA=$(run_psql -d "$SIM_DB_NAME" -tAc "SELECT n.nspname FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE t.typname='vector' LIMIT 1;" | tr -d '[:space:]')
+              VECTOR_SCHEMA=$(run_psql -d "$SIM_DB_NAME" -tAc "SELECT n.nspname FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE t.typname=\$\$vector\$\$ LIMIT 1;" | tr -d '[:space:]')
             fi
             if [ -z "$VECTOR_SCHEMA" ]; then
               echo "pgvector type 'vector' is unavailable in database $SIM_DB_NAME"
