@@ -11,11 +11,36 @@ export const Route = createFileRoute('/developer/callback')({
   component: DeveloperCallbackPage,
 })
 
+const SIM_STUDIO_URL = import.meta.env.VITE_SIM_STUDIO_URL || 'https://studio.flowindex.io'
+const SIM_STUDIO_ORIGIN = (() => {
+  try {
+    return new URL(SIM_STUDIO_URL).origin
+  } catch {
+    return 'https://studio.flowindex.io'
+  }
+})()
+
+function normalizeRedirectTarget(redirect?: string): string {
+  if (!redirect) return '/developer'
+  if (redirect.startsWith('/')) return redirect
+
+  try {
+    const url = new URL(redirect)
+    if (url.origin === window.location.origin || url.origin === SIM_STUDIO_ORIGIN) {
+      return url.toString()
+    }
+  } catch {
+    // Ignore malformed redirect
+  }
+
+  return '/developer'
+}
+
 function DeveloperCallbackPage() {
   const { handleCallback } = useAuth()
   const { redirect } = Route.useSearch()
   const processed = useRef(false)
-  const redirectTo = redirect && redirect.startsWith('/') ? redirect : '/developer'
+  const redirectTo = normalizeRedirectTarget(redirect)
 
   useEffect(() => {
     if (processed.current) return
