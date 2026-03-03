@@ -17,7 +17,7 @@
     "ai": "^6.0.101",
     "axios": "^1.13.4",
     "clsx": "^2.1.0",
-    "flowtoken": "^1.0.40",
+    "@flowindex/flowtoken": "file:../frontend/packages/flowtoken",
     "framer-motion": "^12.34.3",
     "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
