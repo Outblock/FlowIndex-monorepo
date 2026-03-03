@@ -462,8 +462,12 @@ func (r *Repository) RefreshAnalyticsDailyMetricsRange(ctx context.Context, from
 // otherwise it only refreshes the last 30 days (periodic tick).
 func (r *Repository) RefreshDailyStats(ctx context.Context, fullScan bool) error {
 	whereClause := "AND t.timestamp >= NOW() - INTERVAL '30 days'"
+	ftWhereClause := "AND ft.timestamp >= NOW() - INTERVAL '30 days'"
+	nftWhereClause := "AND nt.timestamp >= NOW() - INTERVAL '30 days'"
 	if fullScan {
 		whereClause = ""
+		ftWhereClause = ""
+		nftWhereClause = ""
 	}
 	query := fmt.Sprintf(`
 		WITH tx_agg AS (
@@ -478,20 +482,39 @@ func (r *Repository) RefreshDailyStats(ctx context.Context, fullScan bool) error
 			WHERE t.timestamp IS NOT NULL
 			  %s
 			GROUP BY DATE(t.timestamp)
+		),
+		ft_agg AS (
+			SELECT DATE(ft.timestamp) AS date, COUNT(*) AS cnt
+			FROM app.ft_transfers ft
+			WHERE ft.timestamp IS NOT NULL %s
+			GROUP BY 1
+		),
+		nft_agg AS (
+			SELECT DATE(nt.timestamp) AS date, COUNT(*) AS cnt
+			FROM app.nft_transfers nt
+			WHERE nt.timestamp IS NOT NULL %s
+			GROUP BY 1
 		)
-		INSERT INTO app.daily_stats (date, tx_count, evm_tx_count, total_gas_used, active_accounts, failed_tx_count, updated_at)
+		INSERT INTO app.daily_stats (date, tx_count, evm_tx_count, total_gas_used, active_accounts, failed_tx_count, ft_transfer_count, nft_transfer_count, updated_at)
 		SELECT
 			a.date, a.tx_count, a.evm_tx_count, a.total_gas_used, a.active_accounts,
-			a.failed_tx_count, NOW()
+			a.failed_tx_count,
+			COALESCE(f.cnt, 0),
+			COALESCE(n.cnt, 0),
+			NOW()
 		FROM tx_agg a
+		LEFT JOIN ft_agg f ON f.date = a.date
+		LEFT JOIN nft_agg n ON n.date = a.date
 		ON CONFLICT (date) DO UPDATE SET
 			tx_count = EXCLUDED.tx_count,
 			evm_tx_count = EXCLUDED.evm_tx_count,
 			total_gas_used = EXCLUDED.total_gas_used,
 			active_accounts = EXCLUDED.active_accounts,
 			failed_tx_count = EXCLUDED.failed_tx_count,
+			ft_transfer_count = EXCLUDED.ft_transfer_count,
+			nft_transfer_count = EXCLUDED.nft_transfer_count,
 			updated_at = NOW();
-	`, whereClause)
+	`, whereClause, ftWhereClause, nftWhereClause)
 	_, err := r.db.Exec(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to refresh daily stats: %w", err)

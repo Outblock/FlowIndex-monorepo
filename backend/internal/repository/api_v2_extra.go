@@ -82,6 +82,26 @@ func (r *Repository) CountFTTokens(ctx context.Context) (int64, error) {
 	return total, nil
 }
 
+// FTTokenStats holds aggregate statistics about FT tokens.
+type FTTokenStats struct {
+	Total       int64 `json:"total"`
+	WithPrice   int64 `json:"with_price"`
+	EVMBridged  int64 `json:"evm_bridged"`
+}
+
+// GetFTTokenStats returns summary counts for FT tokens.
+func (r *Repository) GetFTTokenStats(ctx context.Context) (FTTokenStats, error) {
+	var s FTTokenStats
+	err := r.db.QueryRow(ctx, `
+		SELECT
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE COALESCE(market_symbol, '') != '') AS with_price,
+			COUNT(*) FILTER (WHERE COALESCE(evm_address, '') != '') AS evm_bridged
+		FROM app.ft_tokens
+	`).Scan(&s.Total, &s.WithPrice, &s.EVMBridged)
+	return s, err
+}
+
 func (r *Repository) CountFTTokenContracts(ctx context.Context) (int64, error) {
 	var total int64
 	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM app.ft_tokens`).Scan(&total); err != nil {

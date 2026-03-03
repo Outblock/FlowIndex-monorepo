@@ -273,10 +273,11 @@ type FTToken struct {
 	Socials         []byte    `json:"socials,omitempty"`
 	EVMAddress      string    `json:"evm_address,omitempty"`
 	TotalSupply     string    `json:"total_supply,omitempty"`
-	HolderCount     int64     `json:"holder_count,omitempty"`
-	TransferCount   int64     `json:"transfer_count,omitempty"`
-	IsVerified      bool      `json:"is_verified"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	HolderCount     int64      `json:"holder_count,omitempty"`
+	TransferCount   int64      `json:"transfer_count,omitempty"`
+	IsVerified      bool       `json:"is_verified"`
+	DeployedAt      *time.Time `json:"deployed_at,omitempty"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 // FTHolding represents app.ft_holdings

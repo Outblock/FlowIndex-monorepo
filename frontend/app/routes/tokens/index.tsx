@@ -2,10 +2,10 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { AddressLink } from '../../components/AddressLink';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Coins, Info, Search, X, Loader2 } from 'lucide-react';
+import { Coins, Info, Search, X, Loader2, DollarSign, ArrowLeftRight, AlertTriangle } from 'lucide-react';
 import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
 import { EVMBridgeBadge } from '../../components/ui/EVMBridgeBadge';
-import { ensureHeyApiConfigured } from '../../api/heyapi';
+import { ensureHeyApiConfigured, getBaseURL } from '../../api/heyapi';
 import { getFlowV1Ft } from '../../api/gen/find';
 import { Pagination } from '../../components/Pagination';
 
@@ -26,6 +26,18 @@ async function fetchTokens(page: number, search: string) {
   return { tokens: payload?.data || [], meta: payload?._meta || null };
 }
 
+async function fetchFTStats(): Promise<{ total: number; with_price: number; evm_bridged: number } | null> {
+  try {
+    await ensureHeyApiConfigured();
+    const res = await fetch(`${getBaseURL()}/flow/ft/stats`);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json?.data || null;
+  } catch {
+    return null;
+  }
+}
+
 export const Route = createFileRoute('/tokens/')({
   component: Tokens,
   validateSearch: (search: Record<string, unknown>): TokensSearch => ({
@@ -37,11 +49,14 @@ export const Route = createFileRoute('/tokens/')({
     const page = Number(params.get('page') || '1');
     const search = params.get('search') || '';
     try {
-      const data = await fetchTokens(page, search);
-      return { ...data, page, search };
+      const [data, stats] = await Promise.all([
+        fetchTokens(page, search),
+        fetchFTStats(),
+      ]);
+      return { ...data, stats, page, search };
     } catch (e) {
       console.error('Failed to load tokens', e);
-      return { tokens: [], meta: null, page, search };
+      return { tokens: [], meta: null, stats: null, page, search };
     }
   },
 })
@@ -70,11 +85,23 @@ function TokenLogo({ logo, symbol }: { logo?: string; symbol: string }) {
   );
 }
 
+function formatDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '-';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return '-';
+  }
+}
+
 function Tokens() {
   const loaderData = Route.useLoaderData();
 
   const [tokens, setTokens] = useState<any[]>(loaderData.tokens);
   const [meta, setMeta] = useState<any>(loaderData.meta);
+  const [stats, setStats] = useState<any>(loaderData.stats);
   const [currentPage, setCurrentPage] = useState(loaderData.page);
   const [currentSearch, setCurrentSearch] = useState(loaderData.search || '');
   const [searchInput, setSearchInput] = useState(loaderData.search || '');
@@ -87,6 +114,7 @@ function Tokens() {
   useEffect(() => {
     setTokens(loaderData.tokens);
     setMeta(loaderData.meta);
+    setStats(loaderData.stats);
     setCurrentPage(loaderData.page);
     setCurrentSearch(loaderData.search || '');
     setSearchInput(loaderData.search || '');
@@ -161,11 +189,55 @@ function Tokens() {
           <div>
             <h1 className="text-3xl font-bold text-zinc-900 dark:text-white uppercase tracking-tighter">Tokens</h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 font-mono">
-              {totalCount.toLocaleString()} Fungible Tokens
+              Fungible Tokens on Flow
             </p>
           </div>
         </div>
       </motion.div>
+
+      {/* Stats Cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+      >
+        <div className="bg-white dark:bg-nothing-dark border border-zinc-200 dark:border-white/10 p-5 rounded-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <Coins className="h-4 w-4 text-zinc-400" />
+            <p className="text-xs text-zinc-500 dark:text-gray-400 uppercase tracking-widest">Total Tokens</p>
+          </div>
+          <p className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">
+            {stats?.total != null ? stats.total.toLocaleString() : '-'}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-nothing-dark border border-zinc-200 dark:border-white/10 p-5 rounded-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <DollarSign className="h-4 w-4 text-zinc-400" />
+            <p className="text-xs text-zinc-500 dark:text-gray-400 uppercase tracking-widest">With Market Price</p>
+          </div>
+          <p className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">
+            {stats?.with_price != null ? stats.with_price.toLocaleString() : '-'}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-nothing-dark border border-zinc-200 dark:border-white/10 p-5 rounded-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <ArrowLeftRight className="h-4 w-4 text-zinc-400" />
+            <p className="text-xs text-zinc-500 dark:text-gray-400 uppercase tracking-widest">EVM Bridged</p>
+          </div>
+          <p className="text-2xl font-bold font-mono text-zinc-900 dark:text-white">
+            {stats?.evm_bridged != null ? stats.evm_bridged.toLocaleString() : '-'}
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Indexing disclaimer */}
+      <div className="flex items-start gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/30 rounded-sm text-xs text-amber-700 dark:text-amber-400">
+        <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <span>Historical indexing is still in progress. Holder counts, deploy dates, and transfer data may be incomplete or inaccurate until indexing completes.</span>
+      </div>
 
       {/* Search */}
       <div className="relative">
@@ -198,6 +270,7 @@ function Tokens() {
               <tr className="border-b border-zinc-200 dark:border-white/5 bg-zinc-50/50 dark:bg-white/5">
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono">Token</th>
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono">Address</th>
+                <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-right">Deployed</th>
                 <th className="p-4 text-xs font-semibold text-zinc-500 dark:text-gray-400 uppercase tracking-wider font-mono text-right">
                   <span className="inline-flex items-center gap-1.5 group relative">
                     Holders
@@ -213,7 +286,7 @@ function Tokens() {
               <AnimatePresence mode="popLayout">
                 {tokens.length === 0 && !isLoading && (
                   <tr>
-                    <td colSpan={3} className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400 font-mono">
+                    <td colSpan={4} className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400 font-mono">
                       {currentSearch ? `No tokens matching "${currentSearch}"` : 'No tokens found'}
                     </td>
                   </tr>
@@ -228,6 +301,7 @@ function Tokens() {
                   const logo = t?.logo || '';
                   const evmAddress = String(t?.evm_address || '');
                   const isVerified = Boolean(t?.is_verified);
+                  const deployedAt = t?.deployed_at;
 
                   return (
                     <motion.tr
@@ -269,12 +343,17 @@ function Tokens() {
                         {addr ? (
                           <AddressLink address={addr} prefixLen={20} suffixLen={0} />
                         ) : (
-                          <span className="text-zinc-500 font-mono text-sm">N/A</span>
+                          <span className="text-zinc-500 font-mono text-sm">-</span>
                         )}
                       </td>
                       <td className="p-4 text-right">
+                        <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                          {formatDate(deployedAt)}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
                         <span className="font-mono text-sm text-zinc-900 dark:text-white">
-                          {holderCount.toLocaleString()}
+                          {holderCount > 0 ? holderCount.toLocaleString() : '-'}
                         </span>
                       </td>
                     </motion.tr>

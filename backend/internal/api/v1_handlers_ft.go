@@ -44,6 +44,15 @@ func (s *Server) handleFlowFTTransfers(w http.ResponseWriter, r *http.Request) {
 	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": len(out), "has_more": hasMore}, nil)
 }
 
+func (s *Server) handleFlowFTTokenStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.repo.GetFTTokenStats(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeAPIResponse(w, stats, nil, nil)
+}
+
 func (s *Server) handleFlowListFTTokens(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parseLimitOffset(r)
 	sort := r.URL.Query().Get("sort")
