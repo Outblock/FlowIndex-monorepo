@@ -369,8 +369,7 @@ jobs:
               done < "$1"
             }
             load_env /mnt/stateful_partition/pgdata/backend.env
-            chmod +x ~/supabase/run-migrations.sh
-            ~/supabase/run-migrations.sh ~/supabase/migrations
+            bash ~/supabase/run-migrations.sh ~/supabase/migrations
             rm -rf ~/supabase
           '
 
