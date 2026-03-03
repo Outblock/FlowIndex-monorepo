@@ -491,6 +491,9 @@ jobs:
               -e GOTRUE_SMTP_PASS="${{ secrets.GOTRUE_SMTP_PASS }}" \
               -e GOTRUE_SMTP_SENDER_NAME="${{ secrets.GOTRUE_SMTP_SENDER_NAME }}" \
               -e GOTRUE_SMTP_ADMIN_EMAIL="${{ secrets.GOTRUE_SMTP_ADMIN_EMAIL }}" \
+              -e GOTRUE_MAILER_TEMPLATES_MAGIC_LINK=https://flowindex.io/email-templates/magic-link.html \
+              -e GOTRUE_MAILER_TEMPLATES_CONFIRMATION=https://flowindex.io/email-templates/confirmation.html \
+              -e GOTRUE_MAILER_TEMPLATES_RECOVERY=https://flowindex.io/email-templates/magic-link.html \
               -e GOTRUE_EXTERNAL_GITHUB_ENABLED=true \
               -e GOTRUE_EXTERNAL_GITHUB_CLIENT_ID="${{ secrets.OAUTH_GITHUB_CLIENT_ID }}" \
               -e GOTRUE_EXTERNAL_GITHUB_SECRET="${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}" \
