@@ -76,6 +76,7 @@ import { FlowTokenListLookupBlock } from '@/blocks/blocks/flow_token_list_lookup
 import { FlowIncrementFiBlock } from '@/blocks/blocks/flow_increment_fi'
 import { FlowFlowIndexApiBlock } from '@/blocks/blocks/flow_flowindex_api'
 import { FlowFindProfileBlock } from '@/blocks/blocks/flow_find_profile'
+import { FlowTriggerBlock } from '@/blocks/blocks/flow_trigger'
 import { FunctionBlock } from '@/blocks/blocks/function'
 import { GammaBlock } from '@/blocks/blocks/gamma'
 import { GenericWebhookBlock } from '@/blocks/blocks/generic_webhook'
@@ -309,6 +310,7 @@ export const registry: Record<string, BlockConfig> = {
   flow_increment_fi: FlowIncrementFiBlock,
   flow_flowindex_api: FlowFlowIndexApiBlock,
   flow_find_profile: FlowFindProfileBlock,
+  flow_trigger: FlowTriggerBlock,
   function: FunctionBlock,
   gamma: GammaBlock,
   generic_webhook: GenericWebhookBlock,
