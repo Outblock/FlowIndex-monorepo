@@ -10,7 +10,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Structure
 
-Always verify which server/project/directory a change should go in before starting work. Ask if ambiguous. Known projects: flowindex-frontend, flowindex-backend, Runner, MCP servers.
+Always verify which server/project/directory a change should go in before starting work. Ask if ambiguous.
+
+**Top-level directories:**
+- `backend/` — Go indexer + API server
+- `frontend/` — TanStack Start SSR app (React 19, TypeScript)
+- `runner/` — Runner service
+- `supabase/` — Self-hosted Supabase auth stack (edge functions, migrations, gateway)
+- `devportal/` — Developer portal (Fumadocs + Scalar)
+- `ai/` — AI chat assistant
+- `sdk/` — SDK
+- `sim-workflow/` — Simulation workflow
+- `studio/` — Supabase Studio proxy
+- `scripts/` — Utility scripts
 
 ## Pre-Commit Checklist
 
@@ -22,18 +34,19 @@ When pushing to main, always pull/rebase first to avoid non-fast-forward errors.
 
 ## Project Overview
 
-FlowIndex is a high-performance blockchain explorer and indexer for the Flow blockchain with Flow-EVM support. It features a Go backend with concurrent block ingestion and a React frontend.
+FlowIndex is a high-performance blockchain explorer and indexer for the Flow blockchain with Flow-EVM support. It features a Go backend with concurrent block ingestion and a TanStack Start SSR frontend.
 
 **Key Technologies:**
 - Backend: Go 1.24+, PostgreSQL (pgx driver), Flow SDK, Gorilla WebSocket/Mux
-- Frontend: React 19, Vite, TailwindCSS, Shadcn/UI, React Router, Recharts
-- Deployment: Docker, Docker Compose, GCP (or any Docker-capable platform)
+- Frontend: React 19, TanStack Start (SSR via Nitro), TanStack Router, TypeScript, TailwindCSS, Shadcn/UI, Recharts
+- Auth: Self-hosted Supabase (GoTrue + PostgREST + edge functions)
+- Deployment: Docker, Docker Compose, GCP
 
 ## Development Commands
 
 ### Local Development (Docker Compose)
 ```bash
-# Start all services (PostgreSQL, backend, frontend)
+# Start all services
 docker compose up -d --build
 
 # View logs
@@ -47,15 +60,16 @@ docker compose down
 # - Frontend: http://localhost:5173
 # - Backend API: http://localhost:8080
 # - PostgreSQL: localhost:5432
+# - Supabase Gateway: localhost:54321
+# - Supabase Studio: localhost:8000
+# - DevPortal: localhost:3001
 ```
 
 ### Backend (Go)
 ```bash
 cd backend
 
-# Install dependencies
-go mod download
-go mod tidy
+go mod download && go mod tidy
 
 # Build
 CGO_CFLAGS="-std=gnu99" CGO_ENABLED=1 go build -o indexer main.go
@@ -66,11 +80,14 @@ FLOW_ACCESS_NODE=access-001.mainnet28.nodes.onflow.org:9000 \
 PORT=8080 \
 ./indexer
 
+# Run migrations only
+./indexer migrate
+
 # Run tests
 go test ./...
 ```
 
-### Frontend (React)
+### Frontend (React/TanStack Start)
 ```bash
 cd frontend
 
@@ -80,11 +97,17 @@ bun install
 # Development server
 bun run dev
 
-# Build for production
+# Build for production (outputs to .output/)
 bun run build
+
+# Run production server
+bun .output/server/index.mjs
 
 # Lint
 bun run lint
+
+# Regenerate API client from OpenAPI specs
+bun run gen:api
 ```
 
 ### Database Management
@@ -103,167 +126,151 @@ psql -c "SELECT * FROM app.indexing_checkpoints;" postgres://flowscan:secretpass
 
 ### Backend Architecture
 
-The backend follows a concurrent pipeline architecture inspired by Blockscout:
+The backend follows a concurrent pipeline architecture:
 
 1. **Main Entry Point** (`backend/main.go`):
-   - Initializes two independent ingesters: Forward (live) and Backward (history)
-   - Forward Ingester: Real-time block processing with WebSocket broadcasts
-   - Backward Ingester: Historical data backfill (can be disabled via `ENABLE_HISTORY_INGESTER=false`)
-   - Both run concurrently with separate worker pools
+   - Two independent ingesters: Forward (live blocks) and Backward (history backfill)
+   - LiveDerivers and HistoryDerivers: process derived data from raw blocks
+   - Workers/Processors: async workers for tokens, EVM, staking, etc.
+   - `RAW_ONLY=true` disables all workers/derivers (raw ingestion only)
 
 2. **Ingester Service** (`internal/ingester/service.go`):
-   - Manages the block ingestion lifecycle
-   - Supports two modes: "forward" (live) and "backward" (history)
-   - Coordinates worker pool and batch processing
-   - Handles checkpoint persistence and recovery
-   - Broadcasts new blocks/transactions via callbacks (forward mode only)
+   - Manages block ingestion lifecycle in "forward" or "backward" mode
+   - Coordinates worker pool, batch processing, checkpoint persistence
 
 3. **Worker Pool** (`internal/ingester/worker.go`):
-   - Each worker fetches a complete block with all transactions, events, and derived data
+   - Workers fetch complete blocks with all transactions, events, and derived data
    - Returns `FetchResult` containing: Block, Transactions, Events, AddressActivity, TokenTransfers, AccountKeys
-   - EVM transaction detection via script content analysis (`import EVM`)
-   - Stateless workers enable horizontal scaling
+   - EVM detection via `import EVM` in script content
 
 4. **Repository Layer** (`internal/repository/postgres.go`):
    - `SaveBlockData()`: Atomic batch insert of all block-related data
-   - Uses PostgreSQL transactions for consistency
-   - Handles duplicate key conflicts gracefully
+   - Uses PostgreSQL transactions + pgx `CopyFrom` for bulk inserts
 
-5. **Flow Client** (`internal/flow/client.go`):
-   - Wraps Flow SDK gRPC client
-   - Methods: `GetLatestBlock()`, `GetBlockByHeight()`, `GetTransaction()`, `GetTransactionResult()`
-
-6. **API Server** (`internal/api/server.go`):
-   - REST endpoints for blocks, transactions, accounts, stats
+5. **API Server** (`internal/api/server.go`):
+   - REST endpoints: `/health`, `/status`, `/blocks`, `/transactions`, `/accounts/{address}`
+   - V1 routes: `/flow/v1/...` (also at `/api/v1/flow/v1/...`)
    - WebSocket endpoint `/ws` for live updates
-   - CORS enabled for frontend integration
 
-### Database Schema (`backend/schema_v2.sql`)
+6. **Additional subsystems:**
+   - `internal/eventbus/` — Event bus for webhook notifications
+   - `internal/webhooks/` — Webhook delivery (Svix + direct HTTP + Discord/Slack)
+   - `internal/market/` — Price feed (CoinGecko integration)
 
-**Core Tables:**
-- `raw.blocks`: Block metadata (partitioned)
-- `raw.transactions`: Transaction metadata (partitioned)
-- `raw.events`: Event logs (partitioned)
-- `raw.tx_lookup` / `raw.block_lookup`: global ID -> height lookup tables
-- `raw.scripts`: de-duplicated scripts (`script_hash` -> `script_text`)
-- `app.address_transactions`: Many-to-many relationship tracking roles (PROPOSER, PAYER, AUTHORIZER)
-- `app.token_transfers`: FT/NFT transfer records (derived)
-- `app.account_keys`: Account key state keyed by `(address, key_index)` with revocation support
-- `app.indexing_checkpoints`: Progress tracking for ingesters/workers
+### Database Schema
 
-**Design Principles:**
-- Exhaustive data capture aligned with Flow Access API spec
-- Denormalized fields (e.g., `block_height` in events) for query performance
+Two schema files: `backend/schema_v2.sql` (main) and `backend/schema_webhooks.sql` (webhooks). Migrations run automatically on backend startup.
+
+**Key schemas:**
+- `raw.*` — Raw blockchain data: `blocks`, `transactions`, `events` (all partitioned), `tx_lookup`, `block_lookup`, `scripts`
+- `app.*` — Derived/indexed data: `ft_transfers`, `nft_transfers`, `smart_contracts`, `contract_versions`, `ft_tokens`, `ft_holdings`, `nft_collections`, `nft_ownership`, `nft_items`, `account_keys`, `accounts`, `address_transactions`, `staking_nodes`, `staking_delegators`, `defi_pairs`, `defi_events`, `daily_stats`, `market_prices`, etc.
+- `analytics.*` — Analytics: `daily_metrics`, etc.
+
+**Conventions:**
+- Addresses stored as lowercase hex without `0x` prefix
+- EVM hashes stored lowercase without `0x` in `raw.tx_lookup.evm_hash`
+- All timestamps use `TIMESTAMPTZ`
 - JSONB columns for complex nested data
-- Indexes optimized for explorer query patterns
 
 ### Frontend Architecture
 
-1. **Routing** (`frontend/src/App.jsx`):
-   - React Router with routes: `/`, `/block/:id`, `/tx/:id`, `/account/:address`
+The frontend is a **TanStack Start SSR app** (NOT a plain React SPA). Source code is in `frontend/app/`, NOT `frontend/src/`.
 
-2. **Pages** (`frontend/src/pages/`):
-   - `Home.jsx`: Dashboard with live blocks, transactions, daily stats chart, indexing status
-   - `BlockDetail.jsx`: Block information with transaction list
-   - `TransactionDetail.jsx`: Transaction details with event logs and EVM data
-   - `AccountDetail.jsx`: Account activity, transaction history, token transfers
+1. **Routing** — TanStack Router with file-based routes in `frontend/app/routes/`
+   - Key routes: `/blocks`, `/transactions` (also `/tx`, `/txs`), `/account/:address`, `/tokens`, `/nfts`, `/contracts`, `/nodes`, `/analytics`, `/stats`, `/developer`, `/playground`, `/admin`, `/api-docs`
 
-3. **Components** (`frontend/src/components/`):
-   - `DailyStatsChart.jsx`: Recharts-based visualization
-   - `IndexingStatus.jsx`: Real-time ingester progress display
-   - `ui/`: Shadcn/UI components (button, card, badge, etc.)
+2. **API Client** — `frontend/app/api.ts` (TypeScript, Axios-based)
+   - Generated API clients from OpenAPI specs via `bun run gen:api` in `app/api/gen/`
 
-4. **API Client** (`frontend/src/api.js`):
-   - Axios-based wrapper for backend API
-   - Uses `VITE_API_URL` environment variable
+3. **Server** — `frontend/server/` for custom Nitro server routes (OG image generation, etc.)
 
-5. **WebSocket Integration** (`frontend/src/hooks/useWebSocket.js`):
-   - Live block and transaction updates from backend
+4. **Auth** — Supabase auth via `@supabase/supabase-js`
+
+5. **Flow integration** — `@onflow/fcl` for Flow Client Library, Cadence codegen in `frontend/cadence/`
+
+6. **UI stack** — Shadcn/UI (Radix primitives), TailwindCSS, Framer Motion, Lucide icons, Recharts, ReactFlow, Three.js
+
+### Docker Compose Services
+
+14+ services: `db` (PostgreSQL), `backend`, `frontend`, `supabase-db`, `supabase-auth` (GoTrue), `supabase-rest` (PostgREST), `supabase-gateway` (nginx), `supabase-meta`, `supabase-studio`, `studio-auth`, `passkey-auth`, `flow-keys`, `runner-projects`, `docs` (devportal)
+
+## Workers (17 types)
+
+`token_worker`, `evm_worker`, `meta_worker`, `accounts_worker`, `ft_holdings_worker`, `nft_ownership_worker`, `token_metadata_worker`, `nft_item_metadata_worker`, `nft_ownership_reconciler`, `tx_contracts_worker`, `tx_metrics_worker`, `staking_worker`, `defi_worker`, `daily_stats_worker`, `daily_balance_worker`, `analytics_deriver_worker`, `proposer_key_backfill`
+
+Plus `webhook_processor` (in `internal/webhooks/`).
 
 ## Configuration
 
-### Backend Environment Variables
+### Key Backend Environment Variables
 - `DB_URL`: PostgreSQL connection string (required)
 - `FLOW_ACCESS_NODE`: Flow gRPC endpoint (default: mainnet28)
-- `FLOW_ACCESS_NODES`: Optional node pool for live ingestion
-- `FLOW_HISTORIC_ACCESS_NODES`: Optional node pool for history ingestion across sporks
+- `FLOW_ACCESS_NODES`: Node pool for live ingestion
+- `FLOW_HISTORIC_ACCESS_NODES`: Node pool for history ingestion across sporks
+- `FLOW_ARCHIVE_NODE`: Archive node endpoint
 - `PORT`: API server port (default: 8080)
-- `START_BLOCK`: Starting block height for ingestion
-- `LATEST_WORKER_COUNT`: Forward ingester workers (default: 2)
-- `LATEST_BATCH_SIZE`: Forward ingester batch size (default: 1)
-- `HISTORY_WORKER_COUNT`: Backward ingester workers (default: 5)
-- `HISTORY_BATCH_SIZE`: Backward ingester batch size (default: 20)
+- `START_BLOCK`: Starting block height
+- `RAW_ONLY`: Disable all workers/derivers (raw ingestion only)
 - `ENABLE_HISTORY_INGESTER`: Enable history backfill (default: true)
-- `DB_MAX_OPEN_CONNS`: Database connection pool size
-- `DB_MAX_IDLE_CONNS`: Idle connection limit
-- `TX_SCRIPT_INLINE_MAX_BYTES`: If >0, store small scripts inline; otherwise use `raw.scripts`
+- `ENABLE_LIVE_DERIVERS` / `LIVE_DERIVERS_CHUNK` / `HISTORY_DERIVERS_CHUNK`: Deriver pipeline config
+- `LATEST_WORKER_COUNT` / `LATEST_BATCH_SIZE`: Forward ingester tuning
+- `HISTORY_WORKER_COUNT` / `HISTORY_BATCH_SIZE`: Backward ingester tuning
+- `HISTORY_STOP_HEIGHT`: Stop backward ingester at this height
+- `SUPABASE_DB_URL` / `SUPABASE_JWT_SECRET`: Supabase integration
+- `SVIX_AUTH_TOKEN` / `SVIX_SERVER_URL`: Webhook delivery via Svix
+- `ENABLE_PRICE_FEED` / `PRICE_REFRESH_MIN`: Market price feed
+- `ADMIN_TOKEN` / `ADMIN_JWT_SECRET` / `ADMIN_ALLOWED_ROLES`: Admin auth
+- `API_RATE_LIMIT_*`: Rate limiting configuration
 
 ### Frontend Environment Variables
 - `VITE_API_URL`: Backend API base URL (default: http://localhost:8080)
+- `VITE_SUPABASE_URL`: Supabase gateway URL
 
 ## Key Implementation Details
 
-### Dual Ingester Pattern
-The system runs two independent ingesters simultaneously:
-- **Forward Ingester**: Starts from last checkpoint, processes new blocks in ascending order, broadcasts to frontend
-- **Backward Ingester**: Starts from checkpoint, processes historical blocks in descending order, no broadcasts
-- Both use the same worker pool implementation but with different configurations
-- This enables fast historical backfill while maintaining real-time updates
+### Dual Ingester + Deriver Pattern
+- **Forward Ingester**: Real-time blocks in ascending order, broadcasts to frontend via WebSocket
+- **Backward Ingester**: Historical backfill in descending order, no broadcasts
+- **LiveDerivers / HistoryDerivers**: Process derived data (tokens, accounts, etc.) from raw blocks after ingestion
 
 ### EVM Transaction Detection
-Flow-EVM transactions are detected by scanning transaction scripts for `import EVM`. When detected:
-- `transactions.is_evm` flag is set
-- Additional EVM-specific data is stored in `evm_transactions` table
-- Event parsing extracts EVM hash, from/to addresses, value, gas used
+Detected by `import EVM` in transaction scripts. Sets `is_evm` flag, stores EVM data in `evm_transactions`, parses EVM hash/from/to/value/gas from events.
 
 ### Spork-Aware History Backfill
-Flow access nodes only serve blocks for the current spork. For full history:
-- Configure `FLOW_HISTORIC_ACCESS_NODES` with nodes for each spork
-- The ingester pins all RPC calls for a height to a single node for consistency
-- Supports both batch API (spork 18+) and per-tx fallback (spork 1-17)
-
-### Atomic Batch Processing
-Workers fetch complete block data independently, then `SaveBlockData()` inserts all related records in a single transaction. This ensures:
-- No partial block states in database
-- Consistent checkpoint updates
-- Efficient bulk inserts via pgx `CopyFrom`
+Flow access nodes only serve current spork blocks. Configure `FLOW_HISTORIC_ACCESS_NODES` with per-spork nodes. Supports batch API (spork 18+) and per-tx fallback (spork 1-17).
 
 ## Common Development Patterns
 
 ### Adding New API Endpoints
 1. Define route in `backend/internal/api/server.go`
-2. Implement handler method on `Server` struct
-3. Add repository method if database access needed
-4. Update frontend `src/api.js` with new API call
+2. Implement handler on `Server` struct
+3. Add repository method if needed
+4. Update frontend `app/api.ts` or regenerate from OpenAPI spec
 
 ### Adding New Database Tables
-1. Add CREATE TABLE to `backend/schema_v2.sql`
+1. Add to `backend/schema_v2.sql` (use `CREATE TABLE IF NOT EXISTS` + `ALTER TABLE ADD COLUMN IF NOT EXISTS`)
 2. Define Go struct in `internal/models/models.go`
 3. Add repository methods in `internal/repository/postgres.go`
-4. Update `SaveBlockData()` if part of block ingestion pipeline
-
-### Modifying Ingester Logic
-1. Worker logic: `internal/ingester/worker.go` (`FetchBlockData` method)
-2. Service orchestration: `internal/ingester/service.go`
-3. Configuration: `backend/main.go` (ingester initialization)
-4. Schema changes: `backend/schema_v2.sql` + models
 
 ### Frontend Component Development
-1. Use Shadcn/UI components from `src/components/ui/`
-2. Follow minimal, monochrome aesthetic
-3. Tailwind utility classes for styling
-4. Framer Motion for animations
-5. Lucide React for icons
+1. Shadcn/UI components from `app/components/ui/`
+2. TailwindCSS utilities for styling
+3. Framer Motion for animations
+4. Lucide React for icons
+5. File-based routing in `app/routes/`
 
-## Workers (12 types)
-`main_ingester`, `token_worker`, `evm_worker`, `meta_worker`, `accounts_worker`, `ft_holdings_worker`, `nft_ownership_worker`, `token_metadata_worker`, `tx_contracts_worker`, `tx_metrics_worker`, `staking_worker`, `defi_worker`
+## Common Gotchas
+
+- **NUMERIC columns + empty strings**: Cadence event fields often return `""`. Always use `numericOrZero()` helper for NUMERIC/DECIMAL inserts.
+- **CREATE TABLE IF NOT EXISTS** does NOT modify existing tables. Must pair with `ALTER TABLE ADD COLUMN IF NOT EXISTS`.
+- **ALTER TABLE must come BEFORE CREATE INDEX** in schema_v2.sql if the index references new columns.
+- **Dead worker leases**: When a worker fails 21 times, lease gets stuck FAILED. Fix: `DELETE FROM app.worker_leases WHERE worker_type = 'xxx' AND status = 'FAILED'`
+- **Frontend build**: May require `NODE_OPTIONS="--max-old-space-size=8192"` to avoid OOM.
+- **Frontend source is in `app/` not `src/`** — the TanStack Start migration moved everything.
 
 ## Notes
 
-- The codebase prioritizes data completeness over storage optimization (exhaustive redundancy principle)
-- Worker concurrency should be tuned for your infrastructure (local: low, production: high)
+- The codebase prioritizes data completeness over storage optimization
+- Worker concurrency should be tuned for your infrastructure
 - Database migrations run automatically on backend startup via `repo.Migrate("schema_v2.sql")`
-- Frontend expects backend API at `VITE_API_URL` or falls back to relative paths
-- All timestamps use PostgreSQL `TIMESTAMPTZ` for timezone awareness
-- Addresses in DB are stored normalized as lowercase hex without `0x` prefix
-- EVM hashes are stored lowercase without `0x` in `raw.tx_lookup.evm_hash`
+- Exhaustive data capture aligned with Flow Access API spec
