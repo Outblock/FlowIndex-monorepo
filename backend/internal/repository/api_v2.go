@@ -432,13 +432,15 @@ func (r *Repository) ListFTHoldingsByToken(ctx context.Context, contract, contra
 
 func (r *Repository) ListFTTokens(ctx context.Context, limit, offset int) ([]models.FTToken, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT `+ftTokenSelectCols+`, COALESCE(h.holder_count, 0)
+		SELECT `+ftTokenSelectCols+`, COALESCE(h.holder_count, 0), b.timestamp
 		FROM app.ft_tokens ft
 		LEFT JOIN (
 			SELECT contract_address, contract_name, COUNT(*) AS holder_count
 			FROM app.ft_holdings WHERE balance > 0
 			GROUP BY contract_address, contract_name
 		) h ON h.contract_address = ft.contract_address AND h.contract_name = ft.contract_name
+		LEFT JOIN app.smart_contracts sc ON sc.address = ft.contract_address AND sc.name = ft.contract_name
+		LEFT JOIN raw.blocks b ON b.height = sc.first_seen_height
 		ORDER BY COALESCE(h.holder_count, 0) DESC, ft.contract_address ASC
 		LIMIT $1 OFFSET $2`, limit, offset)
 	if err != nil {
@@ -447,7 +449,7 @@ func (r *Repository) ListFTTokens(ctx context.Context, limit, offset int) ([]mod
 	defer rows.Close()
 	var out []models.FTToken
 	for rows.Next() {
-		t, err := scanFTTokenWithHolders(rows.Scan)
+		t, err := scanFTTokenWithHoldersAndDeploy(rows.Scan)
 		if err != nil {
 			return nil, err
 		}
@@ -510,6 +512,15 @@ func scanFTTokenWithHolders(scan func(dest ...interface{}) error) (models.FTToke
 	var t models.FTToken
 	err := scan(&t.ContractAddress, &t.ContractName, &t.Name, &t.Symbol, &t.Decimals,
 		&t.Description, &t.ExternalURL, &t.Logo, &t.VaultPath, &t.ReceiverPath, &t.BalancePath, &t.Socials, &t.EVMAddress, &t.TotalSupply, &t.IsVerified, &t.UpdatedAt, &t.HolderCount)
+	return t, err
+}
+
+func scanFTTokenWithHoldersAndDeploy(scan func(dest ...interface{}) error) (models.FTToken, error) {
+	var t models.FTToken
+	var deployedAt *time.Time
+	err := scan(&t.ContractAddress, &t.ContractName, &t.Name, &t.Symbol, &t.Decimals,
+		&t.Description, &t.ExternalURL, &t.Logo, &t.VaultPath, &t.ReceiverPath, &t.BalancePath, &t.Socials, &t.EVMAddress, &t.TotalSupply, &t.IsVerified, &t.UpdatedAt, &t.HolderCount, &deployedAt)
+	t.DeployedAt = deployedAt
 	return t, err
 }
 

@@ -420,6 +420,9 @@ func toFTListOutput(token models.FTToken) map[string]interface{} {
 	if token.TotalSupply != "" && token.TotalSupply != "0" {
 		out["total_supply"] = parseFloatOrZero(token.TotalSupply)
 	}
+	if token.DeployedAt != nil {
+		out["deployed_at"] = token.DeployedAt.UTC().Format("2006-01-02T15:04:05Z")
+	}
 	return out
 }
 
