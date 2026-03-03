@@ -484,6 +484,13 @@ jobs:
               -e GOTRUE_EXTERNAL_EMAIL_ENABLED=true \
               -e GOTRUE_MAILER_AUTOCONFIRM=true \
               -e GOTRUE_MAILER_URLPATHS_CONFIRMATION=/developer/callback \
+              -e GOTRUE_MAILER_EXTERNAL_HOSTS=flowindex.io \
+              -e GOTRUE_SMTP_HOST="${{ secrets.GOTRUE_SMTP_HOST }}" \
+              -e GOTRUE_SMTP_PORT="${{ secrets.GOTRUE_SMTP_PORT }}" \
+              -e GOTRUE_SMTP_USER="${{ secrets.GOTRUE_SMTP_USER }}" \
+              -e GOTRUE_SMTP_PASS="${{ secrets.GOTRUE_SMTP_PASS }}" \
+              -e GOTRUE_SMTP_SENDER_NAME="${{ secrets.GOTRUE_SMTP_SENDER_NAME }}" \
+              -e GOTRUE_SMTP_ADMIN_EMAIL="${{ secrets.GOTRUE_SMTP_ADMIN_EMAIL }}" \
               -e GOTRUE_EXTERNAL_GITHUB_ENABLED=true \
               -e GOTRUE_EXTERNAL_GITHUB_CLIENT_ID="${{ secrets.OAUTH_GITHUB_CLIENT_ID }}" \
               -e GOTRUE_EXTERNAL_GITHUB_SECRET="${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}" \

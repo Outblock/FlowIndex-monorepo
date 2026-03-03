@@ -312,14 +312,14 @@ CREATE INDEX IF NOT EXISTS idx_workflows_user_id ON public.workflows(user_id);
 
 Run on production supabase via:
 ```bash
-docker exec -e PGPASSWORD=supabase-secret-prod-2026 supabase-postgres \
+docker exec -e PGPASSWORD=${SUPABASE_DB_PASSWORD} supabase-postgres \
   psql -U supabase_admin -d supabase -c "CREATE TABLE IF NOT EXISTS public.workflows ..."
 ```
 
 **Step 2: Verify table exists**
 
 ```bash
-docker exec -e PGPASSWORD=supabase-secret-prod-2026 supabase-postgres \
+docker exec -e PGPASSWORD=${SUPABASE_DB_PASSWORD} supabase-postgres \
   psql -U supabase_admin -d supabase -c "\dt public.workflows"
 ```
 
@@ -1932,7 +1932,7 @@ cd frontend && npm run build
 **Step 3: Run DB migration** (on production)
 
 ```bash
-docker exec -e PGPASSWORD=supabase-secret-prod-2026 supabase-postgres \
+docker exec -e PGPASSWORD=${SUPABASE_DB_PASSWORD} supabase-postgres \
   psql -U supabase_admin -d supabase -c "
     CREATE TABLE IF NOT EXISTS public.workflows (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
