@@ -3,7 +3,7 @@ import { AddressLink } from '../../components/AddressLink';
 import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import { resolveApiBaseUrl } from '../../api';
 import { buildMeta } from '../../lib/og/meta';
-import { ArrowLeft, Activity, User, Box, Clock, CheckCircle, XCircle, Hash, ArrowRightLeft, ArrowRight, Coins, Image as ImageIcon, Zap, Database, AlertCircle, FileText, Layers, Braces, ExternalLink, Repeat, Globe, ChevronDown, Sparkles } from 'lucide-react';
+import { ArrowLeft, Activity, User, Box, Clock, CheckCircle, XCircle, Hash, ArrowRightLeft, ArrowRight, Coins, Image as ImageIcon, Zap, Database, AlertCircle, FileText, Layers, Braces, ExternalLink, Repeat, Globe, ChevronDown, Sparkles, Play } from 'lucide-react';
 import { openAIChat } from '../../components/chat/openAIChat';
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/time';
 import { useTimeTicker } from '../../hooks/useTimeTicker';
@@ -1764,6 +1764,33 @@ function TransactionDetail() {
                                         <h3 className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                             <Braces className="h-4 w-4" /> Cadence Script
                                         </h3>
+                                        <div className="flex items-center gap-2">
+                                        {transaction.script && (
+                                            <Link
+                                                to="/playground"
+                                                search={() => {
+                                                    const params: Record<string, string> = {
+                                                        code: btoa(unescape(encodeURIComponent(transaction.script))),
+                                                    };
+                                                    if (transaction.arguments) {
+                                                        try {
+                                                            const args = typeof transaction.arguments === 'string'
+                                                                ? JSON.parse(transaction.arguments)
+                                                                : transaction.arguments;
+                                                            if (Array.isArray(args)) {
+                                                                params.args = btoa(unescape(encodeURIComponent(JSON.stringify(args))));
+                                                            }
+                                                        } catch { /* skip args if unparseable */ }
+                                                    }
+                                                    return params;
+                                                }}
+                                                target="_blank"
+                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 transition-colors"
+                                            >
+                                                <Play size={10} />
+                                                Open in Playground
+                                            </Link>
+                                        )}
                                         {parsedError?.scriptErrorLine && transaction.script && (
                                             <button
                                                 onClick={() => {
@@ -1776,6 +1803,7 @@ function TransactionDetail() {
                                                 Jump to Error (Line {parsedError.scriptErrorLine})
                                             </button>
                                         )}
+                                        </div>
                                     </div>
                                     {transaction.script ? (
                                         <div className="border border-zinc-200 dark:border-white/5 rounded-sm overflow-hidden text-[10px]">
