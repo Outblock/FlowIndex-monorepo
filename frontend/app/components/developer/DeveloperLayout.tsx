@@ -40,7 +40,11 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !user) {
-      navigate({ to: '/developer/login' })
+      const redirectTarget =
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}`
+          : '/developer'
+      navigate({ to: '/developer/login', search: { redirect: redirectTarget } })
     }
   }, [loading, user, navigate])
 

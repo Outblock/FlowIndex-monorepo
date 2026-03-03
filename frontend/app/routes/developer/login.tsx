@@ -35,6 +35,31 @@ export const Route = createFileRoute('/developer/login')({
   component: DeveloperLoginPage,
 })
 
+const SIM_STUDIO_URL = import.meta.env.VITE_SIM_STUDIO_URL || 'https://studio.flowindex.io'
+const SIM_STUDIO_ORIGIN = (() => {
+  try {
+    return new URL(SIM_STUDIO_URL).origin
+  } catch {
+    return 'https://studio.flowindex.io'
+  }
+})()
+
+function normalizeRedirectTarget(redirect?: string): string {
+  if (!redirect) return '/developer'
+  if (redirect.startsWith('/')) return redirect
+
+  try {
+    const url = new URL(redirect)
+    if (url.origin === window.location.origin || url.origin === SIM_STUDIO_ORIGIN) {
+      return url.toString()
+    }
+  } catch {
+    // Ignore malformed redirect
+  }
+
+  return '/developer'
+}
+
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
@@ -44,7 +69,7 @@ const fadeUp = {
 function DeveloperLoginPage() {
   const { user, loading: authLoading, sendMagicLink, verifyOtp, signInWithProvider } = useAuth()
   const { redirect } = Route.useSearch()
-  const redirectTo = redirect && redirect.startsWith('/') ? redirect : '/developer'
+  const redirectTo = normalizeRedirectTarget(redirect)
 
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
