@@ -348,8 +348,8 @@ export default function ResultPanel({ results, loading }: ResultPanelProps) {
         .json-tree-punctuation { color: #808080; }
         .json-tree-expand,
         .json-tree-collapse { cursor: pointer; color: #808080; user-select: none; display: inline-block; min-width: 14px; text-align: center; margin-right: 4px; font-size: 1.2em; }
-        .json-tree-expand::after { content: '\25B8'; }
-        .json-tree-collapse::after { content: '\25BE'; }
+        .json-tree-expand::after { content: '\\25B8'; }
+        .json-tree-collapse::after { content: '\\25BE'; }
         .json-tree-expand:hover,
         .json-tree-collapse:hover { color: #d4d4d4; }
         .json-tree-collapsed-content { color: #808080; cursor: pointer; margin-right: 4px; }
