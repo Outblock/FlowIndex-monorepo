@@ -171,6 +171,9 @@ export default function App() {
     return loadProject();
   });
 
+  // Pre-fill args from URL ?args=base64 (JSON array or Cadence JSON array)
+  const [initialArgsApplied, setInitialArgsApplied] = useState(false);
+
   const [network, setNetwork] = useState<FlowNetwork>(() => {
     const params = new URLSearchParams(window.location.search);
     const n = params.get('network');
@@ -321,6 +324,35 @@ export default function App() {
 
   const scriptParams = useMemo(() => parseMainParams(activeCode), [activeCode]);
   const codeType = useMemo(() => detectCodeType(activeCode), [activeCode]);
+
+  // Apply args from URL once params are available
+  useEffect(() => {
+    if (initialArgsApplied || scriptParams.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const argsParam = params.get('args');
+    if (!argsParam) { setInitialArgsApplied(true); return; }
+
+    try {
+      let argsStr: string;
+      try { argsStr = atob(argsParam); } catch { argsStr = argsParam; }
+      const parsed = JSON.parse(argsStr);
+      if (!Array.isArray(parsed)) { setInitialArgsApplied(true); return; }
+
+      const vals: Record<string, string> = {};
+      for (let i = 0; i < scriptParams.length && i < parsed.length; i++) {
+        const item = parsed[i];
+        // Support Cadence JSON ({type, value}) or plain values
+        if (item !== null && typeof item === 'object' && 'type' in item && 'value' in item) {
+          const v = item.value;
+          vals[scriptParams[i].name] = typeof v === 'string' ? v : JSON.stringify(v);
+        } else {
+          vals[scriptParams[i].name] = typeof item === 'string' ? item : JSON.stringify(item);
+        }
+      }
+      setParamValues(vals);
+    } catch { /* ignore parse errors */ }
+    setInitialArgsApplied(true);
+  }, [scriptParams, initialArgsApplied]);
 
   const handleCodeChange = useCallback((value: string) => {
     setProject((prev) => updateFileContent(prev, prev.activeFile, value));
