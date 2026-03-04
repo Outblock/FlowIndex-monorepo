@@ -70,10 +70,13 @@ func (bm *bucketMap) allow(key string, rps rate.Limit, burst int) bool {
 // ---------------------------------------------------------------------------
 
 var (
-	ipBuckets    = newBucketMap(15 * time.Minute)
-	userBuckets  = newBucketMap(15 * time.Minute)
-	anonRPS      rate.Limit
-	anonBurst    int
+	ipBuckets       = newBucketMap(15 * time.Minute)
+	userBuckets     = newBucketMap(15 * time.Minute)
+	anonRPS         rate.Limit
+	anonBurst       int
+	trustedOriginRPS   rate.Limit
+	trustedOriginBurst int
+	trustedOrigins     map[string]bool
 )
 
 func init() {
@@ -101,6 +104,40 @@ func init() {
 	}
 	anonRPS = rate.Limit(rps)
 	anonBurst = burst
+
+	// Trusted origins get elevated rate limits (browser Origin header cannot be spoofed).
+	originRPS := 30.0
+	if v := strings.TrimSpace(os.Getenv("API_RATE_LIMIT_TRUSTED_RPS")); v != "" {
+		if n, err := strconv.ParseFloat(v, 64); err == nil && n > 0 {
+			originRPS = n
+		}
+	}
+	trustedOriginRPS = rate.Limit(originRPS)
+	trustedOriginBurst = int(originRPS * 2)
+	if trustedOriginBurst < 1 {
+		trustedOriginBurst = 1
+	}
+
+	// Default trusted origins; override with comma-separated API_RATE_LIMIT_TRUSTED_ORIGINS.
+	defaultOrigins := []string{
+		"https://flowindex.io",
+		"https://www.flowindex.io",
+		"https://run.flowindex.io",
+		"https://ai.flowindex.io",
+		"https://studio.flowindex.io",
+	}
+	trustedOrigins = make(map[string]bool, len(defaultOrigins))
+	if v := strings.TrimSpace(os.Getenv("API_RATE_LIMIT_TRUSTED_ORIGINS")); v != "" {
+		for _, o := range strings.Split(v, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				trustedOrigins[o] = true
+			}
+		}
+	} else {
+		for _, o := range defaultOrigins {
+			trustedOrigins[o] = true
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -202,9 +239,17 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 		if ip == "" {
 			ip = "unknown"
 		}
-		if !ipBuckets.allow(ip, anonRPS, anonBurst) {
+
+		// Elevate limits for requests from our own websites (Origin/Referer
+		// are set by the browser and cannot be spoofed via JavaScript).
+		rpsForIP, burstForIP := anonRPS, anonBurst
+		if isTrustedOrigin(r) {
+			rpsForIP, burstForIP = trustedOriginRPS, trustedOriginBurst
+		}
+
+		if !ipBuckets.allow(ip, rpsForIP, burstForIP) {
 			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(anonRPS)))
+			w.Header().Set("X-RateLimit-Limit", strconv.Itoa(int(rpsForIP)))
 			w.WriteHeader(http.StatusTooManyRequests)
 			w.Write([]byte(`{"error":"rate_limited","message":"too many requests"}`))
 			return
@@ -216,6 +261,24 @@ func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+func isTrustedOrigin(r *http.Request) bool {
+	if origin := strings.TrimSpace(r.Header.Get("Origin")); origin != "" {
+		return trustedOrigins[origin]
+	}
+	// Fallback to Referer (same-origin GET requests may omit Origin).
+	if ref := strings.TrimSpace(r.Header.Get("Referer")); ref != "" {
+		// Extract origin from full referer URL (scheme + host).
+		if idx := strings.Index(ref, "://"); idx > 0 {
+			rest := ref[idx+3:]
+			if slash := strings.Index(rest, "/"); slash > 0 {
+				return trustedOrigins[ref[:idx+3+slash]]
+			}
+			return trustedOrigins[ref]
+		}
+	}
+	return false
+}
 
 func sha256Hash(s string) string {
 	h := sha256.Sum256([]byte(s))
