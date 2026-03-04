@@ -6052,8 +6052,12 @@ export function RedisIcon(props: SVGProps<SVGSVGElement>) {
 
 export function FlowIcon(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-      <path d="M12.8 5.6H17.6V10.4H12.8V5.6ZM8 10.4H12.8V15.2H17.6V10.4H12.8V5.6H8V10.4ZM8 15.2V20H12.8V15.2H8ZM3.2 10.4H8V15.2H3.2V10.4Z" />
+    <svg viewBox="0 0 100 100" {...props}>
+      <circle cx="50" cy="50" r="50" fill="#00EF8B" />
+      <rect x="57.8" y="42.2" width="14.1" height="14.1" fill="#fff" />
+      <path fill="#fff" d="M43.7,61.6c0,2.9-2.4,5.3-5.3,5.3s-5.3-2.4-5.3-5.3c0-2.9,2.4-5.3,5.3-5.3h5.3V42.2h-5.3C27.7,42.2,19,50.9,19,61.6S27.7,81,38.4,81s19.4-8.7,19.4-19.4v-5.3H43.7V61.6z" />
+      <path fill="#fff" d="M63.1,35.1H79V21H63.1c-10.7,0-19.4,8.7-19.4,19.4v1.8h14.1v-1.8C57.8,37.5,60.2,35.1,63.1,35.1z" />
+      <polygon fill="#16FF99" points="57.8,42.2 57.8,42.2 43.7,42.2 43.7,56.3 57.8,56.3" />
     </svg>
   )
 }
