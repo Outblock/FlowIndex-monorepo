@@ -2,10 +2,12 @@ import { createMCPClient } from "@ai-sdk/mcp";
 import { anthropic } from "@ai-sdk/anthropic";
 import {
   streamText,
+  tool,
   stepCountIs,
   convertToModelMessages,
   type UIMessage,
 } from "ai";
+import { z } from "zod";
 
 const CADENCE_MCP_URL =
   process.env.CADENCE_MCP_URL || "https://cadence-mcp.up.railway.app/mcp";
@@ -45,51 +47,92 @@ async function safeMcpTools(
   }
 }
 
+/* ── Client-side editor tools (no execute — handled in browser) ── */
+
+const editorTools = {
+  list_files: tool({
+    description: "List all editable files in the project with their paths",
+    inputSchema: z.object({}),
+  }),
+  read_file: tool({
+    description: "Read the content of a file by path",
+    inputSchema: z.object({
+      path: z.string().describe("File path"),
+    }),
+  }),
+  create_file: tool({
+    description: "Create a new file in the project",
+    inputSchema: z.object({
+      path: z
+        .string()
+        .describe("File path (relative, e.g. contracts/Token.cdc)"),
+      content: z.string().describe("File content"),
+    }),
+  }),
+  update_file: tool({
+    description:
+      "Replace the entire content of an existing file. User will review via diff.",
+    inputSchema: z.object({
+      path: z.string().describe("File path"),
+      content: z.string().describe("New complete file content"),
+    }),
+  }),
+  edit_file: tool({
+    description:
+      "Apply search/replace patches to an existing file. User will review via diff.",
+    inputSchema: z.object({
+      path: z.string().describe("File path"),
+      patches: z
+        .array(
+          z.object({
+            search: z.string().describe("Exact text to find"),
+            replace: z.string().describe("Replacement text"),
+          })
+        )
+        .describe("Search/replace pairs"),
+    }),
+  }),
+  delete_file: tool({
+    description: "Delete a file from the project",
+    inputSchema: z.object({
+      path: z.string().describe("File path"),
+    }),
+  }),
+  set_active_file: tool({
+    description: "Switch the active editor tab to a file",
+    inputSchema: z.object({
+      path: z.string().describe("File path"),
+    }),
+  }),
+};
+
 const SYSTEM_PROMPT = `You are a Cadence programming assistant embedded in Cadence Runner.
 Your primary job is to help users write, edit, and debug Cadence smart contract code for Flow.
 
 ## Response style
 
 - Keep chat concise and implementation-focused.
-- For edit/create requests, first provide a short plan of what changed (3-6 bullets max).
-- Do not paste large code in explanation text.
-- Only show full code in chat when the user explicitly asks to view full code.
+- For edit/create requests, briefly explain what you will change (3-6 bullets max), then use the editor tools.
+- **Never paste full file code in chat text.** Use the editor tools to write code into files.
+- Only show short code snippets in chat when explaining concepts or answering questions.
 
-## Edit payload format (for editor apply)
+## Editor tools
 
-When code should be created/modified in the editor, include machine-readable fenced blocks after the short plan.
-Use one fenced block per changed file with a relative path in metadata.
+You have editor tools that directly manipulate project files. The user reviews changes via a diff view in the editor. **Always use these tools for any file operation — never output raw code blocks with path metadata.**
 
-### Editing existing files — use SEARCH/REPLACE blocks
+- \`list_files\` — see what files exist in the project.
+- \`read_file(path)\` — read a file before editing. Always read first so you know the current content.
+- \`create_file(path, content)\` — create a brand-new file with full content.
+- \`update_file(path, content)\` — rewrite an existing file. Provide the complete new file content. The editor shows a diff for the user to review.
+- \`edit_file(path, patches)\` — apply targeted search/replace patches to an existing file. Each patch has \`search\` (exact text to find) and \`replace\` (replacement text). Prefer this over \`update_file\` for small edits.
+- \`delete_file(path)\` — remove a file.
+- \`set_active_file(path)\` — switch the editor tab to a specific file.
 
-When editing an existing file, use SEARCH/REPLACE blocks instead of rewriting the entire file:
-
-\`\`\`cadence path=contracts/MyToken.cdc
-<<<<<<< SEARCH
-    old code to find exactly as it appears
-=======
-    new replacement code
->>>>>>> REPLACE
-\`\`\`
-
-Multiple SEARCH/REPLACE blocks can appear in one fenced block for the same file.
-The SEARCH section must match the existing code exactly (including whitespace).
-
-### Creating new files — use full content
-
-When creating a brand-new file, provide the complete file content:
-
-\`\`\`cadence path=contracts/NewToken.cdc
-// complete file content for new file
-\`\`\`
-
-Rules:
-- Include \`path=\` (or \`file=\`) metadata for every changed file block.
-- Paths must be relative (no leading \`/\`, no \`..\`, no \`deps/\`).
-- If only one file is changed, still include path metadata.
-- For existing files, always use SEARCH/REPLACE blocks (never rewrite the entire file).
-- For new files, provide complete file content.
-- If the user asks a pure question (no code changes), respond without file blocks.
+Workflow:
+1. Use \`list_files\` or \`read_file\` to understand the current code.
+2. Explain your plan briefly in chat.
+3. Use \`create_file\`, \`update_file\`, or \`edit_file\` to make changes. The user will see a diff and can accept or reject.
+4. If the user asks a question with no code changes, just answer in chat text.
 
 ## Cadence guidelines
 
@@ -188,6 +231,11 @@ export async function POST(req: Request) {
 
   const cadenceMcp = await safeMcpTools(CADENCE_MCP_URL);
 
+  const allTools = {
+    ...editorTools,
+    ...cadenceMcp.tools,
+  };
+
   const result = streamText({
     model: anthropic(cfg.model),
     ...(cfg.thinking && {
@@ -199,9 +247,7 @@ export async function POST(req: Request) {
     }),
     system: systemWithContext,
     messages: await convertToModelMessages(messages),
-    tools: {
-      ...cadenceMcp.tools,
-    },
+    tools: allTools,
     stopWhen: stepCountIs(10),
     onFinish: async () => {
       await cadenceMcp.client?.close();
