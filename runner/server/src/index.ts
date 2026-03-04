@@ -1,8 +1,9 @@
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
+import solc from 'solc';
 import { CadenceLSPClient } from './lspClient.js';
 import { DepsWorkspace, type FlowNetwork } from './depsWorkspace.js';
 import { SolidityLSPClient } from './solidityLspClient.js';
@@ -419,7 +420,96 @@ function remapUrisForClient(value: any, state: ConnectionState): void {
 
 // ─── HTTP + WebSocket servers ───────────────────────────────────────
 
-const httpServer = createServer((_req, res) => {
+// ─── HTTP helpers ─────────────────────────────────────────────────
+
+function setCorsHeaders(res: ServerResponse): void {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks).toString()));
+    req.on('error', reject);
+  });
+}
+
+function handleCompileSol(req: IncomingMessage, res: ServerResponse): void {
+  setCorsHeaders(res);
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Method not allowed' }));
+    return;
+  }
+
+  readBody(req)
+    .then((body) => {
+      let parsed: { sources?: Record<string, { content: string }> };
+      try {
+        parsed = JSON.parse(body);
+      } catch {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        return;
+      }
+
+      if (!parsed.sources || typeof parsed.sources !== 'object') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing "sources" field' }));
+        return;
+      }
+
+      const input = {
+        language: 'Solidity',
+        sources: parsed.sources,
+        settings: {
+          outputSelection: {
+            '*': {
+              '*': ['abi', 'evm.bytecode'],
+            },
+          },
+        },
+      };
+
+      const output = JSON.parse(solc.compile(JSON.stringify(input)));
+
+      // Flatten contracts: { "File.sol:ContractName": { abi, evm } }
+      const contracts: Record<string, any> = {};
+      if (output.contracts) {
+        for (const [fileName, fileContracts] of Object.entries(output.contracts as Record<string, any>)) {
+          for (const [contractName, contractData] of Object.entries(fileContracts as Record<string, any>)) {
+            contracts[`${fileName}:${contractName}`] = contractData;
+          }
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ contracts, errors: output.errors ?? [] }));
+    })
+    .catch((err: any) => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message ?? 'Internal server error' }));
+    });
+}
+
+const httpServer = createServer((req, res) => {
+  const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+  if (pathname === '/compile-sol') {
+    handleCompileSol(req, res);
+    return;
+  }
+
   res.writeHead(404);
   res.end();
 });
