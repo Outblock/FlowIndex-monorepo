@@ -6,7 +6,7 @@
       "name": "cadence-runner",
       "dependencies": {
         "@ai-sdk/react": "^3.0.103",
-        "@flowindex/flowtoken": "file:../frontend/packages/flowtoken",
+        "@flowindex/flowtoken": "file:./packages/flowtoken",
         "@monaco-editor/react": "^4.7.0",
         "@onflow/cadence-language-server": "^1.7.4",
         "@onflow/fcl": "^1.21.9",
@@ -146,7 +146,7 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.27.3", "", { "os": "win32", "cpu": "x64" }, "sha512-4uJGhsxuptu3OcpVAzli+/gWusVGwZZHTlS63hh++ehExkVT8SgiEf7/uC/PclrPPkLhZqGgCTjd0VWLo6xMqA=="],
 
-    "@flowindex/flowtoken": ["@flowindex/flowtoken@file:../frontend/packages/flowtoken", { "dependencies": { "react-markdown": "^9.0.1", "react-syntax-highlighter": "^15.5.0", "rehype-raw": "^7.0.0", "remark-gfm": "^4.0.0" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }],
+    "@flowindex/flowtoken": ["@flowindex/flowtoken@file:packages/flowtoken", { "dependencies": { "react-markdown": "^9.0.1", "react-syntax-highlighter": "^15.5.0", "rehype-raw": "^7.0.0", "remark-gfm": "^4.0.0" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }],
 
     "@improbable-eng/grpc-web": ["@improbable-eng/grpc-web@0.15.0", "", { "dependencies": { "browser-headers": "^0.4.1" }, "peerDependencies": { "google-protobuf": "^3.14.0" } }, "sha512-ERft9/0/8CmYalqOVnJnpdDry28q+j+nAlFFARdjyxXDJ+Mhgv9+F600QC8BR9ygOfrXRlAk6CvST2j+JCpQPg=="],
 
