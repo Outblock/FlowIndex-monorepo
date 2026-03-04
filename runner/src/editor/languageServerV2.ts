@@ -8,9 +8,6 @@
 import type { Message } from 'vscode-jsonrpc';
 import type { LSPBridge } from './languageServer';
 import { CadenceLanguageServer } from '@outblock/cadence-language-server';
-// Vite resolves these to hashed URLs at build time from the npm package
-import wasmUrl from '@outblock/cadence-language-server/dist/cadence-language-server.wasm?url';
-import workerUrl from '@outblock/cadence-language-server/dist/worker.js?url';
 
 let instance: CadenceLanguageServer | null = null;
 
@@ -49,7 +46,10 @@ export function preloadV2Cache(files: { path: string; content: string }[]) {
 export async function createV2LSPBridge(
   onMessage: (message: Message) => void,
 ): Promise<LSPBridge> {
-  // wasmUrl and workerUrl are resolved by Vite from the npm package
+  // Served from public/ — worker needs importScripts for wasm_exec.js
+  // so all three files (worker, wasm, wasm_exec) must be at the same path level
+  const wasmUrl = '/cadence-language-server.wasm';
+  const workerUrl = '/cadence-lsp-worker.js';
 
   let messageHandler = onMessage;
 
