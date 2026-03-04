@@ -360,6 +360,74 @@ contract MyToken {
     activeFile: 'src/MyToken.sol',
     folders: ['src'],
   },
+  {
+    label: 'Cross-VM (Cadence ↔ EVM)',
+    description: 'Call an EVM contract from a Cadence transaction',
+    icon: 'link',
+    files: [
+      {
+        path: 'src/Counter.sol',
+        content: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract Counter {
+    uint256 public count;
+
+    function increment() public {
+        count += 1;
+    }
+
+    function getCount() public view returns (uint256) {
+        return count;
+    }
+}
+`,
+        language: 'sol',
+      },
+      {
+        path: 'call_evm.cdc',
+        content: `import EVM from 0xe467b9dd11fa00df
+
+// Call an EVM contract from Cadence
+// Deploy Counter.sol first, then paste the address below.
+
+access(all) fun main(evmContractHex: String): UInt256 {
+    // Convert hex address to EVM.EVMAddress
+    let addressBytes = evmContractHex.decodeHex()
+    let evmAddress = EVM.EVMAddress(bytes: [
+        addressBytes[0],  addressBytes[1],  addressBytes[2],  addressBytes[3],
+        addressBytes[4],  addressBytes[5],  addressBytes[6],  addressBytes[7],
+        addressBytes[8],  addressBytes[9],  addressBytes[10], addressBytes[11],
+        addressBytes[12], addressBytes[13], addressBytes[14], addressBytes[15],
+        addressBytes[16], addressBytes[17], addressBytes[18], addressBytes[19]
+    ])
+
+    // ABI-encode getCount() selector: keccak256("getCount()")[:4] = 0xa87d942c
+    let calldata: [UInt8] = [0xa8, 0x7d, 0x94, 0x2c]
+
+    // Call the EVM contract
+    let result = EVM.run(
+        tx: calldata,
+        coinbase: evmAddress
+    )
+
+    // Decode the uint256 return value (last 32 bytes)
+    let data = result.data
+    // Simple decode: last 32 bytes as UInt256
+    var value: UInt256 = 0
+    var i = data.length - 32
+    while i < data.length {
+        value = value << 8 + UInt256(data[i])
+        i = i + 1
+    }
+    return value
+}
+`,
+      },
+    ],
+    activeFile: 'call_evm.cdc',
+    folders: ['src'],
+  },
 ];
 
 function defaultProject(): ProjectState {
