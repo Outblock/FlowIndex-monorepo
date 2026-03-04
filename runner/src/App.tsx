@@ -158,6 +158,15 @@ function applyCodeToPath(state: ProjectState, path: string, newCode: string): Pr
 export default function App() {
   const [project, setProject] = useState<ProjectState>(() => {
     const params = new URLSearchParams(window.location.search);
+    // If loading from a tx, start with empty editor (will be filled by fetch)
+    if (params.get('tx')) {
+      return {
+        files: [{ path: 'main.cdc', content: '// Loading transaction...' }],
+        activeFile: 'main.cdc',
+        openFiles: ['main.cdc'],
+        folders: [],
+      };
+    }
     const codeParam = params.get('code');
     if (codeParam) {
       let code: string;
@@ -183,12 +192,14 @@ export default function App() {
     const txId = params.get('tx');
     if (!txId) return;
 
-    const API_URL = import.meta.env.VITE_API_URL || 'https://api.flowindex.io';
+    // Use the main site's API proxy (works cross-origin with CORS)
+    const API_BASE = 'https://flowindex.io/api';
     (async () => {
       try {
-        const { data } = await axios.get(`${API_URL}/flow/v1/transactions/${txId}`);
-        const tx = data.data || data;
-        if (tx.script) {
+        const { data } = await axios.get(`${API_BASE}/flow/transaction/${txId}`);
+        // API returns { data: [tx] }
+        const tx = Array.isArray(data.data) ? data.data[0] : (data.data || data);
+        if (tx?.script) {
           setProject({
             files: [{ path: 'main.cdc', content: tx.script }],
             activeFile: 'main.cdc',
@@ -196,7 +207,7 @@ export default function App() {
             folders: [],
           });
         }
-        if (tx.arguments) {
+        if (tx?.arguments) {
           const args = typeof tx.arguments === 'string' ? JSON.parse(tx.arguments) : tx.arguments;
           if (Array.isArray(args) && args.length > 0) {
             pendingTxArgsRef.current = args;
@@ -283,9 +294,11 @@ export default function App() {
   }, [project, network]);
 
   // Cloud auto-save (debounced 2s) — auto-creates if no cloud project yet
+  const isTxMode = useMemo(() => !!new URLSearchParams(window.location.search).get('tx'), []);
   useEffect(() => {
     if (!user) return;
     if (viewingShared) return;
+    if (isTxMode) return; // Don't auto-save when viewing a transaction
     if (cloudMeta.id === '_dismissed') return;
 
     const timer = setTimeout(async () => {
