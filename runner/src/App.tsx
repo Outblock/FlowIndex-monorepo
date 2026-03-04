@@ -614,6 +614,22 @@ export default function App() {
     });
   }, []);
 
+  const handleAICreateFile = useCallback((path: string, content: string) => {
+    setProject((prev) => {
+      let next = createFile(prev, path, content);
+      next = updateFileContent(next, path, content);
+      return openFile(next, path);
+    });
+  }, []);
+
+  const handleAIDeleteFile = useCallback((path: string) => {
+    setProject((prev) => deleteFile(prev, path));
+  }, []);
+
+  const handleAISetActiveFile = useCallback((path: string) => {
+    setProject((prev) => openFile(prev, path));
+  }, []);
+
   const handleLoadTemplate = useCallback((template: Template) => {
     setProject({
       files: template.files,
@@ -1082,6 +1098,9 @@ export default function App() {
                   onApplyCodeToFile={handleApplyCodeToFile}
                   onAutoApplyEdits={handleAutoApplyEdits}
                   onLoadTemplate={handleLoadTemplate}
+                  onCreateFile={handleAICreateFile}
+                  onDeleteFile={handleAIDeleteFile}
+                  onSetActiveFile={handleAISetActiveFile}
                   editorCode={activeCode}
                   projectFiles={getUserFiles(project)}
                   activeFile={project.activeFile}
@@ -1149,6 +1168,9 @@ export default function App() {
               onApplyCodeToFile={(path, code) => { handleApplyCodeToFile(path, code); setShowMobileAI(false); }}
               onAutoApplyEdits={handleAutoApplyEdits}
               onLoadTemplate={(t) => { handleLoadTemplate(t); setShowMobileAI(false); }}
+              onCreateFile={handleAICreateFile}
+              onDeleteFile={handleAIDeleteFile}
+              onSetActiveFile={handleAISetActiveFile}
               editorCode={activeCode}
               projectFiles={getUserFiles(project)}
               activeFile={project.activeFile}

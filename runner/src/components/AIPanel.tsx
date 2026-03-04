@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import type { UIMessage } from 'ai';
 import {
   Bot, X, Send, Trash2, Loader2, Sparkles, Database, Copy, Check, Download,
@@ -39,6 +39,9 @@ interface AIPanelProps {
     meta?: { assistantId?: string; streaming?: boolean },
   ) => void;
   onLoadTemplate: (template: Template) => void;
+  onCreateFile?: (path: string, content: string) => void;
+  onDeleteFile?: (path: string) => void;
+  onSetActiveFile?: (path: string) => void;
   editorCode?: string;
   projectFiles?: { path: string; content: string; readOnly?: boolean }[];
   activeFile?: string;
@@ -1030,6 +1033,45 @@ function ChatMessage({ message, hideTools, isStreamingMsg, onInsertCode, onApply
                   />
                 );
               }
+              // Editor tools (client-side)
+              if (name === 'list_files' || name === 'read_file' || name === 'create_file'
+                || name === 'update_file' || name === 'edit_file' || name === 'delete_file'
+                || name === 'set_active_file') {
+                const done = toolPart.state === 'output-available' || toolPart.state === 'result';
+                const args = toolPart.input ?? toolPart.args ?? {};
+                const filePath = args.path || '';
+
+                const editorToolLabels: Record<string, string> = {
+                  list_files: 'Listed project files',
+                  read_file: `Read ${filePath}`,
+                  create_file: `Created ${filePath}`,
+                  update_file: `Updated ${filePath} (pending review)`,
+                  edit_file: `Edited ${filePath} (pending review)`,
+                  delete_file: `Deleted ${filePath}`,
+                  set_active_file: `Switched to ${filePath}`,
+                };
+                const pendingLabels: Record<string, string> = {
+                  list_files: 'Listing files...',
+                  read_file: `Reading ${filePath}...`,
+                  create_file: `Creating ${filePath}...`,
+                  update_file: `Updating ${filePath}...`,
+                  edit_file: `Editing ${filePath}...`,
+                  delete_file: `Deleting ${filePath}...`,
+                  set_active_file: `Switching to ${filePath}...`,
+                };
+
+                return (
+                  <div key={i} className="flex items-center gap-2 py-1.5 px-2.5 my-1 text-[11px] text-zinc-500 bg-zinc-800/50 border border-zinc-700/50 rounded">
+                    {!done ? (
+                      <Loader2 size={10} className="animate-spin" />
+                    ) : (
+                      <Code size={10} className="text-emerald-400" />
+                    )}
+                    <span className="truncate">{done ? editorToolLabels[name] : pendingLabels[name]}</span>
+                  </div>
+                );
+              }
+
               // SQL tools
               if (name === 'run_sql' || name === 'runSQL' || name === 'run_flowindex_sql' || name === 'run_evm_sql') {
                 return <SqlToolPart key={i} part={toolPart} />;
@@ -1380,6 +1422,9 @@ export default function AIPanel({
   onApplyCodeToFile,
   onAutoApplyEdits,
   onLoadTemplate,
+  onCreateFile,
+  onDeleteFile,
+  onSetActiveFile,
   editorCode,
   projectFiles,
   activeFile,
@@ -1445,8 +1490,81 @@ export default function AIPanel({
     [safeFetch],
   );
 
-  const { messages, sendMessage, status, stop, setMessages } = useChat({
+  // Stable refs for onToolCall callbacks
+  const onCreateFileRef = useRef(onCreateFile);
+  onCreateFileRef.current = onCreateFile;
+  const onDeleteFileRef = useRef(onDeleteFile);
+  onDeleteFileRef.current = onDeleteFile;
+  const onSetActiveFileRef = useRef(onSetActiveFile);
+  onSetActiveFileRef.current = onSetActiveFile;
+  const onAutoApplyEditsRef = useRef(onAutoApplyEdits);
+  onAutoApplyEditsRef.current = onAutoApplyEdits;
+
+  const { messages, sendMessage, status, stop, setMessages, addToolOutput } = useChat({
     transport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async onToolCall({ toolCall }: { toolCall: any }) {
+      if (toolCall.dynamic) return;
+
+      const id = toolCall.toolCallId;
+      const name = toolCall.toolName;
+      const args = toolCall.input ?? {};
+
+      // Schedule addToolOutput via setTimeout to avoid deadlock —
+      // onToolCall runs inside the stream job executor lock,
+      // and addToolOutput also needs that lock.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const emit = (output: any) => {
+        setTimeout(() => addToolOutput({ tool: name, toolCallId: id, output }), 0);
+      };
+      const emitError = (errorText: string) => {
+        setTimeout(() => addToolOutput({ tool: name, toolCallId: id, state: 'output-error' as const, errorText } as any), 0);
+      };
+
+      switch (name) {
+        case 'list_files': {
+          const files = (projectFilesRef.current || [])
+            .filter((f: { readOnly?: boolean }) => !f.readOnly)
+            .map((f: { path: string; content: string }) => ({ path: f.path, size: f.content.length }));
+          emit({ files });
+          return;
+        }
+        case 'read_file': {
+          const file = (projectFilesRef.current || []).find(
+            (f: { path: string }) => f.path === args.path,
+          );
+          if (file) emit({ content: file.content });
+          else emitError(`File not found: ${args.path}`);
+          return;
+        }
+        case 'create_file': {
+          onCreateFileRef.current?.(args.path, args.content);
+          emit({ success: true, path: args.path });
+          return;
+        }
+        case 'update_file': {
+          onAutoApplyEditsRef.current?.([{ path: args.path, code: args.content }]);
+          emit({ success: true, message: 'Diff pending user review' });
+          return;
+        }
+        case 'edit_file': {
+          onAutoApplyEditsRef.current?.([{ path: args.path, code: '', patches: args.patches }]);
+          emit({ success: true, message: 'Diff pending user review' });
+          return;
+        }
+        case 'delete_file': {
+          onDeleteFileRef.current?.(args.path);
+          emit({ success: true });
+          return;
+        }
+        case 'set_active_file': {
+          onSetActiveFileRef.current?.(args.path);
+          emit({ success: true });
+          return;
+        }
+      }
+    },
     onError: (error) => {
       console.error('[AIPanel] streaming error:', error);
       setChatError(error?.message || 'Failed to get response. Please try again.');
@@ -1472,38 +1590,25 @@ export default function AIPanel({
     try { localStorage.setItem(AUTO_APPLY_STORAGE_KEY, String(autoApply)); } catch { /* noop */ }
   }, [autoApply]);
 
-  const autoApplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Fallback: extract edits from code blocks in text ONLY after streaming finishes.
+  // Tool-based edits (update_file, edit_file) are handled by onToolCall above.
   useEffect(() => {
     if (!autoApply || !onAutoApplyEdits) return;
-    if (status !== 'ready' && status !== 'streaming') return;
+    if (status !== 'ready') return;
 
     const last = messages[messages.length - 1];
     if (!last || last.role !== 'assistant') return;
 
-    // Debounce during streaming to avoid cascading re-renders on every token
-    const delay = status === 'streaming' ? 300 : 0;
+    const edits = extractEditsFromAssistantMessage(last, false);
+    if (edits.length === 0) return;
 
-    if (autoApplyTimerRef.current) clearTimeout(autoApplyTimerRef.current);
-    autoApplyTimerRef.current = setTimeout(() => {
-      const allowPartialFence = status !== 'ready';
-      const edits = extractEditsFromAssistantMessage(last, allowPartialFence);
-      if (edits.length === 0) return;
+    const signature = editsSignature(edits);
+    if (!signature) return;
+    const prevSignature = appliedAssistantSignaturesRef.current.get(last.id);
+    if (prevSignature === signature) return;
+    appliedAssistantSignaturesRef.current.set(last.id, signature);
 
-      const signature = editsSignature(edits);
-      if (!signature) return;
-      const prevSignature = appliedAssistantSignaturesRef.current.get(last.id);
-      if (prevSignature === signature) return;
-      appliedAssistantSignaturesRef.current.set(last.id, signature);
-
-      onAutoApplyEdits(edits, {
-        assistantId: last.id,
-        streaming: status !== 'ready',
-      });
-    }, delay);
-
-    return () => {
-      if (autoApplyTimerRef.current) clearTimeout(autoApplyTimerRef.current);
-    };
+    onAutoApplyEdits(edits, { assistantId: last.id });
   }, [messages, status, autoApply, onAutoApplyEdits]);
 
   const handleSend = useCallback(async (text: string) => {
