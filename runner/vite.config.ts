@@ -7,6 +7,7 @@ export default defineConfig({
     alias: {
       '~': '/src',
     },
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime'],
   },
   optimizeDeps: {
     include: ['monaco-editor'],
