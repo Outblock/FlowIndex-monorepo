@@ -172,6 +172,7 @@ import { RouterBlock, RouterV2Block } from '@/blocks/blocks/router'
 import { RssBlock } from '@/blocks/blocks/rss'
 import { S3Block } from '@/blocks/blocks/s3'
 import { SalesforceBlock } from '@/blocks/blocks/salesforce'
+import { SendEmailBlock } from '@/blocks/blocks/send_email'
 import { ScheduleBlock } from '@/blocks/blocks/schedule'
 import { SearchBlock } from '@/blocks/blocks/search'
 import { SendGridBlock } from '@/blocks/blocks/sendgrid'
@@ -416,6 +417,7 @@ export const registry: Record<string, BlockConfig> = {
   rss: RssBlock,
   s3: S3Block,
   salesforce: SalesforceBlock,
+  send_email: SendEmailBlock,
   schedule: ScheduleBlock,
   search: SearchBlock,
   sendgrid: SendGridBlock,
