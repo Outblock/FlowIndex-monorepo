@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       limit: limit || '100',
     })
     const data = await flowApiFetch<{ data: FlowEvent[]; _meta?: { count?: number } }>(
-      `/flow/v1/events/search${qs}`
+      `/flow/events/search${qs}`
     )
     const events = data.data ?? (data as unknown as FlowEvent[])
     const list = Array.isArray(events) ? events : []

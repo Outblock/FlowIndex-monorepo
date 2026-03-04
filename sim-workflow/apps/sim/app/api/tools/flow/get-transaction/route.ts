@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { id } = Schema.parse(body)
 
-    const data = await flowApiFetch<{ data: FlowTransaction }>(`/flow/v1/transaction/${id}`)
+    const data = await flowApiFetch<{ data: FlowTransaction }>(`/flow/transaction/${id}`)
     const tx = data.data ?? (data as unknown as FlowTransaction)
 
     return NextResponse.json({

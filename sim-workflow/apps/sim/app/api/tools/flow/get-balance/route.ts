@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const addr = address.replace(/^0x/, '').toLowerCase()
 
     const qs = buildQueryString({ token })
-    const data = await flowApiFetch<{ data: FtBalance[] }>(`/flow/v1/account/${addr}/ft${qs}`)
+    const data = await flowApiFetch<{ data: FtBalance[] }>(`/flow/account/${addr}/ft${qs}`)
     const balances = data.data ?? (data as unknown as FtBalance[])
     const list = Array.isArray(balances) ? balances : []
 

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const cleanName = name.replace(/\.find$/i, '').trim()
 
     const data = await flowApiFetch<Record<string, unknown>>(
-      `/flow/v1/resolve/${encodeURIComponent(cleanName)}`
+      `/flow/account/${encodeURIComponent(cleanName)}`
     )
 
     const profile = data.data ?? data

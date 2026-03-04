@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const { collectionIdentifier } = Schema.parse(body)
 
     const data = await flowApiFetch<Record<string, unknown>>(
-      `/flow/v1/nft/collections/${encodeURIComponent(collectionIdentifier)}`
+      `/flow/nft/${encodeURIComponent(collectionIdentifier)}`
     )
 
     const collection = data.data ?? data

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const addr = address.replace(/^0x/, '').toLowerCase()
 
     const data = await flowApiFetch<{ data?: { code?: string }; code?: string }>(
-      `/flow/v1/account/${addr}/contract/${contractName}`
+      `/flow/account/${addr}/contract/${contractName}`
     )
     const code = data.data?.code ?? data.code ?? ''
 

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { height, id } = Schema.parse(body)
 
-    const path = id ? `/flow/v1/block/id/${id}` : `/flow/v1/block/${height}`
+    const path = id ? `/flow/block/${id}` : `/flow/block/${height}`
     const data = await flowApiFetch<{ data: FlowBlock }>(path)
     const block = data.data ?? (data as unknown as FlowBlock)
 

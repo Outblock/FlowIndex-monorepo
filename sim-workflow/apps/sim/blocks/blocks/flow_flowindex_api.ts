@@ -13,7 +13,7 @@ export const FlowFlowIndexApiBlock: BlockConfig = {
       id: 'endpoint',
       title: 'Endpoint',
       type: 'short-input',
-      placeholder: '/flow/v1/blocks?limit=5',
+      placeholder: '/flow/block?limit=5',
       required: true,
     },
     {

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const addr = address ? address.replace(/^0x/, '').toLowerCase() : undefined
     const qs = buildQueryString({ symbol, address: addr })
     const data = await flowApiFetch<{ data: Array<Record<string, unknown>> }>(
-      `/flow/v1/ft/tokens${qs}`
+      `/flow/ft${qs}`
     )
     const tokens = data.data ?? (data as unknown as Array<Record<string, unknown>>)
     const list = Array.isArray(tokens) ? tokens : []
