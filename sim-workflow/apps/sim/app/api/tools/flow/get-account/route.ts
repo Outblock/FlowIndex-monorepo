@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const { address } = Schema.parse(body)
     const addr = address.replace(/^0x/, '').toLowerCase()
 
-    const data = await flowApiFetch<{ data: FlowAccountInfo }>(`/flow/v1/account/${addr}`)
+    const data = await flowApiFetch<{ data: FlowAccountInfo }>(`/flow/account/${addr}`)
     const account = data.data ?? (data as unknown as FlowAccountInfo)
 
     const contractNames = Array.isArray(account.contracts) ? account.contracts : []

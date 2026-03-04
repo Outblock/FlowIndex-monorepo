@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const { name } = Schema.parse(body)
 
     const data = await flowApiFetch<{ data: { address: string } }>(
-      `/flow/v1/account/${encodeURIComponent(name)}`
+      `/flow/account/${encodeURIComponent(name)}`
     )
     const account = data.data ?? (data as unknown as { address: string })
     const address = account.address || ''

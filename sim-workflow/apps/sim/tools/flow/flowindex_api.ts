@@ -19,7 +19,7 @@ export const flowFlowIndexApiTool: ToolConfig<FlowFlowIndexApiParams, FlowFlowIn
     endpoint: {
       type: 'string',
       required: true,
-      description: 'API endpoint path (e.g. /flow/v1/blocks)',
+      description: 'API endpoint path (e.g. /flow/block)',
     },
     method: {
       type: 'string',

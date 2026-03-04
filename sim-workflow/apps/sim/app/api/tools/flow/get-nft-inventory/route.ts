@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const addr = address.replace(/^0x/, '').toLowerCase()
 
     const data = await flowApiFetch<{ data: Array<Record<string, unknown>> }>(
-      `/flow/v1/account/${addr}/nft`
+      `/flow/account/${addr}/nft`
     )
     const collections = Array.isArray(data.data) ? data.data : []
 
