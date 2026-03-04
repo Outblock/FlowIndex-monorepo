@@ -1334,6 +1334,44 @@ export async function formatWebhookInput(
     return extractAttioGenericData(body)
   }
 
+  if (foundWebhook.provider === 'flow') {
+    const eventType = body.event_type || ''
+    const data = body.data || body
+
+    // Normalize addresses to 0x-prefixed format
+    const addr = (v: unknown): string => {
+      if (!v || typeof v !== 'string') return ''
+      return v.startsWith('0x') ? v : `0x${v}`
+    }
+
+    return {
+      eventType,
+      blockHeight: data.block_height ?? body.block_height ?? 0,
+      timestamp: data.timestamp ?? body.timestamp ?? '',
+      transactionId: data.transaction_id || data.tx_hash || '',
+      from: addr(data.from_address || data.sender),
+      to: addr(data.to_address || data.receiver),
+      amount: String(data.amount ?? ''),
+      token: data.token_symbol || data.token || '',
+      nftId: data.nft_id || '',
+      collection: data.collection || data.nft_type || '',
+      proposer: addr(data.proposer),
+      payer: addr(data.payer),
+      authorizers: Array.isArray(data.authorizers) ? data.authorizers.map(addr) : [],
+      status: data.status || '',
+      isEvm: Boolean(data.is_evm),
+      nodeId: data.node_id || '',
+      delegatorId: data.delegator_id || '',
+      stakingAmount: String(data.staking_amount ?? ''),
+      pool: data.pool || data.pair_address || '',
+      swapAmountIn: String(data.amount_in ?? ''),
+      swapAmountOut: String(data.amount_out ?? ''),
+      evmHash: data.evm_hash || '',
+      gasUsed: data.gas_used || 0,
+      raw: JSON.stringify(body),
+    }
+  }
+
   return body
 }
 
