@@ -1,7 +1,7 @@
 FROM oven/bun:1 AS frontend-builder
 WORKDIR /app
 COPY runner/package.json runner/bun.lock* ./
-COPY frontend/packages/flowtoken /frontend/packages/flowtoken
+COPY frontend/packages/flowtoken ./packages/flowtoken
 RUN bun install --frozen-lockfile
 COPY runner/ .
 ARG VITE_AI_CHAT_URL=https://ai.flowindex.io
