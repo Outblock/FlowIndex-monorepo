@@ -1668,6 +1668,7 @@ import {
   resendSendTool,
   resendUpdateContactTool,
 } from '@/tools/resend'
+import { systemSendEmailTool } from '@/tools/flow/system_send_email'
 import {
   revenuecatCreatePurchaseTool,
   revenuecatDeferGoogleSubscriptionTool,
@@ -2505,6 +2506,7 @@ export const tools: Record<string, ToolConfig> = {
   resend_update_contact: resendUpdateContactTool,
   resend_delete_contact: resendDeleteContactTool,
   resend_list_domains: resendListDomainsTool,
+  system_send_email: systemSendEmailTool,
   sendgrid_send_mail: sendGridSendMailTool,
   sendgrid_add_contact: sendGridAddContactTool,
   sendgrid_get_contact: sendGridGetContactTool,
