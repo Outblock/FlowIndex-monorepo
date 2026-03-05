@@ -15,6 +15,7 @@ import { configureFcl } from './flow/fclConfig';
 import { parseMainParams } from './flow/cadenceParams';
 import { detectCodeType, executeScript, executeTransaction, executeCustodialTransaction, deployContract } from './flow/execute';
 import type { ExecutionResult } from './flow/execute';
+import { parseExecutionError, setErrorDecorations, type ParsedArgError } from './editor/errorDecorations';
 import type { FlowNetwork } from './flow/networks';
 import { useAuth } from './auth/AuthContext';
 import { useKeys } from './auth/useKeys';
@@ -433,6 +434,8 @@ export default function App() {
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const pendingDefinitionRef = useRef<{ path: string; line: number; column: number } | null>(null);
+  const errorDecoCleanupRef = useRef<(() => void) | null>(null);
+  const [argErrors, setArgErrors] = useState<ParsedArgError[]>([]);
 
   // Resize hooks
   const explorer = useHorizontalResize(220, 150, 400, 'left');
@@ -621,6 +624,11 @@ export default function App() {
       if (!confirmed) return;
     }
 
+    // Clear previous error decorations
+    errorDecoCleanupRef.current?.();
+    errorDecoCleanupRef.current = null;
+    setArgErrors([]);
+
     setLoading(true);
     setResults([]);
 
@@ -659,6 +667,32 @@ export default function App() {
 
     setLoading(false);
   }, [activeCode, codeType, paramValues, loading, selectedSigner, signWithLocalKey, promptForPassword, autoSign]);
+
+  // Apply error decorations when execution results contain errors
+  useEffect(() => {
+    const lastError = [...results].reverse().find((r: ExecutionResult) => r.type === 'error');
+    if (!lastError || typeof lastError.data !== 'string') return;
+
+    const parsed = parseExecutionError(lastError.data);
+
+    // Line error → Monaco decorations
+    if (parsed.lineError && editorRef.current && monacoInstance) {
+      errorDecoCleanupRef.current?.();
+      errorDecoCleanupRef.current = setErrorDecorations(editorRef.current, monacoInstance, parsed.lineError);
+    }
+
+    // Argument errors → highlight param inputs
+    if (parsed.argErrors.length > 0) {
+      setArgErrors(parsed.argErrors);
+    }
+  }, [results, monacoInstance]);
+
+  // Clear error decorations when code changes
+  useEffect(() => {
+    errorDecoCleanupRef.current?.();
+    errorDecoCleanupRef.current = null;
+    setArgErrors([]);
+  }, [activeCode]);
 
   const handleInsertCode = useCallback((newCode: string) => {
     setProject((prev) => updateFileContent(prev, prev.activeFile, newCode));
@@ -1375,6 +1409,7 @@ export default function App() {
                     params={scriptParams}
                     values={paramValues}
                     onChange={setParamValues}
+                    argErrors={argErrors}
                   />
                 </div>
                 <div className="flex-1 min-h-0">

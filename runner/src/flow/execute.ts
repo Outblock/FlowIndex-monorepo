@@ -2,7 +2,7 @@ import { fcl } from './fclConfig';
 import { parseMainParams, buildFclArgs } from './cadenceParams';
 
 export interface ExecutionResult {
-  type: 'script_result' | 'tx_submitted' | 'tx_sealed' | 'error';
+  type: 'script_result' | 'tx_submitted' | 'tx_sealed' | 'error' | 'log';
   data: any;
   events?: any[];
   txId?: string;
