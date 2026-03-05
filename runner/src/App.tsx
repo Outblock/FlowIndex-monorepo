@@ -480,6 +480,7 @@ export default function App() {
   const [showGitHubConnect, setShowGitHubConnect] = useState(false);
   const [gitPushing, setGitPushing] = useState(false);
   const [lastPulledFiles, setLastPulledFiles] = useState<Map<string, string>>(new Map());
+  const [hasPulled, setHasPulled] = useState(false);
 
   const github = useGitHub(cloudMeta.id);
 
@@ -1084,9 +1085,24 @@ export default function App() {
     }
   }, [ghInstallationId, github.connection]);
 
+  // Auto-pull files when connection exists on page load
+  useEffect(() => {
+    if (github.connection && !hasPulled) {
+      github.pullFiles().then(files => {
+        const pulled = new Map<string, string>();
+        files.forEach(f => pulled.set(f.path, f.content));
+        setLastPulledFiles(pulled);
+        setHasPulled(true);
+      }).catch(() => {
+        // If pull fails (e.g. empty repo), still mark as pulled
+        setHasPulled(true);
+      });
+    }
+  }, [github.connection, hasPulled]);
+
   // Compute changed files for the Git commit panel
   const gitChangedFiles = useMemo(() => {
-    if (!github.connection || lastPulledFiles.size === 0) return [];
+    if (!github.connection || !hasPulled) return [];
     const changes: { path: string; status: 'modified' | 'new' | 'deleted' }[] = [];
     const userFiles = getUserFiles(project);
 
@@ -1106,7 +1122,7 @@ export default function App() {
     }
 
     return changes;
-  }, [project, lastPulledFiles, github.connection]);
+  }, [project, lastPulledFiles, hasPulled, github.connection]);
 
   // Handle GitHub connect: link repo and pull files
   const handleGitHubConnect = async (installationId: number, owner: string, repo: string, path: string, branch: string) => {
@@ -1128,6 +1144,7 @@ export default function App() {
       });
     }
     setLastPulledFiles(pulled);
+    setHasPulled(true);
     setShowGitHubConnect(false);
     setGhInstallationId(installationId);
     // Clean URL params
