@@ -1445,7 +1445,7 @@ export default function App() {
               onGetPrivateKey={getPrivateKey}
               onViewAccount={handleViewAccount}
               selectedAccount={selectedSigner.type === 'local' ? { keyId: selectedSigner.key.id, address: selectedSigner.account.flowAddress, keyIndex: selectedSigner.account.keyIndex } : null}
-              onSelectAccount={(key, account) => persistSigner({ type: 'local', key, account })}
+              onSelectAccount={(key, account) => { persistSigner({ type: 'local', key, account }); setShowKeyManager(false); }}
             />
           </div>
         </div>
