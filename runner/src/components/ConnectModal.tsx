@@ -189,7 +189,7 @@ export default function ConnectModal({
               <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0">
                 <FlowLogo size={20} />
               </div>
-              <span>Flow Wallet</span>
+              <span>FCL Wallet</span>
             </button>
           </div>
 
@@ -313,15 +313,15 @@ export default function ConnectModal({
               </div>
             </div>
           ) : hovered === 'fcl' ? (
-            // Show FCL / Flow Wallet info
+            // Show FCL / FCL Wallet info
             <div className="flex flex-col items-center gap-4 animate-in fade-in duration-150">
               <div className="w-16 h-16 rounded-2xl overflow-hidden flex items-center justify-center">
                 <FlowLogo size={64} />
               </div>
               <div className="text-center">
-                <div className="text-sm font-medium text-zinc-200">Flow Wallet</div>
+                <div className="text-sm font-medium text-zinc-200">FCL Wallet</div>
                 <div className="text-xs text-zinc-500 mt-1 max-w-[220px] leading-relaxed">
-                  Connect an external wallet like Flow Wallet, Lilico, or any FCL-compatible wallet.
+                  Connect an external wallet like FCL Wallet, Lilico, or any FCL-compatible wallet.
                 </div>
               </div>
               <button
@@ -356,9 +356,9 @@ export default function ConnectModal({
                 <div className="flex items-start gap-2.5">
                   <div className="w-4 h-4 mt-0.5 flex-shrink-0"><FlowLogo size={16} /></div>
                   <div>
-                    <div className="text-xs text-zinc-300 font-medium">Flow Wallet</div>
+                    <div className="text-xs text-zinc-300 font-medium">FCL Wallet</div>
                     <div className="text-[10px] text-zinc-500 leading-relaxed">
-                      External wallet like Lilico or Flow Wallet.
+                      External wallet like Lilico or FCL Wallet.
                     </div>
                   </div>
                 </div>

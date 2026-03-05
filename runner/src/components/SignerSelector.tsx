@@ -200,7 +200,7 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
               }`}
             >
               <Wallet className="w-3.5 h-3.5" />
-              Flow Wallet
+              FCL Wallet
             </button>
           </>
 
