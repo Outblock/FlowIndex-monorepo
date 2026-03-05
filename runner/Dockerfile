@@ -44,6 +44,6 @@ COPY runner/nginx.conf /etc/nginx/templates/default.conf.template
 COPY runner/supervisord.conf /etc/supervisord.conf
 COPY runner/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-EXPOSE 80
+EXPOSE 80 3003
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]

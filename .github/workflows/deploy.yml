@@ -336,6 +336,14 @@ jobs:
               -e PORT=8081 \
               -e GOTRUE_URL=http://10.128.0.4:9999 \
               -e SUPABASE_GATEWAY_URL=http://10.128.0.4:54321 \
+              -e GITHUB_APP_ID="${{ secrets.GITHUB_APP_ID }}" \
+              -e GITHUB_APP_PRIVATE_KEY="${{ secrets.GITHUB_APP_PRIVATE_KEY }}" \
+              -e GITHUB_APP_CLIENT_ID="${{ secrets.GITHUB_APP_CLIENT_ID }}" \
+              -e GITHUB_APP_CLIENT_SECRET="${{ secrets.GITHUB_APP_CLIENT_SECRET }}" \
+              -e GITHUB_APP_SLUG="${{ secrets.GITHUB_APP_SLUG }}" \
+              -e GITHUB_APP_WEBHOOK_SECRET="${{ secrets.GITHUB_APP_WEBHOOK_SECRET }}" \
+              -e FRONTEND_URL="https://run.flowindex.io" \
+              -e HTTP_PORT=3003 \
               ${{ env.REGISTRY }}/runner:${{ github.sha }}
           '
 
