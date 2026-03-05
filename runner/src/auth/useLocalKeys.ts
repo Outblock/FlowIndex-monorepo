@@ -127,6 +127,10 @@ export function useLocalKeys(): UseLocalKeysReturn {
   // In-memory cache of decrypted private keys (keyId -> hex string)
   const keyCache = useRef<Map<string, string>>(new Map());
 
+  // Ref to always access latest localKeys (avoids stale closure in createAccount)
+  const localKeysRef = useRef(localKeys);
+  localKeysRef.current = localKeys;
+
   // -------------------------------------------------------------------------
   // Init: load keys from localStorage
   // -------------------------------------------------------------------------
@@ -448,7 +452,7 @@ export function useLocalKeys(): UseLocalKeysReturn {
       keyId: string,
       network: 'mainnet' | 'testnet',
     ): Promise<KeyAccount[]> => {
-      const key = localKeys.find((k) => k.id === keyId);
+      const key = localKeysRef.current.find((k) => k.id === keyId);
       if (!key) throw new Error(`Local key not found: ${keyId}`);
 
       // Query both P256 and secp256k1 public keys in parallel
@@ -480,7 +484,7 @@ export function useLocalKeys(): UseLocalKeysReturn {
       setAccountsMap((prev) => ({ ...prev, [keyId]: merged }));
       return merged;
     },
-    [localKeys],
+    [],
   );
 
   // -------------------------------------------------------------------------
@@ -494,7 +498,7 @@ export function useLocalKeys(): UseLocalKeysReturn {
       hashAlgo: 'SHA2_256' | 'SHA3_256',
       network: 'mainnet' | 'testnet',
     ): Promise<{ txId: string }> => {
-      const key = localKeys.find((k) => k.id === keyId);
+      const key = localKeysRef.current.find((k) => k.id === keyId);
       if (!key) throw new Error(`Local key not found: ${keyId}`);
 
       const publicKey =
@@ -518,7 +522,7 @@ export function useLocalKeys(): UseLocalKeysReturn {
 
       return { txId: result.txId ?? '' };
     },
-    [localKeys, refreshAccounts],
+    [refreshAccounts],
   );
 
   return {
