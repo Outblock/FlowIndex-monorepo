@@ -79,7 +79,7 @@ interface KeyManagerProps {
     hashAlgo: 'SHA2_256' | 'SHA3_256',
     network: 'mainnet' | 'testnet',
   ) => Promise<{ txId: string }>;
-  onGetPrivateKey?: (keyId: string, password?: string) => Promise<string>;
+  onRevealSecret?: (keyId: string, password?: string) => Promise<{ type: 'mnemonic' | 'privateKey'; value: string }>;
   onViewAccount?: (address: string) => void;
   selectedAccount?: { keyId: string; address: string; keyIndex: number } | null;
   onSelectAccount?: (key: LocalKey, account: KeyAccount) => void;
@@ -180,7 +180,7 @@ export default function KeyManager({
   onExportKeystore,
   onRefreshAccounts,
   onCreateAccount,
-  onGetPrivateKey,
+  onRevealSecret,
   onViewAccount,
   selectedAccount,
   onSelectAccount,
@@ -482,7 +482,7 @@ export default function KeyManager({
                     onExportKeystore={onExportKeystore}
                     onRefreshAccounts={onRefreshAccounts}
                     onCreateAccount={onCreateAccount}
-                    onGetPrivateKey={onGetPrivateKey}
+                    onRevealSecret={onRevealSecret}
                     onViewAccount={onViewAccount}
                   />
                 ))
@@ -524,7 +524,8 @@ function GenerateForm({
   const [error, setError] = useState('');
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [mnemonicCopied, setMnemonicCopied] = useState(false);
-  const [autoStatus, setAutoStatus] = useState('');
+  const [autoStatusMainnet, setAutoStatusMainnet] = useState<'idle' | 'creating' | 'done' | 'error'>('idle');
+  const [autoStatusTestnet, setAutoStatusTestnet] = useState<'idle' | 'creating' | 'done' | 'error'>('idle');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleGenerate = async () => {
@@ -539,15 +540,19 @@ function GenerateForm({
       setMnemonic(result.mnemonic);
       setLabel('');
       setPassword('');
-      const networks: ('mainnet' | 'testnet')[] = [];
-      if (createMainnet) networks.push('mainnet');
-      if (createTestnet) networks.push('testnet');
-      if (autoCreate && networks.length > 0) {
-        setAutoStatus('Creating accounts...');
-        onAutoCreate(result.key.id, sigAlgo, hashAlgo, networks)
-          .then(() => setAutoStatus('Accounts created'))
-          .catch(() => setAutoStatus(''))
-          .finally(() => setTimeout(() => setAutoStatus(''), 3000));
+      if (autoCreate) {
+        if (createMainnet) {
+          setAutoStatusMainnet('creating');
+          onAutoCreate(result.key.id, sigAlgo, hashAlgo, ['mainnet'])
+            .then(() => setAutoStatusMainnet('done'))
+            .catch(() => setAutoStatusMainnet('error'));
+        }
+        if (createTestnet) {
+          setAutoStatusTestnet('creating');
+          onAutoCreate(result.key.id, sigAlgo, hashAlgo, ['testnet'])
+            .then(() => setAutoStatusTestnet('done'))
+            .catch(() => setAutoStatusTestnet('error'));
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to generate key');
@@ -584,10 +589,21 @@ function GenerateForm({
             {mnemonicCopied ? 'Copied!' : 'Copy Phrase'}
           </button>
         </div>
-        {autoStatus && (
-          <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            {autoStatus}
+        {/* Per-network account creation status */}
+        {(autoStatusMainnet !== 'idle' || autoStatusTestnet !== 'idle') && (
+          <div className="space-y-1">
+            {autoStatusMainnet !== 'idle' && (
+              <div className={`flex items-center gap-1.5 text-[11px] ${autoStatusMainnet === 'done' ? 'text-emerald-400' : autoStatusMainnet === 'error' ? 'text-red-400' : 'text-zinc-400'}`}>
+                {autoStatusMainnet === 'creating' ? <Loader2 className="w-3 h-3 animate-spin" /> : autoStatusMainnet === 'done' ? <Check className="w-3 h-3" /> : null}
+                Mainnet: {autoStatusMainnet === 'creating' ? 'Creating account...' : autoStatusMainnet === 'done' ? 'Account created' : 'Failed'}
+              </div>
+            )}
+            {autoStatusTestnet !== 'idle' && (
+              <div className={`flex items-center gap-1.5 text-[11px] ${autoStatusTestnet === 'done' ? 'text-emerald-400' : autoStatusTestnet === 'error' ? 'text-red-400' : 'text-zinc-400'}`}>
+                {autoStatusTestnet === 'creating' ? <Loader2 className="w-3 h-3 animate-spin" /> : autoStatusTestnet === 'done' ? <Check className="w-3 h-3" /> : null}
+                Testnet: {autoStatusTestnet === 'creating' ? 'Creating account...' : autoStatusTestnet === 'done' ? 'Account created' : 'Failed'}
+              </div>
+            )}
           </div>
         )}
         <button onClick={() => setMnemonic(null)} className={btnSecondary}>
@@ -599,24 +615,24 @@ function GenerateForm({
 
   return (
     <div className="space-y-2.5">
-      {/* Label + word count on same row */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Key label (optional)"
-          className={`${inputClass} flex-1`}
-        />
-        <select
-          value={wordCount}
-          onChange={(e) => setWordCount(Number(e.target.value) as 12 | 24)}
-          className={`${inputClass} w-auto shrink-0`}
-        >
-          <option value={12}>12 words</option>
-          <option value={24}>24 words</option>
-        </select>
-      </div>
+      {/* Label */}
+      <input
+        type="text"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="Key label (optional)"
+        className={inputClass}
+      />
+
+      {/* Word count */}
+      <select
+        value={wordCount}
+        onChange={(e) => setWordCount(Number(e.target.value) as 12 | 24)}
+        className={inputClass}
+      >
+        <option value={12}>12 words</option>
+        <option value={24}>24 words</option>
+      </select>
 
       {/* Auto-create toggle + network checkboxes */}
       <div className="flex items-center gap-3">
@@ -1020,7 +1036,7 @@ function LocalKeyCard({
   onExportKeystore,
   onRefreshAccounts,
   onCreateAccount,
-  onGetPrivateKey,
+  onRevealSecret,
   onViewAccount,
 }: {
   localKey: LocalKey;
@@ -1035,7 +1051,7 @@ function LocalKeyCard({
     hashAlgo: 'SHA2_256' | 'SHA3_256',
     network: 'mainnet' | 'testnet',
   ) => Promise<{ txId: string }>;
-  onGetPrivateKey?: (keyId: string, password?: string) => Promise<string>;
+  onRevealSecret?: (keyId: string, password?: string) => Promise<{ type: 'mnemonic' | 'privateKey'; value: string }>;
   onViewAccount?: (address: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -1044,11 +1060,32 @@ function LocalKeyCard({
   const [exporting, setExporting] = useState(false);
   const [exportPassword, setExportPassword] = useState('');
   const [showExportInput, setShowExportInput] = useState(false);
-  const [revealedPrivateKey, setRevealedPrivateKey] = useState<string | null>(null);
+  const [revealedSecret, setRevealedSecret] = useState<{ type: 'mnemonic' | 'privateKey'; value: string } | null>(null);
   const [revealingKey, setRevealingKey] = useState(false);
-  const [pkCopied, setPkCopied] = useState(false);
+  const [secretCopied, setSecretCopied] = useState(false);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
+  const [createSigAlgo, setCreateSigAlgo] = useState<'ECDSA_P256' | 'ECDSA_secp256k1'>('ECDSA_secp256k1');
+  const [createHashAlgo, setCreateHashAlgo] = useState<'SHA2_256' | 'SHA3_256'>('SHA2_256');
+  const [creating, setCreating] = useState(false);
+  const [createResult, setCreateResult] = useState<string | null>(null);
+
+  const handleCreateAccount = async (targetNetwork: 'mainnet' | 'testnet') => {
+    setCreating(true);
+    setActionError('');
+    setCreateResult(null);
+    try {
+      const result = await onCreateAccount(localKey.id, createSigAlgo, createHashAlgo, targetNetwork);
+      setCreateResult(`Account created on ${targetNetwork} (tx: ${result.txId.slice(0, 8)}...)`);
+      // Auto-refresh accounts after a short delay
+      setTimeout(() => onRefreshAccounts(localKey.id, targetNetwork).catch(() => {}), 3000);
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : 'Failed to create account');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setActionError('');
@@ -1144,9 +1181,13 @@ function LocalKeyCard({
                 className="w-full flex items-center gap-2 bg-zinc-900 rounded px-2 py-1.5 hover:bg-zinc-700/50 transition-colors group text-left"
               >
                 <Avatar size={18} name={acc.flowAddress} variant="beam" colors={colorsFromAddress(acc.flowAddress)} />
-                <span className="text-[11px] text-zinc-200 font-mono">{acc.flowAddress}</span>
-                <span className="text-[10px] text-zinc-500">#{acc.keyIndex}</span>
-                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 ml-auto" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[11px] text-zinc-200 font-mono">{acc.flowAddress}</span>
+                  <span className="text-[9px] text-zinc-500">
+                    #{acc.keyIndex} · {acc.sigAlgo === 'ECDSA_secp256k1' ? 'secp256k1' : 'P256'} · {acc.hashAlgo}
+                  </span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 ml-auto shrink-0" />
               </button>
             ))}
           </div>
@@ -1171,53 +1212,65 @@ function LocalKeyCard({
               {exporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
               Export
             </button>
-            {onGetPrivateKey && (
+            {onRevealSecret && (
               <button
                 onClick={async () => {
-                  if (revealedPrivateKey) {
-                    setRevealedPrivateKey(null);
+                  if (revealedSecret) {
+                    setRevealedSecret(null);
                     return;
                   }
                   setRevealingKey(true);
                   setActionError('');
                   try {
-                    const pk = await onGetPrivateKey(localKey.id);
-                    setRevealedPrivateKey(pk);
+                    const secret = await onRevealSecret(localKey.id);
+                    setRevealedSecret(secret);
                   } catch (err: unknown) {
-                    setActionError(err instanceof Error ? err.message : 'Failed to decrypt key');
+                    setActionError(err instanceof Error ? err.message : 'Failed to decrypt');
                   } finally {
                     setRevealingKey(false);
                   }
                 }}
                 disabled={revealingKey}
                 className={btnSecondary}
-                title={revealedPrivateKey ? 'Hide private key' : 'Reveal private key'}
+                title={revealedSecret ? 'Hide secret' : localKey.source === 'mnemonic' ? 'Reveal mnemonic' : 'Reveal private key'}
               >
-                {revealingKey ? <Loader2 className="w-3 h-3 animate-spin" /> : revealedPrivateKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                {revealedPrivateKey ? 'Hide' : 'Reveal'}
+                {revealingKey ? <Loader2 className="w-3 h-3 animate-spin" /> : revealedSecret ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {revealedSecret ? 'Hide' : 'Reveal'}
               </button>
             )}
           </div>
 
-          {/* Revealed private key */}
-          {revealedPrivateKey && (
+          {/* Revealed secret (mnemonic or private key) */}
+          {revealedSecret && (
             <div className="bg-red-500/5 border border-red-500/20 rounded px-2 py-1.5 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-red-400 font-medium">Private Key</span>
+                <span className="text-[10px] text-red-400 font-medium">
+                  {revealedSecret.type === 'mnemonic' ? 'Recovery Phrase' : 'Private Key'}
+                </span>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(revealedPrivateKey);
-                    setPkCopied(true);
-                    setTimeout(() => setPkCopied(false), 2000);
+                    navigator.clipboard.writeText(revealedSecret.value);
+                    setSecretCopied(true);
+                    setTimeout(() => setSecretCopied(false), 2000);
                   }}
                   className="text-zinc-500 hover:text-zinc-300 p-0.5"
                 >
-                  {pkCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {secretCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 </button>
               </div>
-              <p className="text-[10px] text-zinc-300 font-mono break-all select-all leading-relaxed">
-                {revealedPrivateKey}
-              </p>
+              {revealedSecret.type === 'mnemonic' ? (
+                <div className="grid grid-cols-3 gap-1">
+                  {revealedSecret.value.split(' ').map((word, i) => (
+                    <div key={i} className="bg-zinc-800 rounded px-1.5 py-0.5 text-[10px] font-mono text-zinc-200">
+                      <span className="text-zinc-500 mr-1">{i + 1}.</span>{word}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[10px] text-zinc-300 font-mono break-all select-all leading-relaxed">
+                  {revealedSecret.value}
+                </p>
+              )}
             </div>
           )}
 
@@ -1251,6 +1304,69 @@ function LocalKeyCard({
             <span className="text-[10px] text-zinc-400 font-mono">{truncateKey(localKey.publicKeySecp256k1)}</span>
             <CopyButton text={localKey.publicKeySecp256k1} />
           </div>
+
+          {/* Create Account */}
+          {!showCreateAccount ? (
+            <button
+              onClick={() => setShowCreateAccount(true)}
+              className={`${btnSecondary} w-full justify-center`}
+            >
+              <Plus className="w-3 h-3" />
+              Create Account
+            </button>
+          ) : (
+            <div className="space-y-2 bg-zinc-900 rounded px-2.5 py-2 border border-zinc-700">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-500">Curve:</span>
+                  <select
+                    value={createSigAlgo}
+                    onChange={(e) => setCreateSigAlgo(e.target.value as 'ECDSA_P256' | 'ECDSA_secp256k1')}
+                    className={`${inputClass} w-auto text-[11px]`}
+                  >
+                    <option value="ECDSA_secp256k1">secp256k1</option>
+                    <option value="ECDSA_P256">P256</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-zinc-500">Hash:</span>
+                  <select
+                    value={createHashAlgo}
+                    onChange={(e) => setCreateHashAlgo(e.target.value as 'SHA2_256' | 'SHA3_256')}
+                    className={`${inputClass} w-auto text-[11px]`}
+                  >
+                    <option value="SHA2_256">SHA2_256</option>
+                    <option value="SHA3_256">SHA3_256</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => handleCreateAccount('mainnet')}
+                  disabled={creating}
+                  className={`${btnPrimary} flex-1 justify-center`}
+                >
+                  {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Mainnet
+                </button>
+                <button
+                  onClick={() => handleCreateAccount('testnet')}
+                  disabled={creating}
+                  className={`${btnSecondary} flex-1 justify-center`}
+                >
+                  {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Testnet
+                </button>
+                <button
+                  onClick={() => setShowCreateAccount(false)}
+                  className="text-zinc-500 hover:text-zinc-300 p-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+              {createResult && <p className="text-emerald-400 text-[10px]">{createResult}</p>}
+            </div>
+          )}
 
           {actionError && <p className="text-red-400 text-[11px]">{actionError}</p>}
           {actionSuccess && <p className="text-emerald-400 text-[11px]">{actionSuccess}</p>}

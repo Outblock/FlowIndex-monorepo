@@ -286,7 +286,7 @@ export default function App() {
     localKeys, accountsMap, wasmReady,
     generateNewKey, importMnemonic, importPrivateKey: importLocalPrivateKey,
     importKeystore, deleteLocalKey, exportKeystore,
-    signWithLocalKey, refreshAccounts, createAccount, getPrivateKey,
+    signWithLocalKey, refreshAccounts, createAccount, getPrivateKey, revealSecret,
   } = useLocalKeys();
   const [showKeyManager, setShowKeyManager] = useState(false);
   const [accountPanelAddress, setAccountPanelAddress] = useState<string | null>(null);
@@ -322,6 +322,18 @@ export default function App() {
       setPasswordPrompt({ keyLabel, resolve, reject });
     });
   }, []);
+
+  // Auto-discover accounts for all local keys on mount (or when keys/network change)
+  const discoveredKeysRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const key of localKeys) {
+      const cacheKey = `${key.id}:${network}`;
+      if (!discoveredKeysRef.current.has(cacheKey)) {
+        discoveredKeysRef.current.add(cacheKey);
+        refreshAccounts(key.id, network).catch(() => {});
+      }
+    }
+  }, [localKeys, network, refreshAccounts]);
 
   // Restore saved signer from localStorage, or auto-select first local account.
   // localKeys are loaded from localStorage (public keys are plaintext, no WASM needed).
@@ -947,30 +959,15 @@ export default function App() {
           </select>
 
 
-          {/* Signer selector - show when there are local accounts available */}
-          {localKeys.some(k => (accountsMap[k.id] || []).length > 0) && (
-            <SignerSelector
-              selected={selectedSigner}
-              onSelect={persistSigner}
-              localKeys={localKeys}
-              accountsMap={accountsMap}
-              onViewAccount={handleViewAccount}
-            />
-          )}
-
-          {/* Account button — show only when no local accounts exist (SignerSelector handles everything otherwise) */}
-          {!isMobile && !localKeys.some(k => (accountsMap[k.id] || []).length > 0) && (
-            <WalletButton
-              localKeys={localKeys}
-              accountsMap={accountsMap}
-              selectedLocalAccount={null}
-              network={network}
-              onOpenKeyManager={() => setShowKeyManager(true)}
-              onSelectLocalAccount={(key, account) => persistSigner({ type: 'local', key, account })}
-              onDisconnectLocal={() => persistSigner({ type: 'none' })}
-              onViewAccount={handleViewAccount}
-            />
-          )}
+          {/* Signer selector — always shown */}
+          <SignerSelector
+            selected={selectedSigner}
+            onSelect={persistSigner}
+            localKeys={localKeys}
+            accountsMap={accountsMap}
+            onViewAccount={handleViewAccount}
+            onOpenKeyManager={() => setShowKeyManager(true)}
+          />
 
           {/* Desktop run button */}
           {!isMobile && (
@@ -1442,7 +1439,7 @@ export default function App() {
               onExportKeystore={exportKeystore}
               onRefreshAccounts={refreshAccounts}
               onCreateAccount={createAccount}
-              onGetPrivateKey={getPrivateKey}
+              onRevealSecret={revealSecret}
               onViewAccount={handleViewAccount}
               selectedAccount={selectedSigner.type === 'local' ? { keyId: selectedSigner.key.id, address: selectedSigner.account.flowAddress, keyIndex: selectedSigner.account.keyIndex } : null}
               onSelectAccount={(key, account) => { persistSigner({ type: 'local', key, account }); setShowKeyManager(false); }}

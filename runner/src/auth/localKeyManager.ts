@@ -137,16 +137,16 @@ export async function generatePrivateKey(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export interface DerivedKeys {
-  privateKeyHex: string; // P256 private key (primary, used for encryption)
-  privateKeySecpHex?: string; // secp256k1 private key (different derivation path for mnemonic)
+  privateKeyHex: string;
   publicKeyP256: string;
   publicKeySecp256k1: string;
 }
 
 /**
  * Derive keys from a BIP39 mnemonic using the Flow BIP44 path.
- * Like Flow-Wallet-Tool, derives separate keys per curve since HD derivation
- * produces different private keys for different curves on the same path.
+ * Uses the P256 (nist256p1) curve for derivation. The same private key bytes
+ * are used with both curves — secp256k1 public key is extracted from the same
+ * key data, and signing works correctly with either curve.
  */
 export async function deriveFromMnemonic(
   mnemonic: string,
@@ -160,38 +160,16 @@ export async function deriveFromMnemonic(
   }
 
   const wallet = core.HDWallet.createWithMnemonic(mnemonic, passphrase);
+  const privateKey = wallet.getKeyByCurve(core.Curve.nist256p1, path);
 
-  // P256 key
-  const p256Key = wallet.getKeyByCurve(core.Curve.nist256p1, path);
-  const p256PrivHex = bytesToHex(p256Key.data());
-  const pubP256 = p256Key.getPublicKeyNist256p1();
-  const pubP256Uncompressed = pubP256.uncompressed();
-  const p256PubHex = stripUncompressedPrefix(bytesToHex(pubP256Uncompressed.data()));
-  pubP256Uncompressed.delete();
-  pubP256.delete();
-  p256Key.delete();
-
-  // secp256k1 key (different private key from same mnemonic!)
-  const secpKey = wallet.getKeyByCurve(core.Curve.secp256k1, path);
-  const secpPrivHex = bytesToHex(secpKey.data());
-  const pubSecp = secpKey.getPublicKeySecp256k1(false);
-  const secpPubHex = stripUncompressedPrefix(bytesToHex(pubSecp.data()));
-  pubSecp.delete();
-  secpKey.delete();
-
+  const result = extractPublicKeys(core, privateKey);
   wallet.delete();
 
-  return {
-    privateKeyHex: p256PrivHex,
-    privateKeySecpHex: secpPrivHex,
-    publicKeyP256: p256PubHex,
-    publicKeySecp256k1: secpPubHex,
-  };
+  return result;
 }
 
 /**
  * Derive both public keys from a private key hex string.
- * For raw private keys, the same bytes work with both curves.
  */
 export async function deriveFromPrivateKey(hex: string): Promise<DerivedKeys> {
   const core = await getWalletCore();
@@ -202,6 +180,20 @@ export async function deriveFromPrivateKey(hex: string): Promise<DerivedKeys> {
   }
 
   const privateKey = core.PrivateKey.createWithData(pkBytes);
+  const result = extractPublicKeys(core, privateKey);
+
+  return result;
+}
+
+/**
+ * Extract P256 and secp256k1 public keys from a wallet-core PrivateKey.
+ * Same private key bytes work with both curves.
+ * Note: deletes the PrivateKey after extraction.
+ */
+function extractPublicKeys(
+  core: WalletCore,
+  privateKey: InstanceType<WalletCore['PrivateKey']>,
+): DerivedKeys {
   const privateKeyHex = bytesToHex(privateKey.data());
 
   // P256 (nist256p1) — uncompressed
@@ -211,7 +203,7 @@ export async function deriveFromPrivateKey(hex: string): Promise<DerivedKeys> {
   pubP256Uncompressed.delete();
   pubP256.delete();
 
-  // secp256k1 — uncompressed (same private key bytes for raw import)
+  // secp256k1 — uncompressed (same private key bytes)
   const pubSecp = privateKey.getPublicKeySecp256k1(false);
   const secpHex = stripUncompressedPrefix(bytesToHex(pubSecp.data()));
   pubSecp.delete();
@@ -279,25 +271,18 @@ export async function encryptMnemonicToKeystore(
   return jsonStr;
 }
 
-/** Result of decrypting a keystore — may contain both P256 and secp256k1 keys for mnemonic-based keystores. */
-export interface DecryptedKeys {
-  privateKeyHex: string; // P256 private key
-  privateKeySecpHex?: string; // secp256k1 private key (only for mnemonic-based keys)
-}
-
 /**
- * Decrypt keys from a wallet-core StoredKey JSON string.
+ * Decrypt a private key from a wallet-core StoredKey JSON string.
+ * Returns hex-encoded private key.
  *
  * For mnemonic-based keystores, we decrypt the mnemonic and re-derive
- * both curve keys (P256 + secp256k1), because HD derivation produces
- * different private keys per curve.
- *
- * For raw private key keystores, returns the single key (works with both curves).
+ * the Flow key (using the nist256p1 curve + Flow BIP44 path), because
+ * `decryptPrivateKey` returns the Ethereum-derived key which is different.
  */
 export async function decryptFromKeystore(
   json: string,
   password: string = '',
-): Promise<DecryptedKeys> {
+): Promise<string> {
   const core = await getWalletCore();
   const jsonBytes = stringToBytes(json);
   const pwBytes = stringToBytes(password);
@@ -308,15 +293,12 @@ export async function decryptFromKeystore(
   const mnemonic = storedKey.decryptMnemonic(pwBytes);
   if (mnemonic && mnemonic.length > 0) {
     storedKey.delete();
-    // Re-derive both curve keys from the mnemonic
+    // Re-derive the Flow private key from the mnemonic
     const derived = await deriveFromMnemonic(mnemonic);
-    return {
-      privateKeyHex: derived.privateKeyHex,
-      privateKeySecpHex: derived.privateKeySecpHex,
-    };
+    return derived.privateKeyHex;
   }
 
-  // Private key-based keystore: decrypt directly (same bytes for both curves)
+  // Private key-based keystore: decrypt directly
   const privateKeyBytes = storedKey.decryptPrivateKey(pwBytes);
 
   if (!privateKeyBytes || privateKeyBytes.length === 0) {
@@ -327,7 +309,27 @@ export async function decryptFromKeystore(
   const hex = bytesToHex(privateKeyBytes);
   storedKey.delete();
 
-  return { privateKeyHex: hex };
+  return hex;
+}
+
+/**
+ * Decrypt the mnemonic from a mnemonic-based StoredKey JSON string.
+ * Returns null if the keystore is not mnemonic-based.
+ */
+export async function decryptMnemonicFromKeystore(
+  json: string,
+  password: string = '',
+): Promise<string | null> {
+  const core = await getWalletCore();
+  const jsonBytes = stringToBytes(json);
+  const pwBytes = stringToBytes(password);
+
+  const storedKey = core.StoredKey.importJSON(jsonBytes);
+  const mnemonic = storedKey.decryptMnemonic(pwBytes);
+  storedKey.delete();
+
+  if (mnemonic && mnemonic.length > 0) return mnemonic;
+  return null;
 }
 
 // ---------------------------------------------------------------------------

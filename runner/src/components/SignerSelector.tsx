@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Wallet, ChevronDown, LogOut } from 'lucide-react';
+import { Wallet, ChevronDown, LogOut, Key, Settings2 } from 'lucide-react';
 import Avatar from 'boring-avatars';
 import { fcl } from '../flow/fclConfig';
 import type { LocalKey, KeyAccount } from '../auth/localKeyManager';
@@ -15,6 +15,7 @@ interface SignerSelectorProps {
   localKeys: LocalKey[];
   accountsMap: Record<string, KeyAccount[]>;
   onViewAccount?: (address: string) => void;
+  onOpenKeyManager?: () => void;
 }
 
 /** Derive 5 colors from an address (matches frontend AddressLink). */
@@ -49,7 +50,7 @@ function useFlowBalance(address: string | null) {
   return balance;
 }
 
-export default function SignerSelector({ selected, onSelect, localKeys, accountsMap, onViewAccount }: SignerSelectorProps) {
+export default function SignerSelector({ selected, onSelect, localKeys, accountsMap, onViewAccount, onOpenKeyManager }: SignerSelectorProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -176,28 +177,34 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
             </>
           )}
 
-          {/* FCL Wallet group — only show when NOT connected to a local key */}
-          {selected.type !== 'local' && (
+          {/* FCL Wallet group */}
+          <>
+            <div className="px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-700">
+              FCL Wallet
+            </div>
+            <button
+              onClick={() => { fcl.authenticate(); onSelect({ type: 'fcl' }); setOpen(false); }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-zinc-700 transition-colors ${
+                selected.type === 'fcl' ? 'text-emerald-400' : 'text-zinc-300'
+              }`}
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              Connect Wallet
+            </button>
+          </>
+
+          {/* Manage Keys */}
+          {onOpenKeyManager && (
             <>
-              <div className="px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider border-b border-zinc-700">
-                FCL Wallet
-              </div>
+              <div className="border-t border-zinc-700" />
               <button
-                onClick={() => { fcl.authenticate(); onSelect({ type: 'fcl' }); setOpen(false); }}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-zinc-700 transition-colors ${
-                  selected.type === 'fcl' ? 'text-emerald-400' : 'text-zinc-300'
-                }`}
+                onClick={() => { onOpenKeyManager(); setOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-400 hover:bg-zinc-700 transition-colors"
               >
-                <Wallet className="w-3.5 h-3.5" />
-                Connected Wallet
+                <Key className="w-3.5 h-3.5" />
+                Manage Keys
               </button>
             </>
-          )}
-
-          {localEntries.length === 0 && selected.type !== 'local' && (
-            <div className="px-3 py-2 text-[10px] text-zinc-500">
-              No local keys available. Open key manager to create one.
-            </div>
           )}
 
           {/* Disconnect option — show when connected */}

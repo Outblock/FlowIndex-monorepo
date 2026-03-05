@@ -10,7 +10,6 @@ import type {
   LocalKey,
   KeyAccount,
   DerivedKeys,
-  DecryptedKeys,
 } from './localKeyManager';
 import {
   getWalletCore,
@@ -20,6 +19,7 @@ import {
   encryptToKeystore,
   encryptMnemonicToKeystore,
   decryptFromKeystore,
+  decryptMnemonicFromKeystore,
   signMessage,
   saveLocalKeys,
   loadLocalKeys,
@@ -98,7 +98,9 @@ export interface UseLocalKeysReturn {
     network: 'mainnet' | 'testnet',
   ) => Promise<{ txId: string }>;
   // Private key access
-  getPrivateKey: (keyId: string, password?: string, sigAlgo?: 'ECDSA_P256' | 'ECDSA_secp256k1') => Promise<string>;
+  getPrivateKey: (keyId: string, password?: string) => Promise<string>;
+  // Reveal secret — returns { type: 'mnemonic', value } or { type: 'privateKey', value }
+  revealSecret: (keyId: string, password?: string) => Promise<{ type: 'mnemonic' | 'privateKey'; value: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,8 +123,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
   const [loading, setLoading] = useState(true);
   const [wasmReady, setWasmReady] = useState(false);
 
-  // In-memory cache of decrypted private keys (keyId -> { p256, secp256k1? })
-  const keyCache = useRef<Map<string, DecryptedKeys>>(new Map());
+  // In-memory cache of decrypted private keys (keyId -> hex string)
+  const keyCache = useRef<Map<string, string>>(new Map());
 
   // -------------------------------------------------------------------------
   // Init: load keys from localStorage + init WASM
@@ -170,16 +172,10 @@ export function useLocalKeys(): UseLocalKeysReturn {
   // -------------------------------------------------------------------------
 
   const getPrivateKey = useCallback(
-    async (keyId: string, password?: string, sigAlgo?: 'ECDSA_P256' | 'ECDSA_secp256k1'): Promise<string> => {
+    async (keyId: string, password?: string): Promise<string> => {
       // Try cache first
       const cached = keyCache.current.get(keyId);
-      if (cached) {
-        // For secp256k1, use the dedicated key if available (mnemonic-derived)
-        if (sigAlgo === 'ECDSA_secp256k1' && cached.privateKeySecpHex) {
-          return cached.privateKeySecpHex;
-        }
-        return cached.privateKeyHex;
-      }
+      if (cached) return cached;
 
       // Find the key
       const key = localKeys.find((k) => k.id === keyId);
@@ -187,15 +183,9 @@ export function useLocalKeys(): UseLocalKeysReturn {
 
       // Use autoPassword if available (transparent to user)
       if (key.autoPassword) {
-        const decrypted = await decryptFromKeystore(
-          key.encryptedKey,
-          key.autoPassword,
-        );
-        keyCache.current.set(keyId, decrypted);
-        if (sigAlgo === 'ECDSA_secp256k1' && decrypted.privateKeySecpHex) {
-          return decrypted.privateKeySecpHex;
-        }
-        return decrypted.privateKeyHex;
+        const hex = await decryptFromKeystore(key.encryptedKey, key.autoPassword);
+        keyCache.current.set(keyId, hex);
+        return hex;
       }
 
       // If password-protected and no password provided, signal the UI
@@ -203,20 +193,36 @@ export function useLocalKeys(): UseLocalKeysReturn {
         throw new Error('PASSWORD_REQUIRED');
       }
 
-      const decrypted = await decryptFromKeystore(
-        key.encryptedKey,
-        password ?? '',
-      );
-
-      // Cache the decrypted keys
-      keyCache.current.set(keyId, decrypted);
-
-      if (sigAlgo === 'ECDSA_secp256k1' && decrypted.privateKeySecpHex) {
-        return decrypted.privateKeySecpHex;
-      }
-      return decrypted.privateKeyHex;
+      const hex = await decryptFromKeystore(key.encryptedKey, password ?? '');
+      keyCache.current.set(keyId, hex);
+      return hex;
     },
     [localKeys],
+  );
+
+  // -------------------------------------------------------------------------
+  // Reveal secret — mnemonic for mnemonic keys, private key for others
+  // -------------------------------------------------------------------------
+
+  const revealSecret = useCallback(
+    async (keyId: string, password?: string): Promise<{ type: 'mnemonic' | 'privateKey'; value: string }> => {
+      const key = localKeys.find((k) => k.id === keyId);
+      if (!key) throw new Error(`Local key not found: ${keyId}`);
+
+      const pw = key.autoPassword ?? password;
+      if (!pw && key.hasPassword && !password) throw new Error('PASSWORD_REQUIRED');
+
+      // For mnemonic-based keys, try to decrypt the mnemonic
+      if (key.source === 'mnemonic') {
+        const mnemonic = await decryptMnemonicFromKeystore(key.encryptedKey, pw ?? '');
+        if (mnemonic) return { type: 'mnemonic', value: mnemonic };
+      }
+
+      // Fallback to private key
+      const hex = await getPrivateKey(keyId, password);
+      return { type: 'privateKey', value: hex };
+    },
+    [localKeys, getPrivateKey],
   );
 
   // -------------------------------------------------------------------------
@@ -251,11 +257,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
         createdAt: Date.now(),
       };
 
-      // Cache the decrypted private keys
-      keyCache.current.set(key.id, {
-        privateKeyHex: derived.privateKeyHex,
-        privateKeySecpHex: derived.privateKeySecpHex,
-      });
+      // Cache the decrypted private key
+      keyCache.current.set(key.id, derived.privateKeyHex);
 
       return key;
     },
@@ -294,11 +297,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
         createdAt: Date.now(),
       };
 
-      // Cache decrypted private keys
-      keyCache.current.set(key.id, {
-        privateKeyHex: derived.privateKeyHex,
-        privateKeySecpHex: derived.privateKeySecpHex,
-      });
+      // Cache decrypted private key
+      keyCache.current.set(key.id, derived.privateKeyHex);
 
       setLocalKeys((prev) => [...prev, key]);
       return { mnemonic, key };
@@ -332,10 +332,7 @@ export function useLocalKeys(): UseLocalKeysReturn {
         createdAt: Date.now(),
       };
 
-      keyCache.current.set(key.id, {
-        privateKeyHex: derived.privateKeyHex,
-        privateKeySecpHex: derived.privateKeySecpHex,
-      });
+      keyCache.current.set(key.id, derived.privateKeyHex);
 
       setLocalKeys((prev) => [...prev, key]);
       return key;
@@ -365,8 +362,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
       newPassword: string = '',
     ): Promise<LocalKey> => {
       // Decrypt from the imported keystore
-      const decrypted = await decryptFromKeystore(json, keystorePassword);
-      const derived = await deriveFromPrivateKey(decrypted.privateKeyHex);
+      const privateKeyHex = await decryptFromKeystore(json, keystorePassword);
+      const derived = await deriveFromPrivateKey(privateKeyHex);
 
       // Re-encrypt with the new password (or empty)
       const key = await buildLocalKey(derived, label, 'keystore', newPassword);
@@ -408,7 +405,7 @@ export function useLocalKeys(): UseLocalKeysReturn {
       password?: string,
       sigAlgo: 'ECDSA_P256' | 'ECDSA_secp256k1' = 'ECDSA_P256',
     ): Promise<string> => {
-      const privateKeyHex = await getPrivateKey(keyId, password, sigAlgo);
+      const privateKeyHex = await getPrivateKey(keyId, password);
       return signMessage(privateKeyHex, message, sigAlgo);
     },
     [getPrivateKey],
@@ -506,5 +503,6 @@ export function useLocalKeys(): UseLocalKeysReturn {
     refreshAccounts,
     createAccount,
     getPrivateKey,
+    revealSecret,
   };
 }
