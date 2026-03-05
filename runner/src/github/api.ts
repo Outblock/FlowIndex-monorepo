@@ -46,6 +46,37 @@ export interface WorkflowRun {
   head_commit: { message: string };
 }
 
+export interface DeployEnvironment {
+  id: string;
+  connection_id: string;
+  name: string;
+  branch: string;
+  network: string;
+  flow_address: string | null;
+  secrets_configured: boolean;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface Deployment {
+  id: string;
+  connection_id: string;
+  environment_id: string | null;
+  commit_sha: string;
+  commit_message: string | null;
+  commit_author: string | null;
+  branch: string;
+  network: string;
+  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled';
+  workflow_run_id: number | null;
+  logs_url: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  trigger_type: string;
+  created_at: string;
+}
+
 export const githubApi = {
   listRepos: (installationId: number) =>
     fetchApi<{ repos: GitHubRepo[] }>(
@@ -109,4 +140,44 @@ export const githubApi = {
     fetchApi<{ runs: WorkflowRun[] }>(
       `/github/runs/${owner}/${repo}?installation_id=${installationId}`,
     ),
+
+  setSecrets: (body: {
+    installation_id: number;
+    owner: string;
+    repo: string;
+    environment_name: string;
+    flow_address: string;
+    flow_private_key: string;
+    flow_key_index: string;
+  }) =>
+    fetchApi<{ success: boolean; secrets: string[] }>('/github/secrets', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  promote: (body: {
+    installation_id: number;
+    owner: string;
+    repo: string;
+    from_branch: string;
+    to_branch: string;
+    title?: string;
+    environments?: { from: { name: string; network: string }; to: { name: string; network: string } };
+  }) =>
+    fetchApi<{ pr_number: number; pr_url: string }>('/github/promote', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  dispatch: (body: {
+    installation_id: number;
+    owner: string;
+    repo: string;
+    action: 'deploy' | 'dry-run' | 'rollback';
+    commit_sha?: string;
+  }) =>
+    fetchApi<{ dispatched: boolean }>('/github/dispatch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };

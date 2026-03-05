@@ -4,6 +4,8 @@ import { supabase } from '../auth/supabaseClient';
 import {
   githubApi,
   type CommitResult,
+  type DeployEnvironment,
+  type Deployment,
   type WorkflowRun,
 } from './api';
 
@@ -58,6 +60,8 @@ export function useGitHub(projectId: string | undefined) {
   const [connection, setConnection] = useState<GitHubConnection | null>(null);
   const [loading, setLoading] = useState(false);
   const [latestRuns, setLatestRuns] = useState<WorkflowRun[]>([]);
+  const [environments, setEnvironments] = useState<DeployEnvironment[]>([]);
+  const [deployments, setDeployments] = useState<Deployment[]>([]);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -279,11 +283,137 @@ export function useGitHub(projectId: string | undefined) {
     }
   }, [connection]);
 
+  // ---- environments -------------------------------------------------------
+
+  const fetchEnvironments = useCallback(async () => {
+    if (!connection?.id || !accessToken) return;
+    try {
+      const result = await callEdge<{ environments: DeployEnvironment[] }>(
+        '/github/environments',
+        { connection_id: connection.id },
+        accessToken,
+      );
+      setEnvironments(result.environments);
+    } catch {
+      setEnvironments([]);
+    }
+  }, [connection?.id, accessToken]);
+
+  const upsertEnvironment = useCallback(
+    async (env: { name: string; branch: string; network: string; flow_address?: string; is_default?: boolean }) => {
+      if (!connection?.id || !accessToken) throw new Error('Not connected');
+      await callEdge(
+        '/github/environments/upsert',
+        { connection_id: connection.id, ...env },
+        accessToken,
+      );
+      await fetchEnvironments();
+    },
+    [connection?.id, accessToken, fetchEnvironments],
+  );
+
+  const deleteEnvironment = useCallback(
+    async (environmentId: string) => {
+      if (!accessToken) throw new Error('Not authenticated');
+      await callEdge('/github/environments/delete', { environment_id: environmentId }, accessToken);
+      await fetchEnvironments();
+    },
+    [accessToken, fetchEnvironments],
+  );
+
+  // ---- secrets ------------------------------------------------------------
+
+  const configureSecrets = useCallback(
+    async (environmentName: string, flowAddress: string, flowPrivateKey: string, flowKeyIndex: string) => {
+      if (!connection) throw new Error('Not connected');
+      await githubApi.setSecrets({
+        installation_id: connection.installation_id,
+        owner: connection.repo_owner,
+        repo: connection.repo_name,
+        environment_name: environmentName,
+        flow_address: flowAddress,
+        flow_private_key: flowPrivateKey,
+        flow_key_index: flowKeyIndex,
+      });
+      const env = environments.find(e => e.name === environmentName);
+      if (env) {
+        await callEdge(
+          '/github/environments/update-secrets',
+          { environment_id: env.id, secrets_configured: true, flow_address: flowAddress },
+          accessToken,
+        );
+      }
+      await fetchEnvironments();
+    },
+    [connection, environments, accessToken, fetchEnvironments],
+  );
+
+  // ---- deployments --------------------------------------------------------
+
+  const fetchDeployments = useCallback(async () => {
+    if (!connection?.id || !accessToken) return;
+    try {
+      const result = await callEdge<{ deployments: Deployment[] }>(
+        '/github/deployments',
+        { connection_id: connection.id, limit: 20 },
+        accessToken,
+      );
+      setDeployments(result.deployments);
+    } catch {
+      setDeployments([]);
+    }
+  }, [connection?.id, accessToken]);
+
+  // ---- promote / rollback / dry-run ----------------------------------------
+
+  const promote = useCallback(
+    async (fromBranch: string, toBranch: string) => {
+      if (!connection) throw new Error('Not connected');
+      const fromEnv = environments.find(e => e.branch === fromBranch);
+      const toEnv = environments.find(e => e.branch === toBranch);
+      return githubApi.promote({
+        installation_id: connection.installation_id,
+        owner: connection.repo_owner,
+        repo: connection.repo_name,
+        from_branch: fromBranch,
+        to_branch: toBranch,
+        environments: fromEnv && toEnv ? {
+          from: { name: fromEnv.name, network: fromEnv.network },
+          to: { name: toEnv.name, network: toEnv.network },
+        } : undefined,
+      });
+    },
+    [connection, environments],
+  );
+
+  const dispatchWorkflow = useCallback(
+    async (action: 'deploy' | 'dry-run' | 'rollback', commitSha?: string) => {
+      if (!connection) throw new Error('Not connected');
+      return githubApi.dispatch({
+        installation_id: connection.installation_id,
+        owner: connection.repo_owner,
+        repo: connection.repo_name,
+        action,
+        commit_sha: commitSha,
+      });
+    },
+    [connection],
+  );
+
   // ---- auto-load connection on mount ---------------------------------------
 
   useEffect(() => {
     fetchConnection();
   }, [fetchConnection]);
+
+  // ---- auto-fetch environments + deployments when connection loads ----------
+
+  useEffect(() => {
+    if (connection) {
+      fetchEnvironments();
+      fetchDeployments();
+    }
+  }, [connection?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- poll runs every 30s when workflow is configured ----------------------
 
@@ -308,15 +438,15 @@ export function useGitHub(projectId: string | undefined) {
   }, [connection?.workflow_configured, fetchRuns]);
 
   return {
-    connection,
-    loading,
-    connect,
-    disconnect,
-    pullFiles,
-    commitAndPush,
+    connection, loading,
+    connect, disconnect,
+    pullFiles, commitAndPush,
     setupWorkflow,
-    latestRuns,
-    fetchRuns,
-    fetchConnection,
+    latestRuns, fetchRuns, fetchConnection,
+    // Deploy environments & secrets
+    environments, fetchEnvironments, upsertEnvironment, deleteEnvironment,
+    deployments, fetchDeployments,
+    configureSecrets,
+    promote, dispatchWorkflow,
   };
 }
