@@ -13,8 +13,16 @@ import {
   Layers,
   Sparkles,
   ChevronDown,
+  ChevronUp,
   Maximize2,
-  Paperclip,
+  Plus,
+  Eye,
+  EyeOff,
+  Wrench,
+  Search,
+  Bot,
+  Download,
+  ChevronRight,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -47,12 +55,6 @@ import {
   PromptInput,
   PromptInputTextarea,
   PromptInputFooter,
-  PromptInputTools,
-  PromptInputButton,
-  PromptInputActionMenu,
-  PromptInputActionMenuTrigger,
-  PromptInputActionMenuContent,
-  PromptInputActionAddAttachments,
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import {
@@ -72,10 +74,18 @@ import { SqlResultTable } from "./sql-result-table";
 import { ChartArtifact } from "./chart-artifact";
 import { FlowLogo } from "./flow-logo";
 import {
-  ModelSelector,
   useModelSelector,
+  CHAT_MODES,
   type ChatMode,
 } from "./model-selector";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 const SQL_INLINE_MAX_ROWS = 5;
 const CADENCE_INLINE_MAX_LINES = 10;
@@ -136,6 +146,8 @@ export function Chat() {
 
   const { messages, sendMessage, status, stop } = useChat({ transport });
   const [input, setInput] = useState("");
+  const [hideTools, setHideTools] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -192,6 +204,7 @@ export function Chat() {
                   key={msg.id}
                   message={msg}
                   isStreaming={(status === "streaming" || status === "submitted") && idx === messages.length - 1}
+                  hideTools={hideTools}
                 />
               ))}
               {/* Pending indicator: avatar + shimmer while waiting for first token */}
@@ -216,6 +229,16 @@ export function Chat() {
         <ConversationScrollButton />
       </Conversation>
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        onChange={(e) => { e.target.value = ''; }}
+      />
+
       {/* Input area */}
       <div className="prompt-input-flow pb-4 pt-2 px-6">
         <div className="mx-auto max-w-3xl">
@@ -232,19 +255,6 @@ export function Chat() {
               autoFocus
             />
             <PromptInputFooter className="!pb-2.5 !pt-0">
-              <PromptInputTools>
-                <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger
-                    className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                  >
-                    <Paperclip size={15} />
-                  </PromptInputActionMenuTrigger>
-                  <PromptInputActionMenuContent>
-                    <PromptInputActionAddAttachments label="Upload image" />
-                  </PromptInputActionMenuContent>
-                </PromptInputActionMenu>
-                <ModelSelector mode={mode} onSelect={selectMode} />
-              </PromptInputTools>
               <PromptInputSubmit
                 status={status}
                 onStop={stop}
@@ -252,6 +262,130 @@ export function Chat() {
               />
             </PromptInputFooter>
           </PromptInput>
+
+          {/* Bottom row: attach + mode selector + tools + MCP */}
+          <div className="flex items-center gap-1.5 mt-1.5">
+            {/* + attach button */}
+            <div className="relative group/attach">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-7 h-7 flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-white/10 rounded-sm transition-colors border border-transparent hover:border-white/10"
+                title="Attach image or PDF"
+              >
+                <Plus size={13} />
+              </button>
+              <div className="absolute bottom-full left-0 mb-1 hidden group-hover/attach:block z-50 pointer-events-none">
+                <div className="bg-zinc-700 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+                  Upload images or PDFs
+                </div>
+              </div>
+            </div>
+
+            {/* Mode selector dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-1 px-2 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold transition-all bg-amber-500/10 border border-amber-500/30 text-amber-500 hover:bg-amber-500/20"
+                >
+                  {(() => {
+                    const current = CHAT_MODES.find(m => m.key === mode) || CHAT_MODES[0];
+                    const CurrentIcon = current.icon;
+                    return <><CurrentIcon size={10} />{current.label}</>;
+                  })()}
+                  <ChevronUp size={8} className="ml-0.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="min-w-[200px] z-[80] bg-zinc-900 border border-white/10 shadow-lg p-1">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-zinc-400 px-2 py-1">Model</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/10" />
+                {CHAT_MODES.map(({ key, label, icon: Icon, desc, model }) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onSelect={() => selectMode(key)}
+                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-sm cursor-pointer transition-colors ${
+                      mode === key
+                        ? 'bg-[var(--flow-green)]/10 text-[var(--flow-green)]'
+                        : 'text-zinc-300'
+                    }`}
+                  >
+                    <Icon size={14} className="shrink-0" />
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-medium leading-tight">{label}</span>
+                      <span className={`text-[10px] leading-tight ${mode === key ? 'text-[var(--flow-green)]/60' : 'text-zinc-500'}`}>{model} · {desc}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* TOOLS toggle */}
+            <button
+              type="button"
+              onClick={() => setHideTools(v => !v)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold transition-all ${
+                hideTools
+                  ? 'bg-zinc-500/10 border border-zinc-500/30 text-zinc-500'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] border border-transparent hover:border-white/10'
+              }`}
+              title={hideTools ? 'Show tool calls' : 'Hide tool calls'}
+            >
+              {hideTools ? <EyeOff size={10} /> : <Eye size={10} />}
+              Tools
+            </button>
+
+            {/* MCP hover popover */}
+            <div className="relative group/mcp">
+              <button
+                type="button"
+                className="flex items-center gap-1 px-2 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] border border-transparent hover:border-white/10 transition-all"
+                title="Connected MCP tools"
+              >
+                <Wrench size={10} />
+                MCP
+              </button>
+              <div className="absolute bottom-full left-0 mb-1.5 hidden group-hover/mcp:block z-50">
+                <div className="bg-zinc-900 border border-white/10 rounded-sm shadow-xl p-2.5 w-56">
+                  <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-400 mb-2">Connected Tools</p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Database size={10} className="text-[var(--flow-green)] shrink-0" />
+                      <span className="text-[11px] text-zinc-300">FlowIndex SQL</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Database size={10} className="text-blue-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">EVM Blockscout SQL</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Code2 size={10} className="text-purple-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">Cadence Scripts</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Code2 size={10} className="text-purple-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">Cadence Check & Docs</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Bot size={10} className="text-orange-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">EVM RPC (Chain 747)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Search size={10} className="text-amber-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">Web Search</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ChevronRight size={10} className="text-cyan-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">API Fetch</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Download size={10} className="text-pink-400 shrink-0" />
+                      <span className="text-[11px] text-zinc-300">Charts</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -328,7 +462,7 @@ function CollapsibleUserMessage({ text }: { text: string }) {
   );
 }
 
-function ChatMessage({ message, isStreaming: isMessageStreaming = false }: { message: UIMessage; isStreaming?: boolean }) {
+function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideTools = false }: { message: UIMessage; isStreaming?: boolean; hideTools?: boolean }) {
   if (message.role === "user") {
     const text = message.parts
       .filter((p) => p.type === "text")
@@ -371,6 +505,7 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false }: { mes
               part.type === "dynamic-tool" ||
               part.type.startsWith("tool-")
             ) {
+              if (hideTools) return null;
               const toolPart = part as any;
               const name =
                 toolPart.toolName ??
