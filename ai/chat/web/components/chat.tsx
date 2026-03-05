@@ -13,6 +13,7 @@ import {
   Sparkles,
   ChevronDown,
   Maximize2,
+  Paperclip,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -45,6 +46,12 @@ import {
   PromptInput,
   PromptInputTextarea,
   PromptInputFooter,
+  PromptInputTools,
+  PromptInputButton,
+  PromptInputActionMenu,
+  PromptInputActionMenuTrigger,
+  PromptInputActionMenuContent,
+  PromptInputActionAddAttachments,
   PromptInputSubmit,
 } from "@/components/ai-elements/prompt-input";
 import {
@@ -63,6 +70,11 @@ import { useArtifactPanel } from "@/components/artifact-panel";
 import { SqlResultTable } from "./sql-result-table";
 import { ChartArtifact } from "./chart-artifact";
 import { FlowLogo } from "./flow-logo";
+import {
+  ModelSelector,
+  useModelSelector,
+  type ChatMode,
+} from "./model-selector";
 
 const SQL_INLINE_MAX_ROWS = 5;
 const CADENCE_INLINE_MAX_LINES = 10;
@@ -101,7 +113,10 @@ const SUGGESTIONS = [
 ];
 
 export function Chat() {
-  const { messages, sendMessage, status, stop } = useChat();
+  const { mode, selectMode } = useModelSelector();
+  const { messages, sendMessage, status, stop } = useChat({
+    body: { mode },
+  });
   const [input, setInput] = useState("");
 
   const handleSend = useCallback(
@@ -168,7 +183,11 @@ export function Chat() {
       {/* Input area */}
       <div className="prompt-input-flow pb-4 pt-2 px-6">
         <div className="mx-auto max-w-3xl">
-          <PromptInput onSubmit={({ text }) => handleSend(text)}>
+          <PromptInput
+            onSubmit={({ text }) => handleSend(text)}
+            accept="image/*"
+            multiple
+          >
             <PromptInputTextarea
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
@@ -177,12 +196,20 @@ export function Chat() {
               autoFocus
             />
             <PromptInputFooter className="!pb-2.5 !pt-0">
-              <div className="flex items-center gap-1.5">
-                <Sparkles size={11} className="text-[var(--text-tertiary)]" />
-                <span className="text-[10.5px] text-[var(--text-tertiary)]">
-                  Powered by Claude &middot; Results may be inaccurate
-                </span>
-              </div>
+              <PromptInputTools>
+                <PromptInputActionMenu>
+                  <PromptInputActionMenuTrigger
+                    tooltip="Attach"
+                    className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                  >
+                    <Paperclip size={15} />
+                  </PromptInputActionMenuTrigger>
+                  <PromptInputActionMenuContent>
+                    <PromptInputActionAddAttachments label="Upload image" />
+                  </PromptInputActionMenuContent>
+                </PromptInputActionMenu>
+                <ModelSelector mode={mode} onSelect={selectMode} />
+              </PromptInputTools>
               <PromptInputSubmit
                 status={status}
                 onStop={stop}
