@@ -502,6 +502,7 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideToo
             }
 
             if (
+              part.type === "tool-invocation" ||
               part.type === "dynamic-tool" ||
               part.type.startsWith("tool-")
             ) {
@@ -509,14 +510,81 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideToo
               const toolPart = part as any;
               const name =
                 toolPart.toolName ??
-                toolPart.type.split("-").slice(1).join("-");
+                toolPart.type?.split("-").slice(1).join("-") ?? "";
               if (name === "createChart") {
                 return <ChartToolPart key={i} part={toolPart} />;
               }
               if (name === "run_cadence") {
                 return <CadenceToolPart key={i} part={toolPart} />;
               }
-              return <SqlToolPart key={i} part={toolPart} />;
+              if (name === "run_sql" || name === "runSQL" || name === "run_flowindex_sql" || name === "run_evm_sql") {
+                return <SqlToolPart key={i} part={toolPart} />;
+              }
+              // web_search / fetch_api — compact status line
+              if (name === "web_search" || name === "web_search_20250305" || name === "fetch_api") {
+                const label = name.startsWith("web_search") ? "Searching the web" : `Fetching ${toolPart.args?.url || toolPart.input?.url || "API"}`;
+                const done = toolPart.state === "output-available" || toolPart.state === "result";
+                const err = toolPart.state === "output-error";
+                return (
+                  <div key={i} className="flex items-center gap-2 py-1.5 px-2.5 my-1 text-[11px] text-zinc-500 bg-white/[0.03] border border-white/5 rounded-sm">
+                    {!done && !err ? (
+                      <span className="inline-block w-2.5 h-2.5 border border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                    ) : err ? (
+                      <span className="text-red-400 text-[10px]">✕</span>
+                    ) : (
+                      <Search size={10} className="text-[var(--flow-green)]" />
+                    )}
+                    <span className="truncate">{done ? (name.startsWith("web_search") ? "Web search complete" : "Fetched API") : label}...</span>
+                  </div>
+                );
+              }
+              // Generic tool fallback — expandable details
+              const toolDone = toolPart.state === "output-available" || toolPart.state === "result";
+              const toolErr = toolPart.state === "output-error";
+              const toolOutput = toolDone ? toolPart.output : toolErr ? (toolPart.errorText || "Tool call failed") : null;
+              const toolInput = toolPart.input ?? toolPart.args;
+              const hasDetails = toolInput || toolOutput;
+              const friendlyName = name.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+              const inputSummary = toolInput
+                ? typeof toolInput === "string"
+                  ? toolInput.slice(0, 60)
+                  : (() => { const s = JSON.stringify(toolInput); return s.length > 80 ? s.slice(0, 77) + "..." : s; })()
+                : "";
+              const truncateOutput = (v: unknown) => {
+                const s = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+                return s.length > 2000 ? s.slice(0, 2000) + "\n...[truncated]" : s;
+              };
+              return (
+                <details key={i} className="my-1 rounded-sm border border-white/5 overflow-hidden">
+                  <summary className="flex items-center gap-2 py-1.5 px-2.5 text-[11px] text-zinc-400 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04] select-none">
+                    {!toolDone && !toolErr ? (
+                      <span className="inline-block w-2.5 h-2.5 border border-zinc-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                    ) : toolErr ? (
+                      <span className="text-red-400 text-[10px] shrink-0">✕</span>
+                    ) : (
+                      <span className="text-[var(--flow-green)] text-[10px] shrink-0">✓</span>
+                    )}
+                    <span className="font-bold truncate">{friendlyName}</span>
+                    {inputSummary && <span className="text-zinc-500 truncate ml-1 font-mono text-[10px]">{inputSummary}</span>}
+                  </summary>
+                  {hasDetails && (
+                    <div className="px-3 py-2 text-[11px] font-mono space-y-1.5 bg-zinc-900 text-zinc-400 max-h-[200px] overflow-auto">
+                      {toolInput && (
+                        <div>
+                          <span className="text-zinc-500">Input: </span>
+                          <pre className="whitespace-pre-wrap break-words text-zinc-300">{typeof toolInput === "string" ? toolInput : JSON.stringify(toolInput, null, 2)}</pre>
+                        </div>
+                      )}
+                      {toolOutput && (
+                        <div>
+                          <span className="text-zinc-500">Output: </span>
+                          <pre className={`whitespace-pre-wrap break-words ${toolErr ? "text-red-400" : "text-zinc-300"}`}>{truncateOutput(toolOutput)}</pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </details>
+              );
             }
 
             return null;
@@ -595,8 +663,8 @@ function ChartToolPart({ part }: { part: any }) {
 function SqlToolPart({ part }: { part: any }) {
   const { openArtifact } = useArtifactPanel();
 
-  const toolName = part.toolName ?? part.type.split("-").slice(1).join("-");
-  if (toolName !== "runSQL" && toolName !== "run_sql") return null;
+  const toolName = part.toolName ?? part.type?.split("-").slice(1).join("-") ?? "";
+  if (toolName !== "runSQL" && toolName !== "run_sql" && toolName !== "run_flowindex_sql" && toolName !== "run_evm_sql") return null;
 
   const isDone =
     part.state === "output-available" || part.state === "result";
