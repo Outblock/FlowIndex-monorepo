@@ -31,6 +31,10 @@ import {
 import { useProjects, type CloudProject, type CloudProjectFull } from './auth/useProjects';
 import ProjectSelector from './components/ProjectSelector';
 import ShareModal from './components/ShareModal';
+import { useGitHub } from './github/useGitHub';
+import GitHubConnect from './components/GitHubConnect';
+import GitCommitPanel from './components/GitCommitPanel';
+import DeployStatus from './components/DeployStatus';
 import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn, Share2, X, MessageSquare, Settings, Cpu, Server, ChevronDown, Globe, Sparkles } from 'lucide-react';
 import type { LspMode } from './editor/useLsp';
 
@@ -459,6 +463,18 @@ export default function App() {
   const autoCreatingRef = useRef(false);
   const [viewingShared, setViewingShared] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // GitHub integration state
+  const [ghInstallationId, setGhInstallationId] = useState<number | undefined>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('github_installation_id');
+    return id ? Number(id) : undefined;
+  });
+  const [showGitHubConnect, setShowGitHubConnect] = useState(false);
+  const [gitPushing, setGitPushing] = useState(false);
+  const [lastPulledFiles, setLastPulledFiles] = useState<Map<string, string>>(new Map());
+
+  const github = useGitHub(cloudMeta.id);
 
   const [monacoInstance, setMonacoInstance] = useState<typeof MonacoNS | null>(null);
   const editorRef = useRef<MonacoNS.editor.IStandaloneCodeEditor | null>(null);
@@ -1054,6 +1070,91 @@ export default function App() {
     URL.revokeObjectURL(url);
   }, [project, cloudMeta.name]);
 
+  // Auto-open GitHub connect modal when returning from GitHub app install
+  useEffect(() => {
+    if (ghInstallationId && !github.connection) {
+      setShowGitHubConnect(true);
+    }
+  }, [ghInstallationId, github.connection]);
+
+  // Compute changed files for the Git commit panel
+  const gitChangedFiles = useMemo(() => {
+    if (!github.connection || lastPulledFiles.size === 0) return [];
+    const changes: { path: string; status: 'modified' | 'new' | 'deleted' }[] = [];
+    const userFiles = getUserFiles(project);
+
+    for (const file of userFiles) {
+      const pulled = lastPulledFiles.get(file.path);
+      if (pulled === undefined) {
+        changes.push({ path: file.path, status: 'new' });
+      } else if (pulled !== file.content) {
+        changes.push({ path: file.path, status: 'modified' });
+      }
+    }
+
+    for (const [path] of lastPulledFiles) {
+      if (!userFiles.some(f => f.path === path)) {
+        changes.push({ path, status: 'deleted' });
+      }
+    }
+
+    return changes;
+  }, [project, lastPulledFiles, github.connection]);
+
+  // Handle GitHub connect: link repo and pull files
+  const handleGitHubConnect = async (installationId: number, owner: string, repo: string, path: string, branch: string) => {
+    await github.connect(installationId, owner, repo, path, branch);
+    const files = await github.pullFiles();
+    const pulled = new Map<string, string>();
+    const newProjectFiles = files.map(f => {
+      pulled.set(f.path, f.content);
+      return { path: f.path, content: f.content };
+    });
+    if (newProjectFiles.length > 0) {
+      setProject({
+        files: newProjectFiles,
+        activeFile: newProjectFiles[0].path,
+        openFiles: [newProjectFiles[0].path],
+        folders: [],
+      });
+    }
+    setLastPulledFiles(pulled);
+    setShowGitHubConnect(false);
+    setGhInstallationId(undefined);
+    // Clean URL params
+    const url = new URL(window.location.href);
+    url.searchParams.delete('github_installation_id');
+    url.searchParams.delete('setup_action');
+    window.history.replaceState({}, '', url.toString());
+  };
+
+  // Handle commit & push to GitHub
+  const handleGitCommit = async (message: string) => {
+    setGitPushing(true);
+    try {
+      const files = gitChangedFiles.map(change => {
+        if (change.status === 'deleted') {
+          return { path: change.path, content: '', action: 'delete' as const };
+        }
+        const content = getFileContent(project, change.path) || '';
+        return { path: change.path, content, action: change.status === 'new' ? 'create' as const : 'update' as const };
+      });
+      await github.commitAndPush(message, files);
+      // Update lastPulledFiles to match current state
+      const newPulled = new Map(lastPulledFiles);
+      for (const change of gitChangedFiles) {
+        if (change.status === 'deleted') {
+          newPulled.delete(change.path);
+        } else {
+          newPulled.set(change.path, getFileContent(project, change.path) || '');
+        }
+      }
+      setLastPulledFiles(newPulled);
+    } finally {
+      setGitPushing(false);
+    }
+  };
+
   const hasBottomPanel = scriptParams.length > 0 || results.length > 0 || loading;
 
   return (
@@ -1175,6 +1276,24 @@ export default function App() {
             onToggleAutoSign={handleToggleAutoSign}
             network={network}
           />
+
+          {/* GitHub integration */}
+          {github.connection ? (
+            <DeployStatus
+              runs={github.latestRuns}
+              repoOwner={github.connection.repo_owner}
+              repoName={github.connection.repo_name}
+              workflowConfigured={github.connection.workflow_configured}
+              onSetupWorkflow={() => github.setupWorkflow(network)}
+            />
+          ) : user && cloudMeta.id && (
+            <button
+              onClick={() => setShowGitHubConnect(true)}
+              className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs px-2 py-1 rounded border border-zinc-700 transition-colors"
+            >
+              <span className="text-xs">Connect GitHub</span>
+            </button>
+          )}
 
           {/* Desktop run button */}
           {!isMobile && (
@@ -1307,6 +1426,17 @@ export default function App() {
                   activeFile={project.activeFile}
                 />
               </div>
+              {/* Git panel */}
+              {github.connection && (
+                <div className="shrink-0 border-t border-zinc-700">
+                  <GitCommitPanel
+                    changedFiles={gitChangedFiles}
+                    onCommit={handleGitCommit}
+                    lastCommitSha={github.connection.last_commit_sha}
+                    pushing={gitPushing}
+                  />
+                </div>
+              )}
               {/* Sign in / user info at sidebar bottom */}
               {!authLoading && (
                 <div className="shrink-0 border-t border-zinc-700">
@@ -1671,6 +1801,15 @@ export default function App() {
             await fetchProjects();
           }}
           onClose={() => setShowShareModal(false)}
+        />
+      )}
+
+      {/* GitHub Connect Modal */}
+      {showGitHubConnect && (
+        <GitHubConnect
+          installationId={ghInstallationId}
+          onConnect={handleGitHubConnect}
+          onClose={() => { setShowGitHubConnect(false); setGhInstallationId(undefined); }}
         />
       )}
 
