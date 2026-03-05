@@ -91,17 +91,17 @@ const TYPE_TAG_CLASSES: Record<string, string> = {
   transfer: 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-gray-400',
 };
 
-function AddressWithAvatar({ address }: { address: string }) {
+function AddressWithAvatar({ address, large = false }: { address: string; large?: boolean }) {
   if (!address) return <span className="text-zinc-400 dark:text-gray-500">—</span>;
   const normalized = address.startsWith('0x') ? address : `0x${address}`;
   const colors = colorsFromAddress(normalized);
   return (
     <Link
       to={`/accounts/${address}` as any}
-      className="inline-flex items-center gap-1 hover:underline"
+      className="inline-flex items-center gap-1.5 hover:underline"
       onClick={(e: React.MouseEvent) => e.stopPropagation()}
     >
-      <Avatar size={10} name={normalized} variant={avatarVariant(normalized)} colors={colors} />
+      <Avatar size={large ? 18 : 10} name={normalized} variant={avatarVariant(normalized)} colors={colors} />
       <span>{formatAddr(address)}</span>
     </Link>
   );
@@ -168,15 +168,15 @@ function TransferRow({ tx, compact = false }: { tx: BigTransfer; compact?: boole
       </div>
 
       {/* From */}
-      <div className="text-[10px] font-mono text-zinc-500 dark:text-gray-400 truncate">
-        <AddressWithAvatar address={tx.from_address} />
+      <div className="text-xs font-mono text-zinc-600 dark:text-gray-300 truncate">
+        <AddressWithAvatar address={tx.from_address} large />
       </div>
 
       <ArrowRight className="h-3 w-3 text-zinc-300 dark:text-gray-600 flex-shrink-0" />
 
       {/* To */}
-      <div className="text-[10px] font-mono text-zinc-500 dark:text-gray-400 truncate">
-        <AddressWithAvatar address={tx.to_address} />
+      <div className="text-xs font-mono text-zinc-600 dark:text-gray-300 truncate">
+        <AddressWithAvatar address={tx.to_address} large />
       </div>
 
       {/* Type tag */}
@@ -433,7 +433,7 @@ export function BigTransfersFull() {
               <TransferHeader />
               {timelineSections.map(section => (
                 <Fragment key={section.label}>
-                  <div className="sticky top-0 z-10 px-3 py-1.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
+                  <div className="sticky top-0 z-10 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-white/10">
                     <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 dark:text-gray-400 font-bold">
                       {section.label}
                     </span>
