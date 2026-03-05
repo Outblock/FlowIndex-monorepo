@@ -190,6 +190,34 @@ services:
     volumes:
       - ./supabase/functions/runner-projects/index.ts:/app/index.ts:ro
 
+  runner:
+    build:
+      context: .
+      dockerfile: runner/Dockerfile
+      args:
+        VITE_AI_CHAT_URL: ${VITE_AI_CHAT_URL:-http://localhost:3004}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:54321}
+        VITE_SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+        VITE_GOTRUE_URL: ${API_EXTERNAL_URL:-http://localhost:9999}
+    environment:
+      PORT: 8081
+      GOTRUE_URL: http://supabase-auth:9999
+      SUPABASE_GATEWAY_URL: http://supabase-gateway:8000
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-cadence-runner}
+      GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      HTTP_PORT: ${HTTP_PORT:-3003}
+    ports:
+      - "8081:80"
+      - "3002:3002"
+      - "3003:3003"
+    depends_on:
+      - supabase-gateway
+
   supabase-gateway:
     image: nginx:alpine
     depends_on:
