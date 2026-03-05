@@ -107,6 +107,65 @@ const editorTools = {
   }),
 };
 
+/* ── Client-side wallet tools (no execute — handled in browser) ── */
+
+const walletTools = {
+  get_wallet_info: tool({
+    description:
+      "Get current wallet/signer state: connected status, address, key info, and active network",
+    inputSchema: z.object({}),
+  }),
+  list_local_keys: tool({
+    description:
+      "List all locally stored keys with their linked on-chain Flow accounts",
+    inputSchema: z.object({}),
+  }),
+  create_flow_account: tool({
+    description:
+      "Create a new Flow account on-chain for a local key. Returns the transaction ID.",
+    inputSchema: z.object({
+      keyId: z.string().describe("Local key ID to create account for"),
+      network: z
+        .enum(["mainnet", "testnet"])
+        .optional()
+        .describe("Network to create account on (default: current network)"),
+    }),
+  }),
+  refresh_accounts: tool({
+    description:
+      "Discover on-chain Flow accounts linked to a local key by scanning the network",
+    inputSchema: z.object({
+      keyId: z.string().describe("Local key ID to refresh accounts for"),
+      network: z
+        .enum(["mainnet", "testnet"])
+        .optional()
+        .describe("Network to scan (default: current network)"),
+    }),
+  }),
+  sign_message: tool({
+    description:
+      "Sign a hex-encoded message with a local key. Returns the signature.",
+    inputSchema: z.object({
+      keyId: z.string().describe("Local key ID to sign with"),
+      message: z.string().describe("Hex-encoded message to sign"),
+      hashAlgo: z
+        .enum(["SHA2_256", "SHA3_256"])
+        .optional()
+        .describe("Hash algorithm (default: SHA3_256)"),
+      sigAlgo: z
+        .enum(["ECDSA_P256", "ECDSA_secp256k1"])
+        .optional()
+        .describe("Signature algorithm (default: ECDSA_secp256k1)"),
+    }),
+  }),
+  switch_network: tool({
+    description: "Switch the runner's active Flow network",
+    inputSchema: z.object({
+      network: z.enum(["mainnet", "testnet"]).describe("Target network"),
+    }),
+  }),
+};
+
 const SYSTEM_PROMPT = `You are a Cadence programming assistant embedded in Cadence Runner.
 Your primary job is to help users write, edit, and debug Cadence smart contract code for Flow.
 
@@ -134,6 +193,19 @@ Workflow:
 2. Explain your plan briefly in chat.
 3. Use \`create_file\`, \`update_file\`, or \`edit_file\` to make changes. The user will see a diff and can accept or reject.
 4. If the user asks a question with no code changes, just answer in chat text.
+
+## Wallet tools
+
+You have wallet tools to query and manage Flow accounts:
+- \`get_wallet_info\` — current signer address, key info, and network
+- \`list_local_keys\` — all stored keys with their linked on-chain accounts
+- \`create_flow_account(keyId, network)\` — create a new Flow account for a key
+- \`refresh_accounts(keyId, network)\` — discover on-chain accounts linked to a key
+- \`sign_message(keyId, message)\` — sign a hex message with a local key
+- \`switch_network(network)\` — switch between mainnet and testnet
+- \`flow_sign_and_send(code, args)\` — sign and submit a Cadence transaction (existing)
+
+Always call \`get_wallet_info\` first to check if a signer is available before attempting transactions.
 
 ## Cadence guidelines
 
@@ -234,6 +306,7 @@ export async function POST(req: Request) {
 
   const allTools = {
     ...editorTools,
+    ...walletTools,
     ...cadenceMcp.tools,
     loadSkill: createLoadSkillTool(),
   };

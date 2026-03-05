@@ -1251,6 +1251,11 @@ export default function App() {
                   selectedSigner={selectedSigner}
                   signWithLocalKey={signWithLocalKey}
                   promptForPassword={promptForPassword}
+                  localKeys={localKeys}
+                  accountsMap={accountsMap}
+                  onCreateAccount={createAccount}
+                  onRefreshAccounts={refreshAccounts}
+                  onSwitchNetwork={(n) => setNetwork(n as FlowNetwork)}
                 />
               </div>
             </>
@@ -1324,6 +1329,11 @@ export default function App() {
               selectedSigner={selectedSigner}
               signWithLocalKey={signWithLocalKey}
               promptForPassword={promptForPassword}
+              localKeys={localKeys}
+              accountsMap={accountsMap}
+              onCreateAccount={createAccount}
+              onRefreshAccounts={refreshAccounts}
+              onSwitchNetwork={(n) => setNetwork(n as FlowNetwork)}
             />
           </div>
         </div>
