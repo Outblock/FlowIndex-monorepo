@@ -91,19 +91,33 @@ const TYPE_TAG_CLASSES: Record<string, string> = {
   transfer: 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-gray-400',
 };
 
-function AddressWithAvatar({ address }: { address: string }) {
+function AddressWithAvatar({ address, large = false }: { address: string; large?: boolean }) {
   if (!address) return <span className="text-zinc-400 dark:text-gray-500">—</span>;
   const normalized = address.startsWith('0x') ? address : `0x${address}`;
   const colors = colorsFromAddress(normalized);
   return (
     <Link
       to={`/accounts/${address}` as any}
-      className="inline-flex items-center gap-1 hover:underline"
+      className="inline-flex items-center gap-1.5 hover:underline"
       onClick={(e: React.MouseEvent) => e.stopPropagation()}
     >
-      <Avatar size={10} name={normalized} variant={avatarVariant(normalized)} colors={colors} />
+      <Avatar size={large ? 18 : 10} name={normalized} variant={avatarVariant(normalized)} colors={colors} />
       <span>{formatAddr(address)}</span>
     </Link>
+  );
+}
+
+function TransferHeader() {
+  return (
+    <div className="grid grid-cols-[auto_1fr_1fr_auto_1fr_auto_auto] items-center gap-3 px-4 py-2 border-b border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5">
+      <div className="w-6" />
+      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-gray-500 font-semibold">Amount</span>
+      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-gray-500 font-semibold">From</span>
+      <div className="w-3" />
+      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-gray-500 font-semibold">To</span>
+      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-gray-500 font-semibold">Type</span>
+      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 dark:text-gray-500 font-semibold text-right min-w-[3.5rem]">Time</span>
+    </div>
   );
 }
 
@@ -140,7 +154,7 @@ function TransferRow({ tx, compact = false }: { tx: BigTransfer; compact?: boole
   return (
     <Link
       to={`/tx/0x${tx.tx_id}` as any}
-      className="grid grid-cols-[auto_1fr_minmax(0,120px)_auto_minmax(0,120px)_auto_auto] items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors border-b border-zinc-100 dark:border-white/5 last:border-b-0"
+      className="grid grid-cols-[auto_1fr_1fr_auto_1fr_auto_auto] items-center gap-3 px-4 py-3.5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors border-b border-zinc-100 dark:border-white/5 last:border-b-0"
     >
       {/* Token icon + amount */}
       <TokenIcon logo={tx.token_logo} symbol={tx.token_symbol} size={24} />
@@ -154,15 +168,15 @@ function TransferRow({ tx, compact = false }: { tx: BigTransfer; compact?: boole
       </div>
 
       {/* From */}
-      <div className="text-[10px] font-mono text-zinc-500 dark:text-gray-400 truncate">
-        <AddressWithAvatar address={tx.from_address} />
+      <div className="text-xs font-mono text-zinc-600 dark:text-gray-300 truncate">
+        <AddressWithAvatar address={tx.from_address} large />
       </div>
 
       <ArrowRight className="h-3 w-3 text-zinc-300 dark:text-gray-600 flex-shrink-0" />
 
       {/* To */}
-      <div className="text-[10px] font-mono text-zinc-500 dark:text-gray-400 truncate">
-        <AddressWithAvatar address={tx.to_address} />
+      <div className="text-xs font-mono text-zinc-600 dark:text-gray-300 truncate">
+        <AddressWithAvatar address={tx.to_address} large />
       </div>
 
       {/* Type tag */}
@@ -416,9 +430,10 @@ export function BigTransfersFull() {
             </div>
           ) : (
             <div className="flex flex-col">
+              <TransferHeader />
               {timelineSections.map(section => (
                 <Fragment key={section.label}>
-                  <div className="sticky top-0 z-10 px-3 py-1.5 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
+                  <div className="sticky top-0 z-10 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-white/10">
                     <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 dark:text-gray-400 font-bold">
                       {section.label}
                     </span>
@@ -457,6 +472,7 @@ export function BigTransfersFull() {
             </div>
           ) : (
             <div className="flex flex-col">
+              <TransferHeader />
               {displayTransfers.map((tx, i) => (
                 <TransferRow key={`${tx.tx_id}-${i}`} tx={tx} />
               ))}
