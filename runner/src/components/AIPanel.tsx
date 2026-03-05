@@ -21,6 +21,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { TEMPLATES, type Template } from '../fs/fileSystem';
+import type { SignerOption } from './SignerSelector';
+import { executeCustodialTransaction } from '../flow/execute';
 
 const AI_CHAT_URL = import.meta.env.VITE_AI_CHAT_URL || 'https://ai.flowindex.io';
 
@@ -49,6 +51,15 @@ interface AIPanelProps {
   network?: string;
   onClose?: () => void;
   onAutoApproveChange?: (autoApprove: boolean) => void;
+  selectedSigner?: SignerOption;
+  signWithLocalKey?: (
+    keyId: string,
+    message: string,
+    hashAlgo?: 'SHA2_256' | 'SHA3_256',
+    password?: string,
+    sigAlgo?: 'ECDSA_P256' | 'ECDSA_secp256k1',
+  ) => Promise<string>;
+  promptForPassword?: (keyLabel: string) => Promise<string>;
 }
 
 /* ── SQL Result Table ── */
@@ -1433,6 +1444,9 @@ export default function AIPanel({
   network,
   onClose,
   onAutoApproveChange,
+  selectedSigner,
+  signWithLocalKey,
+  promptForPassword,
 }: AIPanelProps) {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<ChatMode>(getStoredMode);
@@ -1457,6 +1471,39 @@ export default function AIPanel({
   useEffect(() => {
     onAutoApproveChange?.(autoApprove);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pending approval dialog for flow_sign_and_send when auto-approve is OFF
+  const [pendingApproval, setPendingApproval] = useState<{
+    code: string;
+    args?: Array<{ name: string; value: string }>;
+    signer: Extract<SignerOption, { type: 'local' }>;
+    onApprove: () => void;
+    onReject: () => void;
+  } | null>(null);
+
+  function showSignApprovalDialog(opts: {
+    code: string;
+    args?: Array<{ name: string; value: string }>;
+    signer: Extract<SignerOption, { type: 'local' }>;
+  }): Promise<boolean> {
+    return new Promise((resolve) => {
+      setPendingApproval({
+        ...opts,
+        onApprove: () => { setPendingApproval(null); resolve(true); },
+        onReject: () => { setPendingApproval(null); resolve(false); },
+      });
+    });
+  }
+
+  // Refs for signer props so onToolCall closure stays stable
+  const selectedSignerRef = useRef(selectedSigner);
+  selectedSignerRef.current = selectedSigner;
+  const signWithLocalKeyRef = useRef(signWithLocalKey);
+  signWithLocalKeyRef.current = signWithLocalKey;
+  const promptForPasswordRef = useRef(promptForPassword);
+  promptForPasswordRef.current = promptForPassword;
+  const autoApproveRef = useRef(autoApprove);
+  autoApproveRef.current = autoApprove;
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1583,6 +1630,65 @@ export default function AIPanel({
         case 'set_active_file': {
           onSetActiveFileRef.current?.(args.path);
           emit({ success: true });
+          return;
+        }
+        case 'flow_sign_and_send': {
+          const { code, args: txArgs, network: txNetwork } = args as {
+            code: string;
+            args?: Array<{ name: string; value: string }>;
+            network?: 'mainnet' | 'testnet';
+          };
+
+          const signer = selectedSignerRef.current;
+          if (!signer || signer.type !== 'local') {
+            emit({ error: 'No local key selected. Please select a local key signer.' });
+            return;
+          }
+
+          if (!signWithLocalKeyRef.current) {
+            emit({ error: 'Local key signing not available.' });
+            return;
+          }
+
+          // If auto-approve is OFF, show approval dialog
+          if (!autoApproveRef.current) {
+            const approved = await showSignApprovalDialog({ code, args: txArgs, signer });
+            if (!approved) {
+              emit({ error: 'User rejected the transaction.' });
+              return;
+            }
+          }
+
+          // Execute transaction
+          try {
+            const { key, account } = signer;
+            const paramValues: Record<string, string> = {};
+            if (txArgs) for (const a of txArgs) paramValues[a.name] = a.value;
+
+            let finalResult: any;
+            await executeCustodialTransaction(
+              code,
+              paramValues,
+              account.flowAddress,
+              account.keyIndex,
+              async (message: string) => {
+                try {
+                  return await signWithLocalKeyRef.current!(key.id, message, account.hashAlgo, undefined, account.sigAlgo);
+                } catch (e: any) {
+                  if (e.message === 'PASSWORD_REQUIRED') {
+                    const pw = await promptForPasswordRef.current!(key.label);
+                    return signWithLocalKeyRef.current!(key.id, message, account.hashAlgo, pw, account.sigAlgo);
+                  }
+                  throw e;
+                }
+              },
+              (r) => { finalResult = r; },
+            );
+
+            emit(finalResult ?? { success: true });
+          } catch (e: any) {
+            emit({ error: e.message });
+          }
           return;
         }
       }
@@ -1758,6 +1864,31 @@ export default function AIPanel({
               <div className="mb-3 px-3 py-2 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
                 {chatError}
                 <button onClick={() => setChatError(null)} className="ml-2 underline">Dismiss</button>
+              </div>
+            )}
+            {/* Transaction approval dialog */}
+            {pendingApproval && (
+              <div className="mx-4 my-2 p-4 border border-yellow-500/30 bg-yellow-500/10 rounded-lg">
+                <h4 className="font-medium text-yellow-400 text-sm mb-2">Transaction Approval Required</h4>
+                <pre className="text-xs bg-zinc-900 p-2 rounded mb-2 max-h-40 overflow-auto whitespace-pre-wrap">
+                  {pendingApproval.code}
+                </pre>
+                {pendingApproval.args && pendingApproval.args.length > 0 && (
+                  <div className="text-xs text-zinc-400 mb-2">
+                    Args: {pendingApproval.args.map(a => `${a.name}=${a.value}`).join(', ')}
+                  </div>
+                )}
+                <p className="text-xs text-zinc-400 mb-3">
+                  Signer: {pendingApproval.signer.account.flowAddress} (key #{pendingApproval.signer.account.keyIndex})
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={pendingApproval.onApprove} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-sm text-white transition-colors">
+                    Approve
+                  </button>
+                  <button onClick={pendingApproval.onReject} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-sm text-white transition-colors">
+                    Reject
+                  </button>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />

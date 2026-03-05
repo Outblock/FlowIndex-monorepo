@@ -1240,6 +1240,9 @@ export default function App() {
                   activeFile={project.activeFile}
                   network={network}
                   onClose={() => setShowAI(false)}
+                  selectedSigner={selectedSigner}
+                  signWithLocalKey={signWithLocalKey}
+                  promptForPassword={promptForPassword}
                 />
               </div>
             </>
@@ -1310,6 +1313,9 @@ export default function App() {
               activeFile={project.activeFile}
               network={network}
               onClose={() => setShowMobileAI(false)}
+              selectedSigner={selectedSigner}
+              signWithLocalKey={signWithLocalKey}
+              promptForPassword={promptForPassword}
             />
           </div>
         </div>
