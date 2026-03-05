@@ -161,12 +161,12 @@ export default function ParamPanel({ params, values, onChange, argErrors }: Para
           {params.map((p, i) => {
             const argErr = argErrors?.find(e => e.index === i);
             return (
-              <div key={p.name} className="flex items-center gap-2 group relative">
-                <label className="text-xs text-zinc-400 whitespace-nowrap">
-                  {p.name}
-                  <span className="text-zinc-600 ml-1">: {p.type}</span>
-                </label>
-                <div className="relative">
+              <div key={p.name} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-zinc-400 whitespace-nowrap">
+                    {p.name}
+                    <span className="text-zinc-600 ml-1">: {p.type}</span>
+                  </label>
                   <input
                     type="text"
                     value={values[p.name] || ''}
@@ -174,18 +174,16 @@ export default function ParamPanel({ params, values, onChange, argErrors }: Para
                     placeholder={placeholderFor(p.type)}
                     className={`bg-zinc-800 border rounded px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none w-48 ${
                       argErr
-                        ? 'border-red-500 bg-red-900/20 focus:border-red-400'
+                        ? 'border-red-500 ring-1 ring-red-500/40 bg-red-900/20 focus:border-red-400'
                         : 'border-zinc-700 focus:border-zinc-500'
                     }`}
                   />
-                  {argErr && (
-                    <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block">
-                      <div className="bg-red-950 border border-red-800 rounded px-2 py-1 text-[10px] text-red-300 max-w-xs whitespace-normal shadow-lg">
-                        {argErr.message}
-                      </div>
-                    </div>
-                  )}
                 </div>
+                {argErr && (
+                  <div className="text-[10px] text-red-400 pl-1 max-w-[320px] truncate" title={argErr.message}>
+                    {argErr.message}
+                  </div>
+                )}
               </div>
             );
           })}
