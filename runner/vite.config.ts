@@ -26,6 +26,10 @@ export default defineConfig({
       '/github': {
         target: 'http://localhost:3003',
       },
+      '/functions': {
+        target: 'https://run.flowindex.io',
+        changeOrigin: true,
+      },
     },
   },
 });
