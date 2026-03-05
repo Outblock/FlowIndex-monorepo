@@ -1395,6 +1395,9 @@ export default function App() {
               address={accountPanelAddress}
               network={network}
               onClose={() => setAccountPanelAddress(null)}
+              onDisconnect={() => {
+                if (selectedSigner.type === 'local') setSelectedSigner({ type: 'fcl' });
+              }}
             />
           </div>
         </div>
