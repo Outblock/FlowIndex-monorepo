@@ -325,9 +325,11 @@ export default function App() {
   const hasRestoredSigner = useRef(false);
   useEffect(() => {
     if (hasRestoredSigner.current) return;
-    // Need at least one key with accounts to restore a local signer
+    // Wait until WASM is ready and keys are loaded before attempting restore
+    if (!wasmReady) return;
+    // If keys exist but no accounts yet, wait for account discovery
     const hasLocalAccounts = localKeys.some(k => (accountsMap[k.id] || []).length > 0);
-    if (!hasLocalAccounts && localKeys.length > 0) return; // still loading accounts
+    if (localKeys.length > 0 && !hasLocalAccounts) return;
 
     hasRestoredSigner.current = true;
     try {
@@ -355,7 +357,7 @@ export default function App() {
         return;
       }
     }
-  }, [localKeys, accountsMap]);
+  }, [wasmReady, localKeys, accountsMap]);
 
   const {
     projects: cloudProjects,
