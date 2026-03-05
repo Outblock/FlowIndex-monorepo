@@ -1499,3 +1499,97 @@ func (s *Server) handleAdminReprocessWorker(w http.ResponseWriter, r *http.Reque
 		"message":      fmt.Sprintf("Reprocessing %s from %d to %d in background (%d chunks). Checkpoint: %s. Use resume:true to continue after restart.", req.Worker, req.FromHeight, req.ToHeight, totalChunks, checkpointKey),
 	}, nil, nil)
 }
+
+// handleAdminBackfillContracts fetches ALL contracts from one or more Flow addresses
+// via RPC and upserts them into app.smart_contracts with code and kind classification.
+// This is useful for backfilling contracts that were deployed before the deriver covered
+// those block ranges (e.g., EVM bridge contracts on 1e4aa0b87d10b141).
+//
+// POST /admin/backfill-contracts
+// Body: { "addresses": ["1e4aa0b87d10b141"] }   (hex, no 0x prefix)
+// If no addresses provided, defaults to the known EVM bridge address.
+func (s *Server) handleAdminBackfillContracts(w http.ResponseWriter, r *http.Request) {
+	if s.client == nil {
+		writeAPIError(w, http.StatusServiceUnavailable, "no Flow client configured")
+		return
+	}
+
+	var req struct {
+		Addresses []string `json:"addresses"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	// Default: EVM bridge address
+	if len(req.Addresses) == 0 {
+		req.Addresses = []string{"1e4aa0b87d10b141"}
+	}
+
+	type result struct {
+		Address  string `json:"address"`
+		Found    int    `json:"found"`
+		Upserted int    `json:"upserted"`
+		Error    string `json:"error,omitempty"`
+	}
+	var results []result
+
+	for _, rawAddr := range req.Addresses {
+		addr := normalizeFlowAddr(rawAddr)
+		if addr == "" {
+			results = append(results, result{Address: rawAddr, Error: "invalid address"})
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		acc, err := s.client.GetAccount(ctx, flowsdk.HexToAddress(addr))
+		cancel()
+		if err != nil || acc == nil {
+			errMsg := "RPC error"
+			if err != nil {
+				errMsg = err.Error()
+			}
+			results = append(results, result{Address: addr, Error: errMsg})
+			continue
+		}
+
+		var contracts []models.SmartContract
+		for name, code := range acc.Contracts {
+			kind := ingester.ClassifyContractCode(string(code))
+			if kind == "" {
+				kind = ingester.ClassifyContractByName(name)
+			}
+			if kind == "" {
+				kind = "CONTRACT"
+			}
+			contracts = append(contracts, models.SmartContract{
+				Address:     addr,
+				Name:        name,
+				Code:        string(code),
+				Kind:        kind,
+				BlockHeight: 0, // unknown deployment height
+			})
+		}
+
+		if len(contracts) == 0 {
+			results = append(results, result{Address: addr, Found: 0})
+			continue
+		}
+
+		// Upsert contracts with code
+		if err := s.repo.UpsertSmartContracts(r.Context(), contracts); err != nil {
+			results = append(results, result{Address: addr, Found: len(contracts), Error: err.Error()})
+			continue
+		}
+
+		// Also upsert kind via registry
+		if err := s.repo.UpsertContractRegistry(r.Context(), contracts); err != nil {
+			log.Printf("[WARN] backfill-contracts: UpsertContractRegistry failed for %s: %v", addr, err)
+		}
+
+		results = append(results, result{Address: addr, Found: len(contracts), Upserted: len(contracts)})
+		log.Printf("[INFO] backfill-contracts: address=%s contracts=%d", addr, len(contracts))
+	}
+
+	writeAPIResponse(w, results, nil, nil)
+}
