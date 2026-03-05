@@ -47,41 +47,6 @@ router.get('/repos', async (req: Request, res: Response) => {
   }
 });
 
-// POST /repos — Create a new repo for the installation owner
-router.post('/repos', async (req: Request, res: Response) => {
-  try {
-    const { installation_id, name, description, is_private } = req.body as {
-      installation_id: number;
-      name: string;
-      description?: string;
-      is_private?: boolean;
-    };
-    if (!installation_id || !name) {
-      res.status(400).json({ error: 'installation_id and name are required' });
-      return;
-    }
-    const octokit = await getInstallationOctokit(installation_id);
-    // Create repo for the authenticated installation owner
-    const { data } = await octokit.request('POST /user/repos', {
-      name,
-      description: description || '',
-      private: is_private ?? false,
-      auto_init: true, // create with README so it has a default branch
-    });
-    res.json({
-      id: data.id,
-      full_name: data.full_name,
-      owner: data.owner?.login ?? '',
-      name: data.name,
-      default_branch: data.default_branch,
-      private: data.private,
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    res.status(500).json({ error: message });
-  }
-});
-
 // GET /tree/:owner/:repo — Read file tree of a repo directory
 router.get('/tree/:owner/:repo', async (req: Request, res: Response) => {
   try {
