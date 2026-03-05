@@ -161,8 +161,9 @@ function extractContractName(code: string): string {
 }
 
 /**
- * Deploy a Cadence contract to a Flow account.
- * Generates a deploy transaction that calls Account.contracts.add().
+ * Deploy or update a Cadence contract on a Flow account.
+ * Auto-detects: if the contract already exists on the account, uses update;
+ * otherwise uses add.
  */
 export async function deployContract(
   code: string,
@@ -179,7 +180,27 @@ export async function deployContract(
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
 
-    const deployTx = `
+    // Check if the contract already exists on the account
+    let isUpdate = false;
+    try {
+      const account = await fcl.account(fcl.withPrefix(signerAddress));
+      isUpdate = contractName in (account.contracts || {});
+    } catch {
+      // If we can't fetch the account, default to add
+    }
+
+    if (isUpdate) {
+      onResult({ type: 'log', data: `Updating existing contract "${contractName}"...` });
+    }
+
+    const deployTx = isUpdate
+      ? `
+transaction(name: String, code: String) {
+  prepare(signer: auth(UpdateContract) &Account) {
+    signer.contracts.update(name: name, code: code.decodeHex())
+  }
+}`
+      : `
 transaction(name: String, code: String) {
   prepare(signer: auth(AddContract) &Account) {
     signer.contracts.add(name: name, code: code.decodeHex())
