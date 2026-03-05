@@ -21,6 +21,19 @@ import {
 import Avatar from 'boring-avatars';
 import type { LocalKey, KeyAccount } from '../auth/localKeyManager';
 
+/** Derive 5 colors from an address (matches frontend AddressLink). */
+function colorsFromAddress(addr: string): string[] {
+  let hex = addr.replace(/^0x/, '');
+  if (hex.length > 16) hex = hex.replace(/^0+/, '') || hex;
+  hex = hex.padEnd(16, '0').slice(0, 16);
+  const c1 = `#${hex.slice(0, 6)}`;
+  const c2 = `#${hex.slice(5, 11)}`;
+  const c3 = `#${hex.slice(10, 16)}`;
+  const c4 = `#${hex[1]}${hex[3]}${hex[7]}${hex[9]}${hex[13]}${hex[15]}`;
+  const c5 = `#${hex[0]}${hex[4]}${hex[8]}${hex[12]}${hex[2]}${hex[6]}`;
+  return [c1, c2, c3, c4, c5];
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -325,7 +338,7 @@ export default function KeyManager({
                       size={28}
                       name={account.flowAddress}
                       variant="beam"
-                      colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']}
+                      colors={colorsFromAddress(account.flowAddress)}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
@@ -1130,7 +1143,7 @@ function LocalKeyCard({
                 onClick={() => onViewAccount?.(acc.flowAddress)}
                 className="w-full flex items-center gap-2 bg-zinc-900 rounded px-2 py-1.5 hover:bg-zinc-700/50 transition-colors group text-left"
               >
-                <Avatar size={18} name={acc.flowAddress} variant="beam" colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']} />
+                <Avatar size={18} name={acc.flowAddress} variant="beam" colors={colorsFromAddress(acc.flowAddress)} />
                 <span className="text-[11px] text-zinc-200 font-mono">{acc.flowAddress}</span>
                 <span className="text-[10px] text-zinc-500">#{acc.keyIndex}</span>
                 <ExternalLink className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 ml-auto" />
