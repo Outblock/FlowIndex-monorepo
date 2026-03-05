@@ -150,19 +150,23 @@ router.post('/commit', async (req: Request, res: Response) => {
 
     const octokit = await getInstallationOctokit(installation_id);
 
-    // 1. Get current branch ref SHA
-    const { data: refData } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
-      owner, repo, ref: `heads/${branch}`,
-    });
-    const parentSha = refData.object.sha;
+    // Try to get the current branch ref — may not exist for empty repos
+    let parentSha: string | null = null;
+    let baseTreeSha: string | null = null;
+    try {
+      const { data: refData } = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
+        owner, repo, ref: `heads/${branch}`,
+      });
+      parentSha = refData.object.sha;
+      const { data: commitData } = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
+        owner, repo, commit_sha: parentSha,
+      });
+      baseTreeSha = commitData.tree.sha;
+    } catch {
+      // Empty repo — no branch exists yet, will create initial commit
+    }
 
-    // 2. Get base tree SHA from that commit
-    const { data: commitData } = await octokit.request('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', {
-      owner, repo, commit_sha: parentSha,
-    });
-    const baseTreeSha = commitData.tree.sha;
-
-    // 3. For each file: create blob (or set sha=null for deletes)
+    // Create blobs for each file
     const tree: Array<{ path: string; mode: '100644'; type: 'blob'; sha: string | null }> = [];
 
     for (const file of files) {
@@ -176,20 +180,27 @@ router.post('/commit', async (req: Request, res: Response) => {
       }
     }
 
-    // 4. Create new tree with base_tree
-    const { data: newTree } = await octokit.request('POST /repos/{owner}/{repo}/git/trees', {
-      owner, repo, base_tree: baseTreeSha, tree,
-    });
+    // Create tree (with base_tree if repo has history, without for initial commit)
+    const treeParams: Record<string, unknown> = { owner, repo, tree };
+    if (baseTreeSha) treeParams.base_tree = baseTreeSha;
+    const { data: newTree } = await octokit.request('POST /repos/{owner}/{repo}/git/trees', treeParams as any);
 
-    // 5. Create commit with new tree + parent
-    const { data: newCommit } = await octokit.request('POST /repos/{owner}/{repo}/git/commits', {
-      owner, repo, message, tree: newTree.sha, parents: [parentSha],
-    });
+    // Create commit (with parent if repo has history)
+    const commitParams: Record<string, unknown> = { owner, repo, message, tree: newTree.sha };
+    if (parentSha) commitParams.parents = [parentSha];
+    else commitParams.parents = [];
+    const { data: newCommit } = await octokit.request('POST /repos/{owner}/{repo}/git/commits', commitParams as any);
 
-    // 6. Update branch ref
-    await octokit.request('PATCH /repos/{owner}/{repo}/git/refs/{ref}', {
-      owner, repo, ref: `heads/${branch}`, sha: newCommit.sha,
-    });
+    // Create or update branch ref
+    if (parentSha) {
+      await octokit.request('PATCH /repos/{owner}/{repo}/git/refs/{ref}', {
+        owner, repo, ref: `heads/${branch}`, sha: newCommit.sha,
+      });
+    } else {
+      await octokit.request('POST /repos/{owner}/{repo}/git/refs', {
+        owner, repo, ref: `refs/heads/${branch}`, sha: newCommit.sha,
+      });
+    }
 
     res.json({
       sha: newCommit.sha,
