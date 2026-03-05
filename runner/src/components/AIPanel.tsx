@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import { TEMPLATES, type Template } from '../fs/fileSystem';
 import type { SignerOption } from './SignerSelector';
+import type { LocalKey, KeyAccount } from '../auth/localKeyManager';
 import { executeCustodialTransaction } from '../flow/execute';
 
 const AI_CHAT_URL = import.meta.env.VITE_AI_CHAT_URL || 'https://ai.flowindex.io';
@@ -60,6 +61,19 @@ interface AIPanelProps {
     sigAlgo?: 'ECDSA_P256' | 'ECDSA_secp256k1',
   ) => Promise<string>;
   promptForPassword?: (keyLabel: string) => Promise<string>;
+  localKeys?: LocalKey[];
+  accountsMap?: Record<string, KeyAccount[]>;
+  onCreateAccount?: (
+    keyId: string,
+    sigAlgo: 'ECDSA_P256' | 'ECDSA_secp256k1',
+    hashAlgo: 'SHA2_256' | 'SHA3_256',
+    network: 'mainnet' | 'testnet',
+  ) => Promise<{ txId: string }>;
+  onRefreshAccounts?: (
+    keyId: string,
+    network: 'mainnet' | 'testnet',
+  ) => Promise<KeyAccount[]>;
+  onSwitchNetwork?: (network: 'mainnet' | 'testnet') => void;
 }
 
 /* ── SQL Result Table ── */
@@ -1447,6 +1461,11 @@ export default function AIPanel({
   selectedSigner,
   signWithLocalKey,
   promptForPassword,
+  localKeys,
+  accountsMap,
+  onCreateAccount,
+  onRefreshAccounts,
+  onSwitchNetwork,
 }: AIPanelProps) {
   const [input, setInput] = useState('');
   const [chatMode, setChatMode] = useState<ChatMode>(getStoredMode);
@@ -1504,6 +1523,16 @@ export default function AIPanel({
   promptForPasswordRef.current = promptForPassword;
   const autoApproveRef = useRef(autoApprove);
   autoApproveRef.current = autoApprove;
+  const localKeysRef = useRef(localKeys);
+  localKeysRef.current = localKeys;
+  const accountsMapRef = useRef(accountsMap);
+  accountsMapRef.current = accountsMap;
+  const onCreateAccountRef = useRef(onCreateAccount);
+  onCreateAccountRef.current = onCreateAccount;
+  const onRefreshAccountsRef = useRef(onRefreshAccounts);
+  onRefreshAccountsRef.current = onRefreshAccounts;
+  const onSwitchNetworkRef = useRef(onSwitchNetwork);
+  onSwitchNetworkRef.current = onSwitchNetwork;
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1630,6 +1659,116 @@ export default function AIPanel({
         case 'set_active_file': {
           onSetActiveFileRef.current?.(args.path);
           emit({ success: true });
+          return;
+        }
+        case 'get_wallet_info': {
+          const signer = selectedSignerRef.current;
+          if (signer && signer.type === 'local') {
+            emit({
+              connected: true,
+              type: 'local',
+              address: signer.account.flowAddress,
+              keyLabel: signer.key.label,
+              keyId: signer.key.id,
+              keyIndex: signer.account.keyIndex,
+              sigAlgo: signer.account.sigAlgo,
+              hashAlgo: signer.account.hashAlgo,
+              network: networkRef.current || 'mainnet',
+            });
+          } else {
+            emit({ connected: false, network: networkRef.current || 'mainnet' });
+          }
+          return;
+        }
+        case 'list_local_keys': {
+          const keys = (localKeysRef.current || []).map((k) => ({
+            id: k.id,
+            label: k.label,
+            source: k.source,
+            publicKeyP256: k.publicKeyP256,
+            publicKeySecp256k1: k.publicKeySecp256k1,
+            hasPassword: k.hasPassword,
+            accounts: (accountsMapRef.current || {})[k.id] || [],
+          }));
+          emit({ keys });
+          return;
+        }
+        case 'create_flow_account': {
+          if (!onCreateAccountRef.current) {
+            emitError('Account creation not available.');
+            return;
+          }
+          try {
+            const net = (args.network || networkRef.current || 'mainnet') as 'mainnet' | 'testnet';
+            const result = await onCreateAccountRef.current(
+              args.keyId,
+              'ECDSA_secp256k1',
+              'SHA3_256',
+              net,
+            );
+            emit({ success: true, txId: result.txId, network: net });
+          } catch (e: any) {
+            emitError(e.message || 'Failed to create account');
+          }
+          return;
+        }
+        case 'refresh_accounts': {
+          if (!onRefreshAccountsRef.current) {
+            emitError('Account refresh not available.');
+            return;
+          }
+          try {
+            const net = (args.network || networkRef.current || 'mainnet') as 'mainnet' | 'testnet';
+            const accounts = await onRefreshAccountsRef.current(args.keyId, net);
+            emit({ accounts });
+          } catch (e: any) {
+            emitError(e.message || 'Failed to refresh accounts');
+          }
+          return;
+        }
+        case 'sign_message': {
+          if (!signWithLocalKeyRef.current) {
+            emitError('Local key signing not available.');
+            return;
+          }
+          try {
+            const signature = await signWithLocalKeyRef.current(
+              args.keyId,
+              args.message,
+              args.hashAlgo || 'SHA3_256',
+              undefined,
+              args.sigAlgo || 'ECDSA_secp256k1',
+            );
+            emit({ signature });
+          } catch (e: any) {
+            if (e.message === 'PASSWORD_REQUIRED' && promptForPasswordRef.current) {
+              try {
+                const key = (localKeysRef.current || []).find((k) => k.id === args.keyId);
+                const pw = await promptForPasswordRef.current(key?.label || 'key');
+                const signature = await signWithLocalKeyRef.current!(
+                  args.keyId,
+                  args.message,
+                  args.hashAlgo || 'SHA3_256',
+                  pw,
+                  args.sigAlgo || 'ECDSA_secp256k1',
+                );
+                emit({ signature });
+              } catch (e2: any) {
+                emitError(e2.message || 'Failed to sign message');
+              }
+            } else {
+              emitError(e.message || 'Failed to sign message');
+            }
+          }
+          return;
+        }
+        case 'switch_network': {
+          if (!onSwitchNetworkRef.current) {
+            emitError('Network switching not available.');
+            return;
+          }
+          onSwitchNetworkRef.current(args.network);
+          emit({ success: true, network: args.network });
           return;
         }
         case 'flow_sign_and_send': {
