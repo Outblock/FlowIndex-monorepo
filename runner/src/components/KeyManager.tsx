@@ -83,6 +83,7 @@ interface KeyManagerProps {
   onViewAccount?: (address: string) => void;
   selectedAccount?: { keyId: string; address: string; keyIndex: number } | null;
   onSelectAccount?: (key: LocalKey, account: KeyAccount) => void;
+  initialMode?: 'create' | 'import';
 }
 
 // ---------------------------------------------------------------------------
@@ -184,9 +185,10 @@ export default function KeyManager({
   onViewAccount,
   selectedAccount,
   onSelectAccount,
+  initialMode,
 }: KeyManagerProps) {
-  const [tab, setTab] = useState<'accounts' | 'keys'>('accounts');
-  const [mode, setMode] = useState<'idle' | 'create' | 'import'>('idle');
+  const [tab, setTab] = useState<'accounts' | 'keys'>(initialMode ? 'keys' : 'accounts');
+  const [mode, setMode] = useState<'idle' | 'create' | 'import'>(initialMode ?? 'idle');
   const [importType, setImportType] = useState<ImportType>('mnemonic');
   const [importDropdownOpen, setImportDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

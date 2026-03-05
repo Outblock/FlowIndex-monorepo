@@ -305,6 +305,7 @@ export default function App() {
     signWithLocalKey, refreshAccounts, createAccount, getPrivateKey, revealSecret,
   } = useLocalKeys();
   const [showKeyManager, setShowKeyManager] = useState(false);
+  const [keyManagerInitialMode, setKeyManagerInitialMode] = useState<'create' | 'import' | undefined>();
   const [showNetworkMenu, setShowNetworkMenu] = useState(false);
   const networkMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1834,7 +1835,7 @@ export default function App() {
       {/* Key Manager Panel (overlay) */}
       {showKeyManager && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowKeyManager(false)} />
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowKeyManager(false); setKeyManagerInitialMode(undefined); }} />
           <div className="relative w-[480px] max-w-[90vw] max-h-[80vh] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-y-auto">
             <Suspense
               fallback={
@@ -1842,7 +1843,7 @@ export default function App() {
               }
             >
               <KeyManager
-                onClose={() => setShowKeyManager(false)}
+                onClose={() => { setShowKeyManager(false); setKeyManagerInitialMode(undefined); }}
                 network={network}
                 localKeys={localKeys}
                 accountsMap={accountsMap}
@@ -1859,6 +1860,7 @@ export default function App() {
                 onViewAccount={handleViewAccount}
                 selectedAccount={selectedSigner.type === 'local' ? { keyId: selectedSigner.key.id, address: selectedSigner.account.flowAddress, keyIndex: selectedSigner.account.keyIndex } : null}
                 onSelectAccount={(key, account) => { persistSigner({ type: 'local', key, account }); setShowKeyManager(false); }}
+                initialMode={keyManagerInitialMode}
               />
             </Suspense>
           </div>
@@ -1907,7 +1909,7 @@ export default function App() {
         autoSign={autoSign}
         onToggleAutoSign={handleToggleAutoSign}
         network={network}
-        onOpenKeyManager={() => { setConnectModalOpen(false); setShowKeyManager(true); }}
+        onOpenKeyManager={(mode) => { setConnectModalOpen(false); setKeyManagerInitialMode(mode); setShowKeyManager(true); }}
       />
     </div>
   );

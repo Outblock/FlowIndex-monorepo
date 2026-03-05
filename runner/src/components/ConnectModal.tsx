@@ -14,7 +14,7 @@ interface ConnectModalProps {
   autoSign: boolean;
   onToggleAutoSign: (value: boolean) => void;
   network: 'mainnet' | 'testnet';
-  onOpenKeyManager?: () => void;
+  onOpenKeyManager?: (mode?: 'create' | 'import') => void;
 }
 
 /** Flow logo image */
@@ -297,14 +297,14 @@ export default function ConnectModal({
               </div>
               <div className="w-full space-y-2">
                 <button
-                  onClick={() => { if (onOpenKeyManager) { onOpenKeyManager(); onClose(); } }}
+                  onClick={() => { if (onOpenKeyManager) { onOpenKeyManager('create'); onClose(); } }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Create New Wallet
                 </button>
                 <button
-                  onClick={() => { if (onOpenKeyManager) { onOpenKeyManager(); onClose(); } }}
+                  onClick={() => { if (onOpenKeyManager) { onOpenKeyManager('import'); onClose(); } }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium rounded-lg border border-zinc-700 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
