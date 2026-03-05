@@ -109,6 +109,21 @@ func (s *Server) handleFlowListContracts(w http.ResponseWriter, r *http.Request)
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	// Fallback: if specific identifier lookup returns nothing, try RPC
+	if len(contracts) == 0 && address != "" && name != "" && s.client != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		acc, rpcErr := s.client.GetAccount(ctx, flow.HexToAddress(address))
+		cancel()
+		if rpcErr == nil && acc != nil {
+			if b, ok := acc.Contracts[name]; ok && len(b) > 0 {
+				sc := models.SmartContract{Address: address, Name: name, Code: string(b)}
+				contracts = append(contracts, sc)
+				// Backfill to DB so indexer can overwrite later
+				_ = s.repo.UpsertSmartContracts(r.Context(), []models.SmartContract{sc})
+			}
+		}
+	}
+
 	// dependent_count is now pre-computed in smart_contracts, no need to batch-fetch
 	out := make([]map[string]interface{}, 0, len(contracts))
 	for _, c := range contracts {
