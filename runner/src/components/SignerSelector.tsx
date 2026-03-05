@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Wallet, ChevronDown, LogOut } from 'lucide-react';
 import Avatar from 'boring-avatars';
-import * as fcl from '@onflow/fcl';
+import { fcl } from '../flow/fclConfig';
 import type { LocalKey, KeyAccount } from '../auth/localKeyManager';
 
 export type SignerOption =
@@ -17,7 +17,20 @@ interface SignerSelectorProps {
   onViewAccount?: (address: string) => void;
 }
 
-/** Fetch FLOW balance for an address. Returns formatted string like "1.234". */
+/** Derive 5 colors from an address (matches frontend AddressLink). */
+function colorsFromAddress(addr: string): string[] {
+  let hex = addr.replace(/^0x/, '');
+  if (hex.length > 16) hex = hex.replace(/^0+/, '') || hex;
+  hex = hex.padEnd(16, '0').slice(0, 16);
+  const c1 = `#${hex.slice(0, 6)}`;
+  const c2 = `#${hex.slice(5, 11)}`;
+  const c3 = `#${hex.slice(10, 16)}`;
+  const c4 = `#${hex[1]}${hex[3]}${hex[7]}${hex[9]}${hex[13]}${hex[15]}`;
+  const c5 = `#${hex[0]}${hex[4]}${hex[8]}${hex[12]}${hex[2]}${hex[6]}`;
+  return [c1, c2, c3, c4, c5];
+}
+
+/** Fetch FLOW balance for an address. */
 function useFlowBalance(address: string | null) {
   const [balance, setBalance] = useState<string | null>(null);
 
@@ -26,10 +39,7 @@ function useFlowBalance(address: string | null) {
     let cancelled = false;
     const addr = address.startsWith('0x') ? address : `0x${address}`;
     fcl.account(addr).then((acct: { balance: number }) => {
-      if (!cancelled) {
-        // FCL returns balance in UFix64 units (1e-8)
-        setBalance((acct.balance / 1e8).toFixed(4));
-      }
+      if (!cancelled) setBalance((acct.balance / 1e8).toFixed(4));
     }).catch(() => {
       if (!cancelled) setBalance(null);
     });
@@ -70,18 +80,6 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
 
   const isConnected = selected.type !== 'none';
 
-  const label =
-    selected.type === 'local'
-      ? truncateAddress(selected.account.flowAddress)
-      : selected.type === 'fcl'
-        ? 'FCL Wallet'
-        : 'Connect';
-
-  const icon =
-    selected.type === 'local'
-      ? <Avatar size={14} name={selected.account.flowAddress} variant="beam" colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']} />
-      : <Wallet className="w-3 h-3" />;
-
   // Click the main button: open account panel if local, toggle dropdown otherwise
   const handleMainClick = () => {
     if (selected.type === 'local' && onViewAccount) {
@@ -96,6 +94,37 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
     setOpen(false);
   };
 
+  // Render button content based on connection state
+  const renderButtonContent = () => {
+    if (selected.type === 'local') {
+      const colors = colorsFromAddress(selected.account.flowAddress);
+      return (
+        <>
+          <Avatar size={16} name={selected.account.flowAddress} variant="beam" colors={colors} />
+          {balance !== null ? (
+            <span className="text-xs text-emerald-400 font-medium">{balance} FLOW</span>
+          ) : (
+            <span className="text-xs text-zinc-500">...</span>
+          )}
+        </>
+      );
+    }
+    if (selected.type === 'fcl') {
+      return (
+        <>
+          <Wallet className="w-3.5 h-3.5" />
+          <span className="text-xs">FCL Wallet</span>
+        </>
+      );
+    }
+    return (
+      <>
+        <Wallet className="w-3 h-3" />
+        <span className="text-xs">Connect</span>
+      </>
+    );
+  };
+
   return (
     <div ref={ref} className="relative flex">
       <button
@@ -104,13 +133,7 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
           isConnected ? 'text-emerald-400' : 'text-zinc-400'
         }`}
       >
-        {icon}
-        <span className="max-w-[120px] truncate font-mono">{label}</span>
-        {balance !== null && (
-          <span className="text-[10px] text-zinc-500 ml-0.5">
-            {balance} FLOW
-          </span>
-        )}
+        {renderButtonContent()}
       </button>
       <button
         onClick={() => setOpen(!open)}
@@ -133,6 +156,7 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
                   selected.key.id === entry.key.id &&
                   selected.account.flowAddress === entry.account.flowAddress &&
                   selected.account.keyIndex === entry.account.keyIndex;
+                const colors = colorsFromAddress(entry.account.flowAddress);
                 return (
                   <button
                     key={`${entry.key.id}-${entry.account.flowAddress}-${entry.account.keyIndex}`}
@@ -141,7 +165,7 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
                       isSelected ? 'text-emerald-400' : 'text-zinc-300'
                     }`}
                   >
-                    <Avatar size={16} name={entry.account.flowAddress} variant="beam" colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']} />
+                    <Avatar size={16} name={entry.account.flowAddress} variant="beam" colors={colors} />
                     <span className="truncate">{entry.key.label || 'Key'}</span>
                     <span className="text-zinc-500 ml-auto flex-shrink-0">
                       {truncateAddress(entry.account.flowAddress)}
@@ -159,7 +183,7 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
                 FCL Wallet
               </div>
               <button
-                onClick={() => { onSelect({ type: 'fcl' }); setOpen(false); }}
+                onClick={() => { fcl.authenticate(); onSelect({ type: 'fcl' }); setOpen(false); }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-zinc-700 transition-colors ${
                   selected.type === 'fcl' ? 'text-emerald-400' : 'text-zinc-300'
                 }`}
