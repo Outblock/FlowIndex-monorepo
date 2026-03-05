@@ -1176,6 +1176,40 @@ export default function App() {
             </button>
           )}
           <h1 className="text-sm font-semibold tracking-tight">{isMobile ? 'Runner' : 'Cadence Runner'}</h1>
+
+          {/* LSP status indicator */}
+          <div className="relative group/lsp">
+            <button
+              onClick={() => {
+                if (lspError) { setShowExplorer(true); setShowLspMenu(true); }
+              }}
+              className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+                lspError ? 'hover:bg-zinc-700 cursor-pointer' : 'cursor-default'
+              }`}
+              title={
+                lspError ? 'LSP connection failed — click Settings to switch mode'
+                : activeMode ? `LSP: ${activeMode}${lspMode === 'auto' ? ' (auto)' : ''}`
+                : 'LSP connecting...'
+              }
+            >
+              {!activeMode && !lspError ? (
+                <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+              ) : (
+                <span className={`inline-block w-2 h-2 rounded-full ${
+                  lspError ? 'bg-red-500' : 'bg-emerald-500'
+                }`} />
+              )}
+              {lspError && (
+                <span className="text-[10px] text-red-400">LSP</span>
+              )}
+            </button>
+            {/* Tooltip below on hover */}
+            {!lspError && activeMode && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/lsp:opacity-100 transition-opacity z-50">
+                LSP: {activeMode}{lspMode === 'auto' ? ' (auto)' : ''}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
           {!isMobile && (
@@ -1228,40 +1262,6 @@ export default function App() {
             )}
           </div>
 
-
-          {/* LSP status indicator */}
-          <div className="relative group/lsp">
-            <button
-              onClick={() => {
-                if (lspError) { setShowExplorer(true); setShowLspMenu(true); }
-              }}
-              className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
-                lspError ? 'hover:bg-zinc-700 cursor-pointer' : 'cursor-default'
-              }`}
-              title={
-                lspError ? 'LSP connection failed — click Settings to switch mode'
-                : activeMode ? `LSP: ${activeMode}${lspMode === 'auto' ? ' (auto)' : ''}`
-                : 'LSP connecting...'
-              }
-            >
-              {!activeMode && !lspError ? (
-                <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
-              ) : (
-                <span className={`inline-block w-2 h-2 rounded-full ${
-                  lspError ? 'bg-red-500' : 'bg-emerald-500'
-                }`} />
-              )}
-              {lspError && (
-                <span className="text-[10px] text-red-400">LSP</span>
-              )}
-            </button>
-            {/* Tooltip on hover for non-error states */}
-            {!lspError && activeMode && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-zinc-800 border border-zinc-600 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 pointer-events-none group-hover/lsp:opacity-100 transition-opacity z-50">
-                LSP: {activeMode}{lspMode === 'auto' ? ' (auto)' : ''}
-              </div>
-            )}
-          </div>
 
           {/* Signer selector — always shown */}
           <SignerSelector
