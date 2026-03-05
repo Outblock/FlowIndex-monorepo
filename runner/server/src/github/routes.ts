@@ -527,4 +527,83 @@ router.post('/secrets', async (req: Request, res: Response) => {
   }
 });
 
+// POST /promote — Create a PR from one branch to another (e.g., dev → main)
+router.post('/promote', async (req: Request, res: Response) => {
+  try {
+    const { installation_id, owner, repo, from_branch, to_branch, title, environments } = req.body as {
+      installation_id: number;
+      owner: string;
+      repo: string;
+      from_branch: string;
+      to_branch: string;
+      title?: string;
+      environments?: { from: { name: string; network: string }; to: { name: string; network: string } };
+    };
+
+    if (!installation_id || !owner || !repo || !from_branch || !to_branch) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    const octokit = await getInstallationOctokit(installation_id);
+    const prTitle = title || `Deploy: ${from_branch} → ${to_branch}`;
+    const fromNet = environments?.from?.network || 'testnet';
+    const toNet = environments?.to?.network || 'mainnet';
+
+    const { data: pr } = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
+      owner, repo,
+      title: prTitle,
+      head: from_branch,
+      base: to_branch,
+      body: `## Cadence Deploy Preview\n\n**From:** ${from_branch} (${fromNet})\n**To:** ${to_branch} (${toNet})\n\nMerge this PR to deploy contracts to **${toNet}**.`,
+    });
+
+    // Post comment from the App
+    await octokit.request('POST /repos/{owner}/{repo}/issues/{issue_number}/comments', {
+      owner, repo,
+      issue_number: pr.number,
+      body: `## 🚀 Cadence Deploy Preview\n\n**Target network:** ${toNet}\n**Source branch:** ${from_branch} (${fromNet})\n\nMerging this PR will trigger automatic contract deployment to **${toNet}**.\n\n---\n*Managed by Cadence Runner*`,
+    });
+
+    res.json({ pr_number: pr.number, pr_url: pr.html_url });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /dispatch — Trigger a workflow_dispatch event (deploy, dry-run, rollback)
+router.post('/dispatch', async (req: Request, res: Response) => {
+  try {
+    const { installation_id, owner, repo, action, commit_sha } = req.body as {
+      installation_id: number;
+      owner: string;
+      repo: string;
+      action: 'deploy' | 'dry-run' | 'rollback';
+      commit_sha?: string;
+    };
+
+    if (!installation_id || !owner || !repo || !action) {
+      res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    const octokit = await getInstallationOctokit(installation_id);
+    const { data: repoData } = await octokit.request('GET /repos/{owner}/{repo}', { owner, repo });
+    const ref = repoData.default_branch;
+
+    await octokit.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
+      owner, repo,
+      workflow_id: 'cadence-deploy.yml',
+      ref,
+      inputs: { action, commit_sha: commit_sha || '' },
+    });
+
+    res.json({ dispatched: true, action, commit_sha: commit_sha || 'latest' });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
 export { router as githubRouter };
