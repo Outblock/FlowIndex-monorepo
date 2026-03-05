@@ -630,6 +630,371 @@ serve(async (req: Request) => {
         break;
       }
 
+      // -------------------------------------------------------------------
+      // /github/environments — List environments for a connection
+      // -------------------------------------------------------------------
+      case '/github/environments': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const { connection_id } = data as { connection_id: string };
+        if (!connection_id) {
+          result = error('MISSING_PARAMS', 'connection_id is required');
+          break;
+        }
+        // Verify user owns this connection
+        const { data: ownerConn, error: ownerErr } = await supabaseAdmin
+          .from('runner_github_connections')
+          .select('id')
+          .eq('id', connection_id)
+          .eq('user_id', user.id)
+          .single();
+        if (ownerErr || !ownerConn) {
+          result = error('NOT_FOUND', 'Connection not found or access denied');
+          break;
+        }
+        const { data: envs, error: envsError } = await supabaseAdmin
+          .from('runner_deploy_environments')
+          .select('*')
+          .eq('connection_id', connection_id)
+          .order('created_at', { ascending: true });
+        if (envsError) {
+          result = error('DB_ERROR', envsError.message);
+          break;
+        }
+        result = success({ environments: envs || [] });
+        break;
+      }
+
+      // -------------------------------------------------------------------
+      // /github/environments/upsert — Create or update an environment
+      // -------------------------------------------------------------------
+      case '/github/environments/upsert': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const {
+          connection_id: upsertConnId,
+          name: envName,
+          network: envNetwork,
+          flow_address: envFlowAddress,
+          deploy_path: envDeployPath,
+        } = data as {
+          connection_id: string;
+          name: string;
+          network?: string;
+          flow_address?: string;
+          deploy_path?: string;
+        };
+        if (!upsertConnId || !envName) {
+          result = error('MISSING_PARAMS', 'connection_id and name are required');
+          break;
+        }
+        // Verify user owns connection
+        const { data: upsertOwner, error: upsertOwnerErr } = await supabaseAdmin
+          .from('runner_github_connections')
+          .select('id')
+          .eq('id', upsertConnId)
+          .eq('user_id', user.id)
+          .single();
+        if (upsertOwnerErr || !upsertOwner) {
+          result = error('NOT_FOUND', 'Connection not found or access denied');
+          break;
+        }
+        const upsertRow: Record<string, unknown> = {
+          connection_id: upsertConnId,
+          name: envName,
+          updated_at: new Date().toISOString(),
+        };
+        if (envNetwork !== undefined) upsertRow.network = envNetwork;
+        if (envFlowAddress !== undefined) upsertRow.flow_address = envFlowAddress;
+        if (envDeployPath !== undefined) upsertRow.deploy_path = envDeployPath;
+        const { data: upsertedEnv, error: upsertEnvErr } = await supabaseAdmin
+          .from('runner_deploy_environments')
+          .upsert(upsertRow, { onConflict: 'connection_id,name' })
+          .select('*')
+          .single();
+        if (upsertEnvErr) {
+          result = error('DB_ERROR', upsertEnvErr.message);
+          break;
+        }
+        result = success({ environment: upsertedEnv });
+        break;
+      }
+
+      // -------------------------------------------------------------------
+      // /github/environments/delete — Delete an environment
+      // -------------------------------------------------------------------
+      case '/github/environments/delete': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const { environment_id } = data as { environment_id: string };
+        if (!environment_id) {
+          result = error('MISSING_PARAMS', 'environment_id is required');
+          break;
+        }
+        // Verify ownership via join: environment -> connection -> user
+        const { data: envToDelete, error: envFetchErr } = await supabaseAdmin
+          .from('runner_deploy_environments')
+          .select('id, connection_id, runner_github_connections!inner(user_id)')
+          .eq('id', environment_id)
+          .single();
+        if (envFetchErr || !envToDelete) {
+          result = error('NOT_FOUND', 'Environment not found');
+          break;
+        }
+        const envConn = envToDelete.runner_github_connections as unknown as { user_id: string };
+        if (envConn.user_id !== user.id) {
+          result = error('FORBIDDEN', 'Access denied');
+          break;
+        }
+        const { error: envDeleteErr } = await supabaseAdmin
+          .from('runner_deploy_environments')
+          .delete()
+          .eq('id', environment_id);
+        if (envDeleteErr) {
+          result = error('DB_ERROR', envDeleteErr.message);
+          break;
+        }
+        result = success({ deleted: true });
+        break;
+      }
+
+      // -------------------------------------------------------------------
+      // /github/environments/update-secrets — Mark secrets configured
+      // -------------------------------------------------------------------
+      case '/github/environments/update-secrets': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const {
+          environment_id: secEnvId,
+          flow_address: secFlowAddress,
+        } = data as {
+          environment_id: string;
+          flow_address?: string;
+        };
+        if (!secEnvId) {
+          result = error('MISSING_PARAMS', 'environment_id is required');
+          break;
+        }
+        // Verify ownership via join
+        const { data: secEnv, error: secEnvErr } = await supabaseAdmin
+          .from('runner_deploy_environments')
+          .select('id, connection_id, runner_github_connections!inner(user_id)')
+          .eq('id', secEnvId)
+          .single();
+        if (secEnvErr || !secEnv) {
+          result = error('NOT_FOUND', 'Environment not found');
+          break;
+        }
+        const secConn = secEnv.runner_github_connections as unknown as { user_id: string };
+        if (secConn.user_id !== user.id) {
+          result = error('FORBIDDEN', 'Access denied');
+          break;
+        }
+        const secUpdate: Record<string, unknown> = {
+          secrets_configured: true,
+          updated_at: new Date().toISOString(),
+        };
+        if (secFlowAddress !== undefined) secUpdate.flow_address = secFlowAddress;
+        const { data: updatedSecEnv, error: secUpdateErr } = await supabaseAdmin
+          .from('runner_deploy_environments')
+          .update(secUpdate)
+          .eq('id', secEnvId)
+          .select('*')
+          .single();
+        if (secUpdateErr) {
+          result = error('DB_ERROR', secUpdateErr.message);
+          break;
+        }
+        result = success({ environment: updatedSecEnv });
+        break;
+      }
+
+      // -------------------------------------------------------------------
+      // /github/update-commit — Update last_commit_sha on a connection
+      // -------------------------------------------------------------------
+      case '/github/update-commit': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const {
+          connection_id: commitConnId,
+          last_commit_sha,
+        } = data as {
+          connection_id: string;
+          last_commit_sha: string;
+        };
+        if (!commitConnId || !last_commit_sha) {
+          result = error('MISSING_PARAMS', 'connection_id and last_commit_sha are required');
+          break;
+        }
+        const { data: updatedConn, error: commitErr } = await supabaseAdmin
+          .from('runner_github_connections')
+          .update({
+            last_commit_sha,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', commitConnId)
+          .eq('user_id', user.id)
+          .select('*')
+          .single();
+        if (commitErr || !updatedConn) {
+          result = error('NOT_FOUND', 'Connection not found or access denied');
+          break;
+        }
+        result = success({ connection: updatedConn });
+        break;
+      }
+
+      // -------------------------------------------------------------------
+      // /github/update-workflow — Mark workflow_configured on a connection
+      // -------------------------------------------------------------------
+      case '/github/update-workflow': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const { connection_id: wfConnId } = data as { connection_id: string };
+        if (!wfConnId) {
+          result = error('MISSING_PARAMS', 'connection_id is required');
+          break;
+        }
+        const { data: wfConn, error: wfErr } = await supabaseAdmin
+          .from('runner_github_connections')
+          .update({
+            workflow_configured: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', wfConnId)
+          .eq('user_id', user.id)
+          .select('*')
+          .single();
+        if (wfErr || !wfConn) {
+          result = error('NOT_FOUND', 'Connection not found or access denied');
+          break;
+        }
+        result = success({ connection: wfConn });
+        break;
+      }
+
+      // -------------------------------------------------------------------
+      // /github/deployments — List deployments for a connection
+      // -------------------------------------------------------------------
+      case '/github/deployments': {
+        const user = await getAuthUser(req, supabaseUrl);
+        if (!user) {
+          return new Response(
+            JSON.stringify(error('UNAUTHORIZED', 'Authentication required')),
+            {
+              status: 401,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            },
+          );
+        }
+        const {
+          connection_id: deplConnId,
+          limit: deplLimit,
+        } = data as {
+          connection_id: string;
+          limit?: number;
+        };
+        if (!deplConnId) {
+          result = error('MISSING_PARAMS', 'connection_id is required');
+          break;
+        }
+        // Verify user owns connection
+        const { data: deplOwner, error: deplOwnerErr } = await supabaseAdmin
+          .from('runner_github_connections')
+          .select('id')
+          .eq('id', deplConnId)
+          .eq('user_id', user.id)
+          .single();
+        if (deplOwnerErr || !deplOwner) {
+          result = error('NOT_FOUND', 'Connection not found or access denied');
+          break;
+        }
+        let deplQuery = supabaseAdmin
+          .from('runner_deployments')
+          .select('*')
+          .eq('connection_id', deplConnId)
+          .order('created_at', { ascending: false });
+        if (deplLimit) {
+          deplQuery = deplQuery.limit(deplLimit);
+        }
+        const { data: deployments, error: deplError } = await deplQuery;
+        if (deplError) {
+          result = error('DB_ERROR', deplError.message);
+          break;
+        }
+        result = success({ deployments: deployments || [] });
+        break;
+      }
+
       default:
         result = error('NOT_FOUND', `Unknown endpoint: ${endpoint}`);
     }
