@@ -389,7 +389,7 @@ export const MessageResponse = memo(
   ({ className, children, ...props }: MessageResponseProps) => (
     <div
       className={cn(
-        "prose-flow size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        "text-[13px] text-zinc-300 leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className
       )}
       {...props}
