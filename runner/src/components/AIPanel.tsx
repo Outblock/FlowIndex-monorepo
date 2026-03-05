@@ -1249,10 +1249,10 @@ function getStoredMode(): ChatMode {
 function getStoredAutoApply(): boolean {
   try {
     const v = localStorage.getItem(AUTO_APPLY_STORAGE_KEY);
-    if (v === null) return true;
-    return v !== 'false';
+    if (v === null) return false;
+    return v === 'true';
   } catch {
-    return true;
+    return false;
   }
 }
 
