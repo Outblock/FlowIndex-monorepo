@@ -59,9 +59,9 @@ func (w *MetaWorker) ProcessRange(ctx context.Context, fromHeight, toHeight uint
 		if c.Address == "" || c.Name == "" {
 			continue
 		}
-		kind := classifyContractCode(c.Code)
+		kind := ClassifyContractCode(c.Code)
 		if kind == "" {
-			kind = classifyContractByName(c.Name)
+			kind = ClassifyContractByName(c.Name)
 		}
 		if kind == "" {
 			kind = "CONTRACT"
@@ -463,7 +463,7 @@ func parseWeightToInt(v interface{}) (int, bool) {
 	}
 }
 
-// classifyContractCode inspects Cadence source code to determine if the contract
+// ClassifyContractCode inspects Cadence source code to determine if the contract
 // implements FungibleToken or NonFungibleToken. Returns "FT", "NFT", or "".
 //
 // Detection: the contract declaration must conform to the interface, e.g.:
@@ -473,7 +473,7 @@ func parseWeightToInt(v interface{}) (int, bool) {
 //	access(all) contract Foo: FungibleToken, ViewResolver {
 var contractDeclRe = regexp.MustCompile(`(?:access\s*\([^)]*\)|pub)\s+contract\s+\w+\s*:\s*([^{]+)`)
 
-func classifyContractCode(code string) string {
+func ClassifyContractCode(code string) string {
 	if code == "" {
 		return ""
 	}
@@ -497,9 +497,9 @@ func classifyContractCode(code string) string {
 	return ""
 }
 
-// classifyContractByName returns a kind hint based on well-known naming conventions.
+// ClassifyContractByName returns a kind hint based on well-known naming conventions.
 // Used as a fallback when contract code is unavailable (e.g., deployed before indexing).
-func classifyContractByName(name string) string {
+func ClassifyContractByName(name string) string {
 	if strings.HasPrefix(name, "EVMVMBridgedToken_") {
 		return "FT"
 	}
