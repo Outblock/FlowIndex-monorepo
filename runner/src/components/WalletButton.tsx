@@ -90,68 +90,12 @@ export default function WalletButton({
   }
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs text-emerald-400 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 transition-colors"
-      >
-        <Avatar size={16} name={displayAddress!} variant="beam" colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']} />
-        <span className="font-mono">{truncated}</span>
-        <ChevronDown className="w-3 h-3" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-56 bg-zinc-800 border border-zinc-700 rounded shadow-lg z-50">
-          {/* View account */}
-          <button
-            onClick={() => { onViewAccount?.(displayAddress!); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-700 transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            View Account
-          </button>
-
-          <div className="border-t border-zinc-700" />
-
-          {/* Switch to different local accounts */}
-          {localKeys.length > 0 && onSelectLocalAccount && (
-            <>
-              <div className="px-3 py-1 text-[10px] text-zinc-500 uppercase tracking-wider">
-                Switch Account
-              </div>
-              {localKeys.map((key) => {
-                const accs = accountsMap[key.id] || [];
-                return accs.map((acc) => (
-                  <button
-                    key={`${key.id}-${acc.flowAddress}-${acc.keyIndex}`}
-                    onClick={() => { onSelectLocalAccount(key, acc); setOpen(false); }}
-                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-zinc-700 transition-colors ${
-                      selectedLocalAccount?.account.flowAddress === acc.flowAddress && selectedLocalAccount?.account.keyIndex === acc.keyIndex
-                        ? 'text-emerald-400' : 'text-zinc-300'
-                    }`}
-                  >
-                    <Avatar size={14} name={acc.flowAddress} variant="beam" colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']} />
-                    <span className="font-mono truncate">{acc.flowAddress.slice(0, 6)}...{acc.flowAddress.slice(-4)}</span>
-                  </button>
-                ));
-              })}
-              <div className="border-t border-zinc-700" />
-            </>
-          )}
-
-          {/* Disconnect */}
-          <button
-            onClick={() => {
-              if (fclConnected) fcl.unauthenticate();
-              if (localConnected) onDisconnectLocal?.();
-              setOpen(false);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-zinc-700 transition-colors"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Disconnect
-          </button>
-        </div>
-      )}
-    </div>
+    <button
+      onClick={() => onViewAccount?.(displayAddress!)}
+      className="flex items-center gap-1.5 text-xs text-emerald-400 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-2 py-1 transition-colors"
+    >
+      <Avatar size={16} name={displayAddress!} variant="beam" colors={['#10B981', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444']} />
+      <span className="font-mono">{truncated}</span>
+    </button>
   );
 }

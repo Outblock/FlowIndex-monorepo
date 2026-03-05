@@ -1,10 +1,11 @@
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, LogOut } from 'lucide-react';
 import Avatar from 'boring-avatars';
 
 interface AccountPanelProps {
   address: string;
   network: 'mainnet' | 'testnet';
   onClose: () => void;
+  onDisconnect?: () => void;
 }
 
 function buildUrl(address: string, network: 'mainnet' | 'testnet'): string {
@@ -19,7 +20,7 @@ function formatAddress(address: string): string {
   return `${addr.slice(0, 8)}...${addr.slice(-6)}`;
 }
 
-export default function AccountPanel({ address, network, onClose }: AccountPanelProps) {
+export default function AccountPanel({ address, network, onClose, onDisconnect }: AccountPanelProps) {
   const url = buildUrl(address, network);
   const displayAddr = address.startsWith('0x') ? address : `0x${address}`;
 
@@ -53,6 +54,15 @@ export default function AccountPanel({ address, network, onClose }: AccountPanel
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
+          {onDisconnect && (
+            <button
+              onClick={() => { onDisconnect(); onClose(); }}
+              className="text-zinc-500 hover:text-red-400 p-1 transition-colors"
+              title="Disconnect"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             onClick={onClose}
             className="text-zinc-500 hover:text-zinc-300 p-1 transition-colors"
