@@ -32,7 +32,7 @@ router.get('/repos', async (req: Request, res: Response) => {
     }
     const octokit = await getInstallationOctokit(installationId);
     const { data } = await octokit.request('GET /installation/repositories', { per_page: 100 });
-    const repos = data.repositories.map((r) => ({
+    const repos = data.repositories.map((r: any) => ({
       id: r.id,
       full_name: r.full_name,
       owner: r.owner?.login ?? '',
@@ -394,7 +394,7 @@ router.get('/runs/:owner/:repo', async (req: Request, res: Response) => {
             per_page: 20,
           });
 
-      runs = data.workflow_runs.map((r) => ({
+      runs = data.workflow_runs.map((r: any) => ({
         id: r.id,
         status: r.status,
         conclusion: r.conclusion,
