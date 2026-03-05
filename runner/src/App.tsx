@@ -18,6 +18,7 @@ import type { ExecutionResult } from './flow/execute';
 import type { FlowNetwork } from './flow/networks';
 import { useAuth } from './auth/AuthContext';
 import { useKeys } from './auth/useKeys';
+import { useLocalKeys } from './auth/useLocalKeys';
 import KeyManager from './components/KeyManager';
 import SignerSelector, { type SignerOption } from './components/SignerSelector';
 import {
@@ -279,8 +280,21 @@ export default function App() {
   const [pendingDiffs, setPendingDiffs] = useState<PendingDiffMap>({});
   const { user, loading: authLoading, signOut } = useAuth();
   const { keys, signMessage } = useKeys();
+  const { localKeys, accountsMap, signWithLocalKey } = useLocalKeys();
   const [showKeyManager, setShowKeyManager] = useState(false);
   const [selectedSigner, setSelectedSigner] = useState<SignerOption>({ type: 'fcl' });
+
+  // Auto-select first local key+account as default signer when available
+  useEffect(() => {
+    if (selectedSigner.type !== 'fcl') return; // user already chose something
+    for (const key of localKeys) {
+      const accounts = accountsMap[key.id];
+      if (accounts && accounts.length > 0) {
+        setSelectedSigner({ type: 'local', key, account: accounts[0] });
+        return;
+      }
+    }
+  }, [localKeys, accountsMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     projects: cloudProjects,
@@ -471,6 +485,19 @@ export default function App() {
       await executeTransaction(activeCode, paramValues, (result) => {
         setResults((prev) => [...prev, result]);
       });
+    } else if (selectedSigner.type === 'local') {
+      // Local key signer
+      const { key, account } = selectedSigner;
+      await executeCustodialTransaction(
+        activeCode,
+        paramValues,
+        account.flowAddress,
+        account.keyIndex,
+        (message) => signWithLocalKey(key.id, message, account.hashAlgo, undefined, account.sigAlgo),
+        (result) => {
+          setResults((prev) => [...prev, result]);
+        },
+      );
     } else {
       // Custodial signer
       const key = selectedSigner.key;
@@ -487,7 +514,7 @@ export default function App() {
     }
 
     setLoading(false);
-  }, [activeCode, codeType, paramValues, loading, selectedSigner, signMessage]);
+  }, [activeCode, codeType, paramValues, loading, selectedSigner, signMessage, signWithLocalKey]);
 
   const handleInsertCode = useCallback((newCode: string) => {
     setProject((prev) => updateFileContent(prev, prev.activeFile, newCode));
@@ -842,12 +869,14 @@ export default function App() {
           </select>
 
 
-          {/* Signer selector - show when there are custodial keys and code is transaction */}
-          {codeType === 'transaction' && keys.length > 0 && (
+          {/* Signer selector - show when there are keys available and code is transaction */}
+          {codeType === 'transaction' && (keys.length > 0 || localKeys.some(k => (accountsMap[k.id] || []).length > 0)) && (
             <SignerSelector
               keys={keys}
               selected={selectedSigner}
               onSelect={setSelectedSigner}
+              localKeys={localKeys}
+              accountsMap={accountsMap}
             />
           )}
 
