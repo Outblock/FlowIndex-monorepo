@@ -325,7 +325,9 @@ export function useLocalKeys(): UseLocalKeysReturn {
       keyCache.current.set(`${key.id}:ECDSA_P256`, derived.privateKeyHex);
       keyCache.current.set(`${key.id}:ECDSA_secp256k1`, derived.privateKeyHexSecp256k1);
 
-      setLocalKeys((prev) => [...prev, key]);
+      // Update ref immediately so createAccount (called in same tick) sees it
+      localKeysRef.current = [...localKeysRef.current, key];
+      setLocalKeys(localKeysRef.current);
       return { mnemonic, key };
     },
     [ensureWasmReady],
@@ -361,7 +363,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
       keyCache.current.set(`${key.id}:ECDSA_P256`, derived.privateKeyHex);
       keyCache.current.set(`${key.id}:ECDSA_secp256k1`, derived.privateKeyHexSecp256k1);
 
-      setLocalKeys((prev) => [...prev, key]);
+      localKeysRef.current = [...localKeysRef.current, key];
+      setLocalKeys(localKeysRef.current);
       return key;
     },
     [ensureWasmReady],
@@ -376,7 +379,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
       await ensureWasmReady();
       const derived = await deriveFromPrivateKey(hex);
       const key = await buildLocalKey(derived, label, 'privateKey', password);
-      setLocalKeys((prev) => [...prev, key]);
+      localKeysRef.current = [...localKeysRef.current, key];
+      setLocalKeys(localKeysRef.current);
       return key;
     },
     [buildLocalKey],
@@ -396,7 +400,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
 
       // Re-encrypt with the new password (or empty)
       const key = await buildLocalKey(derived, label, 'keystore', newPassword);
-      setLocalKeys((prev) => [...prev, key]);
+      localKeysRef.current = [...localKeysRef.current, key];
+      setLocalKeys(localKeysRef.current);
       return key;
     },
     [buildLocalKey, ensureWasmReady],
@@ -405,7 +410,8 @@ export function useLocalKeys(): UseLocalKeysReturn {
   const deleteLocalKey = useCallback((id: string) => {
     keyCache.current.delete(`${id}:ECDSA_P256`);
     keyCache.current.delete(`${id}:ECDSA_secp256k1`);
-    setLocalKeys((prev) => prev.filter((k) => k.id !== id));
+    localKeysRef.current = localKeysRef.current.filter((k) => k.id !== id);
+    setLocalKeys(localKeysRef.current);
     setAccountsMap((prev) => {
       const next = { ...prev };
       delete next[id];
