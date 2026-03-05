@@ -1,4 +1,5 @@
 import express from 'express';
+import { githubRouter } from './github/routes.js';
 
 const app = express();
 
@@ -21,5 +22,8 @@ app.use((_req, res, next) => {
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+// GitHub integration routes
+app.use('/github', githubRouter);
 
 export { app };
