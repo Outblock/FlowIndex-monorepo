@@ -287,9 +287,9 @@ export function AccountActivityTab({ address, initialTransactions, initialNextCu
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [viewMode]);
 
-    // IntersectionObserver for infinite scroll
+    // IntersectionObserver for infinite scroll (only after initial data is loaded)
     useEffect(() => {
-        if (viewMode !== 'timeline' || !timelineHasMore) return;
+        if (viewMode !== 'timeline' || !timelineHasMore || timelineTxs.length === 0) return;
         const sentinel = sentinelRef.current;
         if (!sentinel) return;
         const observer = new IntersectionObserver(
@@ -300,7 +300,7 @@ export function AccountActivityTab({ address, initialTransactions, initialNextCu
         );
         observer.observe(sentinel);
         return () => observer.disconnect();
-    }, [viewMode, timelineHasMore, loadMoreTimeline]);
+    }, [viewMode, timelineHasMore, loadMoreTimeline, timelineTxs.length]);
 
     // --- FT Transfers (lazy) ---
     const loadFtTransfers = async (page: number) => {

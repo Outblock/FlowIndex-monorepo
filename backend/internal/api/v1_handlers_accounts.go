@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"flowscan-clone/internal/config"
@@ -315,26 +316,64 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 		txs = filtered
 	}
 	txIDs := collectTxIDs(txs)
-	tags, _ := s.repo.GetTxTagsByTransactionIDs(r.Context(), txIDs)
-	feesByTx, _ := s.repo.GetTransactionFeesByIDs(r.Context(), txIDs)
-	contracts, _ := s.repo.GetTxContractsByTransactionIDs(r.Context(), txIDs)
-	eventsByTx := make(map[string][]models.Event)
+	txRefs := collectTxRefs(txs)
+	ctx := r.Context()
+
+	// Phase 1: Run all independent queries in parallel
+	var (
+		tags              map[string][]string
+		feesByTx          map[string]float64
+		contracts         map[string][]string
+		eventsByTx        = make(map[string][]models.Event)
+		transferSummaries map[string]repository.TransferSummary
+		totalCount        int64
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(5) // tags, fees, contracts, transferSummaries, totalCount
 	if includeEvents {
-		events, _ := s.repo.GetEventsByTransactionIDs(r.Context(), txIDs)
-		for _, e := range events {
-			eventsByTx[e.TransactionID] = append(eventsByTx[e.TransactionID], e)
-		}
+		wg.Add(1)
 	}
 
-	// Fetch transfer summaries for expand preview
-	txRefs := collectTxRefs(txs)
-	transferSummaries, tsErr := s.repo.GetTransferSummariesByTxRefs(r.Context(), txRefs, address)
-	if tsErr != nil {
-		log.Printf("[WARN] GetTransferSummariesByTxRefs failed for address=%s refs=%d: %v", address, len(txRefs), tsErr)
+	go func() { defer wg.Done(); tags, _ = s.repo.GetTxTagsByTransactionIDs(ctx, txIDs) }()
+	go func() { defer wg.Done(); feesByTx, _ = s.repo.GetTransactionFeesByIDs(ctx, txIDs) }()
+	go func() { defer wg.Done(); contracts, _ = s.repo.GetTxContractsByTransactionIDs(ctx, txIDs) }()
+	go func() {
+		defer wg.Done()
+		var tsErr error
+		transferSummaries, tsErr = s.repo.GetTransferSummariesByTxRefs(ctx, txRefs, address)
+		if tsErr != nil {
+			log.Printf("[WARN] GetTransferSummariesByTxRefs failed for address=%s refs=%d: %v", address, len(txRefs), tsErr)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if t, err := s.repo.GetAddressTxCount(ctx, address); err == nil && t > 0 {
+			totalCount = t
+		}
+	}()
+	if includeEvents {
+		go func() {
+			defer wg.Done()
+			events, _ := s.repo.GetEventsByTransactionIDs(ctx, txIDs)
+			for _, e := range events {
+				eventsByTx[e.TransactionID] = append(eventsByTx[e.TransactionID], e)
+			}
+		}()
 	}
+
+	wg.Wait()
+
+	// Phase 2: Token metadata (depends on transferSummaries)
 	ftIDs, nftIDs := collectTokenIdentifiers(transferSummaries)
-	ftMeta, _ := s.repo.GetFTTokenMetadataByIdentifiers(r.Context(), ftIDs)
-	nftMeta, _ := s.repo.GetNFTCollectionMetadataByIdentifiers(r.Context(), nftIDs)
+	var ftMeta map[string]repository.TokenMetadataInfo
+	var nftMeta map[string]repository.TokenMetadataInfo
+
+	var wg2 sync.WaitGroup
+	wg2.Add(2)
+	go func() { defer wg2.Done(); ftMeta, _ = s.repo.GetFTTokenMetadataByIdentifiers(ctx, ftIDs) }()
+	go func() { defer wg2.Done(); nftMeta, _ = s.repo.GetNFTCollectionMetadataByIdentifiers(ctx, nftIDs) }()
+	wg2.Wait()
 
 	out := make([]map[string]interface{}, 0, len(txs))
 	for _, t := range txs {
@@ -343,9 +382,8 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 		out = append(out, toFlowTransactionOutputWithTransfers(t, eventsByTx[t.ID], contracts[t.ID], tags[t.ID], feesByTx[t.ID], &ts, ftMeta, nftMeta, ftPrices))
 	}
 	meta := map[string]interface{}{"limit": limit, "offset": offset, "count": len(out), "has_more": hasMore}
-	// Include pre-computed total from address_stats if available.
-	if total, err := s.repo.GetAddressTxCount(r.Context(), address); err == nil && total > 0 {
-		meta["total"] = total
+	if totalCount > 0 {
+		meta["total"] = totalCount
 	}
 	writeAPIResponse(w, out, meta, nil)
 }
