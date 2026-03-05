@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Wallet, Key, Zap, Droplets, X, ExternalLink, Plus, Download } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Wallet, Key, Zap, Droplets, X, ExternalLink, Plus, Download, Loader2, Check, Settings2 } from 'lucide-react';
 import Avatar from 'boring-avatars';
 import { fcl } from '../flow/fclConfig';
 import type { LocalKey, KeyAccount } from '../auth/localKeyManager';
@@ -15,6 +15,14 @@ interface ConnectModalProps {
   onToggleAutoSign: (value: boolean) => void;
   network: 'mainnet' | 'testnet';
   onOpenKeyManager?: (mode?: 'create' | 'import') => void;
+  onGenerateKey?: (label: string) => Promise<{ mnemonic: string; key: LocalKey }>;
+  onCreateAccount?: (
+    keyId: string,
+    sigAlgo: 'ECDSA_P256' | 'ECDSA_secp256k1',
+    hashAlgo: 'SHA2_256' | 'SHA3_256',
+    network: 'mainnet' | 'testnet',
+  ) => Promise<{ txId: string }>;
+  onRefreshAccounts?: (keyId: string, network: 'mainnet' | 'testnet') => Promise<KeyAccount[]>;
 }
 
 /** Flow logo image */
@@ -59,11 +67,23 @@ function useFlowBalance(address: string | null) {
 
 type HoveredEntry = { key: LocalKey; account: KeyAccount } | 'local-wallet' | 'fcl' | null;
 
+type CreateStep =
+  | { status: 'generating-key' }
+  | { status: 'key-created'; keyId: string }
+  | { status: 'creating-account'; keyId: string; network: string }
+  | { status: 'waiting-tx'; keyId: string; network: string; txId: string }
+  | { status: 'fetching-accounts'; keyId: string }
+  | { status: 'done'; key: LocalKey; account: KeyAccount }
+  | { status: 'error'; message: string };
+
 export default function ConnectModal({
   open, onClose, onSelect, localKeys, accountsMap,
   autoSign, onToggleAutoSign, network, onOpenKeyManager,
+  onGenerateKey, onCreateAccount, onRefreshAccounts,
 }: ConnectModalProps) {
   const [hovered, setHovered] = useState<HoveredEntry>(null);
+  const [createStep, setCreateStep] = useState<CreateStep | null>(null);
+  const createAbortRef = useRef(false);
 
   // Build flat list of local key+account entries
   const localEntries: { key: LocalKey; account: KeyAccount }[] = [];
@@ -80,6 +100,14 @@ export default function ConnectModal({
   const hoveredAddress = hovered && hovered !== 'fcl' && hovered !== 'local-wallet'
     ? hovered.account.flowAddress : null;
   const balance = useFlowBalance(hoveredAddress);
+
+  // Reset create state when modal closes
+  useEffect(() => {
+    if (!open) {
+      setCreateStep(null);
+      createAbortRef.current = false;
+    }
+  }, [open]);
 
   // Close on Escape
   useEffect(() => {
@@ -102,7 +130,172 @@ export default function ConnectModal({
     onClose();
   }, [onSelect, onClose]);
 
+  // Inline wallet creation flow
+  const handleQuickCreate = useCallback(async () => {
+    if (!onGenerateKey || !onCreateAccount || !onRefreshAccounts) return;
+
+    createAbortRef.current = false;
+
+    try {
+      // Step 1: Generate key
+      setCreateStep({ status: 'generating-key' });
+      const { key } = await onGenerateKey('Wallet');
+      if (createAbortRef.current) return;
+
+      // Step 2: Create account on current network
+      setCreateStep({ status: 'creating-account', keyId: key.id, network });
+      const { txId } = await onCreateAccount(key.id, 'ECDSA_P256', 'SHA3_256', network);
+      if (createAbortRef.current) return;
+
+      setCreateStep({ status: 'waiting-tx', keyId: key.id, network, txId });
+
+      // Step 3: Poll for account to appear (the createAccount call already does refreshAccounts internally,
+      // but we may need a few extra tries for indexing delay)
+      setCreateStep({ status: 'fetching-accounts', keyId: key.id });
+      let account: KeyAccount | null = null;
+      for (let i = 0; i < 10; i++) {
+        if (createAbortRef.current) return;
+        const accounts = await onRefreshAccounts(key.id, network);
+        if (accounts.length > 0) {
+          account = accounts[0];
+          break;
+        }
+        await new Promise(r => setTimeout(r, 2000));
+      }
+
+      if (createAbortRef.current) return;
+
+      if (account) {
+        setCreateStep({ status: 'done', key, account });
+      } else {
+        // Account created but not yet indexed — still select the key
+        setCreateStep({ status: 'error', message: 'Account created but not yet indexed. Try refreshing in Key Manager.' });
+      }
+    } catch (err) {
+      if (createAbortRef.current) return;
+      setCreateStep({ status: 'error', message: err instanceof Error ? err.message : 'Failed to create wallet' });
+    }
+  }, [onGenerateKey, onCreateAccount, onRefreshAccounts, network]);
+
   if (!open) return null;
+
+  // Render the creation progress UI for the right panel
+  const renderCreateProgress = () => {
+    if (!createStep) return null;
+
+    const steps: { label: string; done: boolean; active: boolean; error?: boolean }[] = [];
+    const s = createStep.status;
+
+    steps.push({
+      label: 'Generating key',
+      done: s !== 'generating-key',
+      active: s === 'generating-key',
+    });
+    steps.push({
+      label: `Creating ${network} account`,
+      done: s === 'waiting-tx' || s === 'fetching-accounts' || s === 'done',
+      active: s === 'creating-account',
+    });
+    steps.push({
+      label: 'Waiting for transaction',
+      done: s === 'fetching-accounts' || s === 'done',
+      active: s === 'waiting-tx',
+    });
+    steps.push({
+      label: 'Fetching account',
+      done: s === 'done',
+      active: s === 'fetching-accounts',
+    });
+
+    const isError = s === 'error';
+    const isDone = s === 'done';
+
+    return (
+      <div className="flex flex-col items-center gap-5 max-w-[280px] animate-in fade-in duration-150">
+        {/* Icon */}
+        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+          isDone ? 'bg-emerald-500/10 border border-emerald-500/20' :
+          isError ? 'bg-red-500/10 border border-red-500/20' :
+          'bg-zinc-800 border border-zinc-700'
+        }`}>
+          {isDone ? (
+            <Check className="w-7 h-7 text-emerald-400" />
+          ) : isError ? (
+            <X className="w-7 h-7 text-red-400" />
+          ) : (
+            <Loader2 className="w-7 h-7 text-zinc-400 animate-spin" />
+          )}
+        </div>
+
+        <div className="text-center">
+          <div className="text-sm font-medium text-zinc-200">
+            {isDone ? 'Wallet Created' : isError ? 'Creation Failed' : 'Creating Wallet...'}
+          </div>
+        </div>
+
+        {/* Step list */}
+        <div className="w-full space-y-2">
+          {steps.map((step, i) => (
+            <div key={i} className="flex items-center gap-2.5 text-xs">
+              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                {step.done ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : step.active && !isError ? (
+                  <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin" />
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                )}
+              </div>
+              <span className={
+                step.done ? 'text-emerald-400' :
+                step.active && !isError ? 'text-zinc-300' :
+                'text-zinc-600'
+              }>
+                {step.label}
+              </span>
+            </div>
+          ))}
+
+          {isError && (
+            <div className="mt-2 text-[11px] text-red-400/80 bg-red-500/5 border border-red-500/10 rounded px-2.5 py-2">
+              {createStep.message}
+            </div>
+          )}
+        </div>
+
+        {/* Done: auto-connect button */}
+        {isDone && (
+          <button
+            onClick={() => handleSelect({ type: 'local', key: createStep.key, account: createStep.account })}
+            className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg transition-colors"
+          >
+            Connect Wallet
+          </button>
+        )}
+
+        {/* Error: retry */}
+        {isError && (
+          <button
+            onClick={handleQuickCreate}
+            className="w-full px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+        )}
+
+        {/* Advanced link */}
+        {onOpenKeyManager && (
+          <button
+            onClick={() => { onOpenKeyManager(); onClose(); }}
+            className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors flex items-center gap-1"
+          >
+            <Settings2 className="w-3 h-3" />
+            Advanced
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -118,7 +311,7 @@ export default function ConnectModal({
           <X className="w-4 h-4" />
         </button>
 
-        {/* ── Left Panel ── */}
+        {/* -- Left Panel -- */}
         <div className="w-[220px] flex-shrink-0 bg-zinc-900 border-r border-zinc-700/80 flex flex-col overflow-y-auto">
           <div className="px-4 pt-4 pb-2">
             <h3 className="text-sm font-semibold text-zinc-200">Connect Wallet</h3>
@@ -245,9 +438,12 @@ export default function ConnectModal({
           </div>
         </div>
 
-        {/* ── Right Panel ── */}
+        {/* -- Right Panel -- */}
         <div className="flex-1 bg-[#1a1a1e] flex flex-col items-center justify-center p-6 min-h-[360px]">
-          {hovered && hovered !== 'fcl' && hovered !== 'local-wallet' ? (
+          {/* Creating in progress — show progress steps */}
+          {createStep ? renderCreateProgress() :
+
+          hovered && hovered !== 'fcl' && hovered !== 'local-wallet' ? (
             // Show selected local key details
             <div className="flex flex-col items-center gap-4 animate-in fade-in duration-150">
               <Avatar
@@ -297,7 +493,7 @@ export default function ConnectModal({
               </div>
               <div className="w-full space-y-2">
                 <button
-                  onClick={() => { if (onOpenKeyManager) { onOpenKeyManager('create'); onClose(); } }}
+                  onClick={handleQuickCreate}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -311,6 +507,16 @@ export default function ConnectModal({
                   Import Existing Key
                 </button>
               </div>
+              {/* Advanced link */}
+              {onOpenKeyManager && (
+                <button
+                  onClick={() => { onOpenKeyManager(); onClose(); }}
+                  className="text-[11px] text-zinc-500 hover:text-zinc-400 transition-colors flex items-center gap-1"
+                >
+                  <Settings2 className="w-3 h-3" />
+                  Advanced
+                </button>
+              )}
             </div>
           ) : hovered === 'fcl' ? (
             // Show FCL / FCL Wallet info

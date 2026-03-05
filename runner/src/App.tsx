@@ -1910,6 +1910,9 @@ export default function App() {
         onToggleAutoSign={handleToggleAutoSign}
         network={network}
         onOpenKeyManager={(mode) => { setConnectModalOpen(false); setKeyManagerInitialMode(mode); setShowKeyManager(true); }}
+        onGenerateKey={generateNewKey}
+        onCreateAccount={createAccount}
+        onRefreshAccounts={refreshAccounts}
       />
     </div>
   );
