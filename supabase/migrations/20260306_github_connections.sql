@@ -18,5 +18,8 @@ CREATE TABLE IF NOT EXISTS public.runner_github_connections (
 
 CREATE INDEX IF NOT EXISTS idx_runner_github_connections_user
   ON public.runner_github_connections(user_id);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_runner_github_connections_project
-  ON public.runner_github_connections(project_id) WHERE project_id IS NOT NULL;
+ALTER TABLE public.runner_github_connections
+  ADD CONSTRAINT uq_runner_github_connections_project UNIQUE (project_id);
+
+-- Grant access to service_role (used by edge functions via Supabase client)
+GRANT ALL ON public.runner_github_connections TO service_role;
