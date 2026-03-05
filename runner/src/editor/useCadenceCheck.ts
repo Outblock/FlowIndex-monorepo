@@ -9,7 +9,7 @@ export function useCadenceCheck(
   code: string,
   network: string
 ) {
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     if (!editorRef.current || !code.trim()) return;

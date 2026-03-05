@@ -492,7 +492,7 @@ export function deleteFile(state: ProjectState, path: string): ProjectState {
   if (activeFile === path) {
     activeFile = openFiles[0] || files[0]?.path || '';
   }
-  return { files, openFiles, activeFile };
+  return { ...state, files, openFiles, activeFile };
 }
 
 export function renameFile(state: ProjectState, oldPath: string, newPath: string): ProjectState {

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { CadenceParam } from '../flow/cadenceParams';
+import type { ParsedArgError } from '../editor/errorDecorations';
 
 interface ParamPanelProps {
   params: CadenceParam[];
   values: Record<string, string>;
   onChange: (values: Record<string, string>) => void;
+  argErrors?: ParsedArgError[];
 }
 
 function placeholderFor(type: string): string {
@@ -78,7 +80,7 @@ function tryParseJsonIntoValues(
   }
 }
 
-export default function ParamPanel({ params, values, onChange }: ParamPanelProps) {
+export default function ParamPanel({ params, values, onChange, argErrors }: ParamPanelProps) {
   const [jsonMode, setJsonMode] = useState(false);
   const [jsonText, setJsonText] = useState('');
   const [parseError, setParseError] = useState('');
@@ -156,21 +158,37 @@ export default function ParamPanel({ params, values, onChange }: ParamPanelProps
         </div>
       ) : (
         <div className="flex flex-wrap gap-3">
-          {params.map((p) => (
-            <div key={p.name} className="flex items-center gap-2">
-              <label className="text-xs text-zinc-400 whitespace-nowrap">
-                {p.name}
-                <span className="text-zinc-600 ml-1">: {p.type}</span>
-              </label>
-              <input
-                type="text"
-                value={values[p.name] || ''}
-                onChange={(e) => handleChange(p.name, e.target.value)}
-                placeholder={placeholderFor(p.type)}
-                className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-zinc-500 w-48"
-              />
-            </div>
-          ))}
+          {params.map((p, i) => {
+            const argErr = argErrors?.find(e => e.index === i);
+            return (
+              <div key={p.name} className="flex items-center gap-2 group relative">
+                <label className="text-xs text-zinc-400 whitespace-nowrap">
+                  {p.name}
+                  <span className="text-zinc-600 ml-1">: {p.type}</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={values[p.name] || ''}
+                    onChange={(e) => handleChange(p.name, e.target.value)}
+                    placeholder={placeholderFor(p.type)}
+                    className={`bg-zinc-800 border rounded px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none w-48 ${
+                      argErr
+                        ? 'border-red-500 bg-red-900/20 focus:border-red-400'
+                        : 'border-zinc-700 focus:border-zinc-500'
+                    }`}
+                  />
+                  {argErr && (
+                    <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block">
+                      <div className="bg-red-950 border border-red-800 rounded px-2 py-1 text-[10px] text-red-300 max-w-xs whitespace-normal shadow-lg">
+                        {argErr.message}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

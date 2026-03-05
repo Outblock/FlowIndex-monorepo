@@ -15,7 +15,7 @@ export interface CloudProject {
 }
 
 export interface CloudProjectFull extends CloudProject {
-  user_id: string;
+  user_id?: string;
   files: { path: string; content: string }[];
 }
 
@@ -73,7 +73,7 @@ export function useProjects() {
           { slug },
           false, // auth optional
         );
-        return { ...result.project, files: result.files };
+        return { ...result.project, files: result.files } as CloudProjectFull;
       } catch {
         return null;
       }
