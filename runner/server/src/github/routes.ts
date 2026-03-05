@@ -82,6 +82,11 @@ router.get('/tree/:owner/:repo', async (req: Request, res: Response) => {
     }));
     res.json({ files });
   } catch (err: unknown) {
+    // Empty repos return 404 from GitHub — return empty array instead of error
+    if (err instanceof Error && 'status' in err && (err as Record<string, unknown>).status === 404) {
+      res.json({ files: [] });
+      return;
+    }
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });
   }
