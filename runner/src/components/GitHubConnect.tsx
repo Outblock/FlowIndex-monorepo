@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Github, Folder, FolderOpen, ArrowLeft, X, Loader2, Search, GitBranch, Plus, RefreshCw } from 'lucide-react';
+import { Github, Folder, FolderOpen, ArrowLeft, X, Loader2, Search, GitBranch, RefreshCw } from 'lucide-react';
 import { githubApi, type GitHubRepo, type GitHubFile } from '../github/api';
 
 const API_BASE = import.meta.env.VITE_RUNNER_API_URL || '';
@@ -24,10 +24,6 @@ export default function GitHubConnect({ onConnect, onClose, installationId }: Gi
   const [loading, setLoading] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showNewRepo, setShowNewRepo] = useState(false);
-  const [newRepoName, setNewRepoName] = useState('');
-  const [newRepoPrivate, setNewRepoPrivate] = useState(false);
-  const [creating, setCreating] = useState(false);
 
   const refreshRepos = useCallback(() => {
     if (!installationId) return;
@@ -51,8 +47,7 @@ export default function GitHubConnect({ onConnect, onClose, installationId }: Gi
     setBranch(repo.default_branch);
     setCurrentPath('');
     setSelectedPath('/');
-    setStep('directory');
-    await fetchTree(repo, '');
+    setStep('confirm'); // Skip directory, go straight to confirm
   }
 
   async function fetchTree(repo: GitHubRepo, path: string) {
@@ -97,31 +92,10 @@ export default function GitHubConnect({ onConnect, onClose, installationId }: Gi
     }
   }
 
-  async function handleCreateRepo() {
-    if (!installationId || !newRepoName.trim()) return;
-    setCreating(true);
-    setError(null);
-    try {
-      const repo = await githubApi.createRepo({
-        installation_id: installationId,
-        name: newRepoName.trim(),
-        is_private: newRepoPrivate,
-      });
-      setShowNewRepo(false);
-      setNewRepoName('');
-      // Auto-select the newly created repo
-      handleSelectRepo(repo);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create repo');
-    } finally {
-      setCreating(false);
-    }
-  }
 
   const steps: { key: Step; label: string }[] = [
     { key: 'install', label: 'Install' },
     { key: 'repo', label: 'Repository' },
-    { key: 'directory', label: 'Directory' },
     { key: 'confirm', label: 'Connect' },
   ];
 
@@ -211,38 +185,7 @@ export default function GitHubConnect({ onConnect, onClose, installationId }: Gi
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 </button>
-                <button
-                  onClick={() => setShowNewRepo((v) => !v)}
-                  className="flex items-center gap-1 px-2 py-2 bg-zinc-800 border border-zinc-700 rounded text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors text-xs whitespace-nowrap"
-                  title="Create a new repository"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New
-                </button>
               </div>
-              {showNewRepo && (
-                <div className="flex items-center gap-2 p-2 bg-zinc-800/50 border border-zinc-700 rounded">
-                  <input
-                    value={newRepoName}
-                    onChange={(e) => setNewRepoName(e.target.value)}
-                    placeholder="repo-name"
-                    className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-200 text-xs rounded px-2 py-1.5 focus:outline-none focus:border-zinc-600 placeholder-zinc-500"
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateRepo()}
-                    autoFocus
-                  />
-                  <label className="flex items-center gap-1 text-[10px] text-zinc-500 cursor-pointer select-none">
-                    <input type="checkbox" checked={newRepoPrivate} onChange={(e) => setNewRepoPrivate(e.target.checked)} className="rounded" />
-                    Private
-                  </label>
-                  <button
-                    onClick={handleCreateRepo}
-                    disabled={creating || !newRepoName.trim()}
-                    className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs rounded transition-colors"
-                  >
-                    {creating ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Create'}
-                  </button>
-                </div>
-              )}
               <div className="flex-1 overflow-y-auto">
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
@@ -362,10 +305,16 @@ export default function GitHubConnect({ onConnect, onClose, installationId }: Gi
 
               <div className="mt-auto flex items-center gap-2">
                 <button
-                  onClick={() => setStep('directory')}
+                  onClick={() => { setSelectedRepo(null); setStep('repo'); }}
                   className="px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
                 >
                   Back
+                </button>
+                <button
+                  onClick={() => { fetchTree(selectedRepo, ''); setStep('directory'); }}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors"
+                >
+                  Change directory
                 </button>
                 <button
                   onClick={handleConnect}
