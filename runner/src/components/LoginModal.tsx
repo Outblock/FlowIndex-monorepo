@@ -26,9 +26,11 @@ function GoogleIcon({ className }: { className?: string }) {
 interface LoginModalProps {
   open: boolean;
   onClose: () => void;
+  onPasskeyLogin?: () => Promise<void>;
+  hasPasskeySupport?: boolean;
 }
 
-export default function LoginModal({ open, onClose }: LoginModalProps) {
+export default function LoginModal({ open, onClose, onPasskeyLogin, hasPasskeySupport }: LoginModalProps) {
   const { signInWithProvider, sendMagicLink, verifyOtp } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -38,6 +40,7 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
   const [otpValue, setOtpValue] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
 
   const redirectTo = typeof window !== 'undefined' ? window.location.href : '/';
 
@@ -80,12 +83,28 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
     }
   }
 
+  async function handlePasskey() {
+    setError(null);
+    setPasskeyLoading(true);
+    try {
+      if (onPasskeyLogin) {
+        await onPasskeyLogin();
+        onClose();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Passkey authentication failed');
+    } finally {
+      setPasskeyLoading(false);
+    }
+  }
+
   function handleClose() {
     setEmail('');
     setError(null);
     setOtpSent(false);
     setOtpValue('');
     setShowEmailForm(false);
+    setPasskeyLoading(false);
     onClose();
   }
 
@@ -230,6 +249,27 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
                     transition={{ duration: 0.15 }}
                     className="space-y-2"
                   >
+                    {/* Passkey */}
+                    {hasPasskeySupport && (
+                      <button
+                        type="button"
+                        onClick={handlePasskey}
+                        disabled={passkeyLoading}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 bg-zinc-950 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-600 text-zinc-200 font-medium transition-all text-xs group active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4 shrink-0 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" />
+                          <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+                        </svg>
+                        <span className="flex-1 text-left">
+                          {passkeyLoading ? 'Authenticating...' : 'Continue with Passkey'}
+                        </span>
+                        {!passkeyLoading && (
+                          <ArrowRight className="w-3.5 h-3.5 text-zinc-600 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+                        )}
+                      </button>
+                    )}
+
                     {/* GitHub */}
                     <button
                       type="button"
