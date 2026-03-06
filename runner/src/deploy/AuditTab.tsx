@@ -1,12 +1,11 @@
 // ---------------------------------------------------------------------------
 // AuditTab — AI-powered contract security audit with inline annotations
 // Uses streaming AI (Opus 4.6 + thinking) via /api/runner-audit endpoint
+// Raw SSE parsing for reliable stream completion (useChat hangs with MCP tools)
 // Google Docs-style comment sidebar + highlighted code lines
 // ---------------------------------------------------------------------------
 
 import { useState, useMemo, useCallback, useRef, memo } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
 import {
   Shield,
   ShieldAlert,
@@ -46,6 +45,8 @@ interface Props {
   contractName: string;
   network: string;
 }
+
+type AuditStatus = 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
 
 interface ToolCallInfo {
   name: string;
@@ -190,56 +191,6 @@ function stripLineWrapper(html: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Extract reasoning, tool calls, and text from useChat messages
-// ---------------------------------------------------------------------------
-
-function extractMessageParts(messages: any[]) {
-  const assistantMsgs = messages.filter((m: any) => m.role === 'assistant');
-  const lastMsg = assistantMsgs[assistantMsgs.length - 1];
-  if (!lastMsg?.parts) return { reasoningText: '', toolCalls: [] as ToolCallInfo[], assistantText: '' };
-
-  let reasoning = '';
-  let text = '';
-  const toolMap = new Map<string, ToolCallInfo>();
-
-  for (const part of lastMsg.parts) {
-    const p = part as any;
-    switch (p.type) {
-      case 'reasoning':
-        // AI SDK v6: reasoning part has .text field
-        reasoning += p.text || '';
-        break;
-      case 'text':
-        text += p.text || '';
-        break;
-      case 'dynamic-tool':
-        // MCP tools appear as dynamic-tool parts
-        // States: input-streaming → input-available → output-available
-        toolMap.set(p.toolCallId, {
-          name: p.toolName || '',
-          done: p.state === 'output-available' || p.state === 'output-error',
-        });
-        break;
-      default:
-        // Also handle static tool-invocation parts (tool-{name} type)
-        if (p.toolCallId && p.toolName) {
-          toolMap.set(p.toolCallId, {
-            name: p.toolName || '',
-            done: p.state === 'output-available' || p.state === 'result' || p.state === 'output-error',
-          });
-        }
-        break;
-    }
-  }
-
-  return {
-    reasoningText: reasoning,
-    toolCalls: Array.from(toolMap.values()),
-    assistantText: text,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // CodePanel — memoized so it ONLY re-renders when findings/selection change
 // ---------------------------------------------------------------------------
 
@@ -333,105 +284,193 @@ const CodePanel = memo(function CodePanel({
 });
 
 // ---------------------------------------------------------------------------
-// AuditTab
+// AuditTab — raw SSE fetch for reliable stream completion
+// (useChat hangs indefinitely with server-side MCP dynamic tools)
 // ---------------------------------------------------------------------------
 
 export default function AuditTab({ code, contractName, network }: Props) {
   const highlighter = useShikiHighlighter();
 
+  const [status, setStatus] = useState<AuditStatus>('idle');
   const [findings, setFindings] = useState<AuditFinding[]>([]);
   const [summary, setSummary] = useState('');
   const [score, setScore] = useState('');
-  const [scanned, setScanned] = useState(false);
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Streaming state — refs for accumulation, state for rendering
+  const [reasoningText, setReasoningText] = useState('');
+  const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([]);
+  const [assistantText, setAssistantText] = useState('');
+
+  const reasoningRef = useRef('');
+  const textRef = useRef('');
+  const toolMapRef = useRef(new Map<string, ToolCallInfo>());
+  const abortRef = useRef<AbortController | null>(null);
 
   const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  // Custom fetch to inject code/contractName/network into the request body
-  const safeFetch = useCallback(async (url: string | URL | Request, init?: RequestInit) => {
-    if (init?.body) {
-      try {
-        const parsed = JSON.parse(init.body as string);
-        parsed.code = code;
-        parsed.contractName = contractName;
-        parsed.network = network;
-        init = { ...init, body: JSON.stringify(parsed) };
-      } catch { /* not JSON */ }
-    }
-    return globalThis.fetch(url, init);
-  }, [code, contractName, network]);
+  // Run audit — raw SSE fetch
+  const runAudit = useCallback(async () => {
+    if (!code) return;
 
-  const transport = useMemo(
-    () => new DefaultChatTransport({
-      api: `${AI_CHAT_URL}/api/runner-audit`,
-      credentials: 'omit',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      fetch: safeFetch as any,
-    }),
-    [safeFetch],
-  );
+    // Reset all state
+    setFindings([]);
+    setSummary('');
+    setScore('');
+    setSelectedId(null);
+    setThinkingExpanded(false);
+    setReasoningText('');
+    setToolCalls([]);
+    setAssistantText('');
+    reasoningRef.current = '';
+    textRef.current = '';
+    toolMapRef.current = new Map();
 
-  const { messages, sendMessage, status, setMessages, error } = useChat({
-    transport,
-    onError: (err) => {
-      console.error('[audit] useChat error:', err);
-    },
-    onFinish: (msg) => {
-      // Parse findings from the final assistant message
-      const { assistantText } = extractMessageParts([msg]);
-      if (assistantText) {
-        const result = parseAuditResponse(assistantText);
-        if (result) {
-          setFindings(result.findings);
-          setSummary(result.summary || '');
-          setScore(result.score || '');
-          setScanned(true);
+    // Abort previous request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setStatus('connecting');
+
+    try {
+      const res = await fetch(`${AI_CHAT_URL}/api/runner-audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{
+            id: crypto.randomUUID(),
+            role: 'user' as const,
+            parts: [{
+              type: 'text' as const,
+              text: 'Audit this Cadence contract for security vulnerabilities, type errors, and best practice violations. Run all available MCP tools first, then provide your comprehensive analysis.',
+            }],
+          }],
+          code,
+          contractName,
+          network,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        console.error('[audit] HTTP error:', res.status);
+        setStatus('error');
+        return;
+      }
+
+      setStatus('streaming');
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      // Throttle UI updates via requestAnimationFrame
+      let rafId: number | null = null;
+      const scheduleUpdate = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          setReasoningText(reasoningRef.current);
+          setAssistantText(textRef.current);
+          setToolCalls(Array.from(toolMapRef.current.values()));
+        });
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const evt = JSON.parse(data);
+            switch (evt.type) {
+              // Thinking / reasoning — server sends `delta` field
+              case 'reasoning-delta':
+                reasoningRef.current += evt.delta || '';
+                scheduleUpdate();
+                break;
+
+              // Response text — server sends `delta` field
+              case 'text-delta':
+                textRef.current += evt.delta || '';
+                scheduleUpdate();
+                break;
+
+              // Tool call started (streaming input)
+              case 'tool-input-start':
+                toolMapRef.current.set(evt.toolCallId, {
+                  name: evt.toolName,
+                  done: false,
+                });
+                scheduleUpdate();
+                break;
+
+              // Tool input fully available (args parsed)
+              case 'tool-input-available':
+                if (!toolMapRef.current.has(evt.toolCallId)) {
+                  toolMapRef.current.set(evt.toolCallId, {
+                    name: evt.toolName,
+                    done: false,
+                  });
+                  scheduleUpdate();
+                }
+                break;
+
+              // Tool output received
+              case 'tool-output-available': {
+                const existing = toolMapRef.current.get(evt.toolCallId);
+                if (existing) {
+                  toolMapRef.current.set(evt.toolCallId, { ...existing, done: true });
+                } else {
+                  toolMapRef.current.set(evt.toolCallId, {
+                    name: evt.toolName || 'unknown',
+                    done: true,
+                  });
+                }
+                scheduleUpdate();
+                break;
+              }
+            }
+          } catch { /* ignore non-JSON lines */ }
         }
       }
-    },
-  });
 
-  const isStreaming = status === 'streaming' || status === 'submitted';
+      // Final flush
+      if (rafId) cancelAnimationFrame(rafId);
+      setReasoningText(reasoningRef.current);
+      setAssistantText(textRef.current);
+      setToolCalls(Array.from(toolMapRef.current.values()));
 
-  // Extract reasoning, tool calls, and text from messages
-  const { reasoningText, toolCalls, assistantText } = useMemo(
-    () => extractMessageParts(messages),
-    [messages],
-  );
-
-  // Also try to parse findings from assistantText when streaming finishes
-  // (backup for onFinish — handles case where messages update after status changes)
-  const prevStatusRef = useRef(status);
-  if (prevStatusRef.current !== status) {
-    prevStatusRef.current = status;
-    if (status === 'ready' && assistantText && !scanned) {
-      const result = parseAuditResponse(assistantText);
+      // Parse findings from the complete response text
+      const result = parseAuditResponse(textRef.current);
       if (result) {
         setFindings(result.findings);
         setSummary(result.summary || '');
         setScore(result.score || '');
-        setScanned(true);
       }
+
+      setStatus('done');
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      console.error('[audit] Stream error:', err);
+      setStatus('error');
     }
-  }
+  }, [code, contractName, network]);
 
-  // Run audit
-  const runAudit = useCallback(() => {
-    if (!code) return;
-    setFindings([]);
-    setSummary('');
-    setScore('');
-    setScanned(false);
-    setSelectedId(null);
-    setThinkingExpanded(false);
-    setMessages([]);
-
-    sendMessage({
-      text: 'Audit this Cadence contract for security vulnerabilities, type errors, and best practice violations. Run all available MCP tools first, then provide your comprehensive analysis.',
-    });
-  }, [code, sendMessage, setMessages]);
+  const isStreaming = status === 'streaming' || status === 'connecting';
+  const hasStarted = status !== 'idle';
 
   // Per-line Shiki HTML (expensive — only depends on code)
   const highlightedLines = useMemo(() => {
@@ -466,9 +505,6 @@ export default function AuditTab({ code, contractName, network }: Props) {
   const criticalCount = stats.high + stats.error;
   const warningCount = stats.medium + stats.warning;
 
-  const hasStarted = messages.length > 0;
-  const isDone = hasStarted && !isStreaming;
-
   if (!code) {
     return (
       <div className="flex items-center justify-center py-16 text-zinc-500">
@@ -500,7 +536,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
             </span>
           )}
 
-          {isDone && scanned && (
+          {status === 'done' && (
             <div className="flex items-center gap-2 text-[10px]">
               {criticalCount > 0 && (
                 <span className="flex items-center gap-1 text-red-400">
@@ -525,8 +561,8 @@ export default function AuditTab({ code, contractName, network }: Props) {
             </div>
           )}
 
-          {error && (
-            <span className="text-[10px] text-red-400">Error: {error.message}</span>
+          {status === 'error' && (
+            <span className="text-[10px] text-red-400">Audit failed — try again</span>
           )}
         </div>
 
@@ -628,7 +664,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
       )}
 
       {/* Thinking accordion — shown after streaming completes */}
-      {isDone && reasoningText && (
+      {!isStreaming && reasoningText && (
         <div className="border-b border-zinc-800/50">
           <button
             onClick={() => setThinkingExpanded(!thinkingExpanded)}
@@ -654,7 +690,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
       )}
 
       {/* Tool calls summary — shown after streaming completes */}
-      {isDone && toolCalls.length > 0 && (
+      {!isStreaming && toolCalls.length > 0 && (
         <div className="px-4 py-1.5 border-b border-zinc-800/50 flex items-center gap-1.5 flex-wrap">
           {toolCalls.map((tc, i) => (
             <span key={i} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-400">
@@ -666,14 +702,14 @@ export default function AuditTab({ code, contractName, network }: Props) {
       )}
 
       {/* Summary */}
-      {isDone && scanned && summary && (
+      {status === 'done' && summary && (
         <div className="px-4 py-2.5 border-b border-zinc-800 bg-zinc-950/30">
           <p className="text-[11px] text-zinc-400 leading-snug">{summary}</p>
         </div>
       )}
 
       {/* Main content — code panel only rendered after streaming completes */}
-      {!hasStarted ? (
+      {status === 'idle' ? (
         <div className="flex-1 flex flex-col items-center justify-center py-20 gap-4">
           <div className="w-16 h-16 rounded-2xl bg-zinc-800/50 flex items-center justify-center">
             <Shield className="w-8 h-8 text-zinc-600" />
@@ -693,7 +729,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
             Run Audit
           </button>
         </div>
-      ) : isDone && (
+      ) : (status === 'done' || status === 'error') && (
         <div className="flex flex-1 min-h-0" style={{ minHeight: 400 }}>
           <CodePanel
             code={code}
@@ -713,7 +749,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
               </div>
             </div>
 
-            {findings.length === 0 && scanned && (
+            {findings.length === 0 && status === 'done' && (
               <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-500">
                 <ShieldCheck className="w-6 h-6 text-emerald-500/50" />
                 <p className="text-[11px]">No issues found</p>
