@@ -1,10 +1,13 @@
+import { createMCPClient } from "@ai-sdk/mcp";
 import { anthropic } from "@ai-sdk/anthropic";
-import { streamText, convertToModelMessages, type UIMessage } from "ai";
+import { streamText, stepCountIs, convertToModelMessages, type UIMessage } from "ai";
 
+const CADENCE_MCP_URL =
+  process.env.CADENCE_MCP_URL || "https://cadence-mcp.up.railway.app/mcp";
 const CADENCE_MCP_BASE =
   process.env.CADENCE_MCP_BASE_URL || "https://cadence-mcp.up.railway.app";
 
-// Pre-fetch security scan + type check via REST (no MCP, no Claude tool calls)
+// Pre-fetch security scan + type check via REST (milliseconds, skips Claude tool-call overhead)
 async function prefetchScan(
   code: string,
   network: string,
@@ -20,7 +23,6 @@ async function prefetchScan(
       return { scan: "Security scan unavailable", diagnostics: "Type check unavailable" };
     }
     const data = await res.json();
-    // Format scan findings for prompt
     const scanFindings = data.scan?.findings ?? [];
     const scanSummary = data.scan?.summary ?? {};
     const scanText = scanFindings.length > 0
@@ -36,16 +38,39 @@ async function prefetchScan(
   }
 }
 
+// Connect to MCP for non-scan tools (search_docs, get_doc, cadence_hover, etc.)
+async function safeMcpTools(
+  url: string
+): Promise<{
+  tools: Record<string, any>;
+  client: Awaited<ReturnType<typeof createMCPClient>> | null;
+}> {
+  try {
+    const client = await createMCPClient({ transport: { type: "http", url } });
+    const allTools = await client.tools();
+    // Exclude scan tools — those are pre-fetched via REST
+    const { cadence_security_scan, cadence_check, ...tools } = allTools;
+    return { tools, client };
+  } catch (e) {
+    console.error(`[runner-audit] MCP connection failed (${url}):`, e);
+    return { tools: {}, client: null };
+  }
+}
+
 const AUDIT_SYSTEM_PROMPT = `You are a Cadence smart contract security auditor for deployed contracts on the Flow blockchain.
 
 ## Your Task
 
-Analyze the contract code and the pre-fetched tool results below, then output a structured JSON audit.
-The security scan and type check have ALREADY been run — their results are included below. Do NOT call any tools. Just analyze and output.
+Analyze the contract code and the pre-fetched scan results below. The security scan and type check have ALREADY been run — do NOT call cadence_security_scan or cadence_check.
+
+You may optionally use these MCP tools if helpful:
+- \`search_docs\` / \`get_doc\` — look up Cadence best practices
+- \`cadence_hover\` — get type info for specific symbols
+- \`cadence_definition\` — find symbol definitions
 
 ## Output Format
 
-Output ONLY this JSON block. No extra text before or after.
+After your analysis, output ONLY this JSON block. No extra text before or after.
 
 \`\`\`json
 {
@@ -95,8 +120,11 @@ export async function POST(req: Request) {
 
   const net = network || "mainnet";
 
-  // Pre-fetch scan results via REST (milliseconds, not seconds)
-  const { scan, diagnostics } = await prefetchScan(code || "", net);
+  // Pre-fetch scan results via REST (milliseconds) + connect MCP for other tools (in parallel)
+  const [{ scan, diagnostics }, cadenceMcp] = await Promise.all([
+    prefetchScan(code || "", net),
+    safeMcpTools(CADENCE_MCP_URL),
+  ]);
 
   const systemWithContext = `${AUDIT_SYSTEM_PROMPT}
 
@@ -126,7 +154,11 @@ ${diagnostics}`;
     },
     system: systemWithContext,
     messages: await convertToModelMessages(messages),
-    // No tools — scan results are pre-fetched, Claude just analyzes
+    tools: cadenceMcp.tools,
+    stopWhen: stepCountIs(8),
+    onFinish: async () => {
+      await cadenceMcp.client?.close();
+    },
   });
 
   return result.toUIMessageStreamResponse();
