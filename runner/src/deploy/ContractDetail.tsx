@@ -480,7 +480,7 @@ export default function ContractDetail() {
               )}
               <div className="text-right">
                 <div className="text-[10px] text-zinc-500">Version</div>
-                <div className="text-xs font-medium text-zinc-200">v{contract?.version ?? 1}</div>
+                <div className="text-xs font-medium text-zinc-200">v{versions.length > 0 ? Math.max(...versions.map(v => v.version)) : (contract?.version ?? 1)}</div>
               </div>
             </div>
           </div>
@@ -539,7 +539,7 @@ export default function ContractDetail() {
               <ContractStats
                 holders={tokenMeta?.holder_count ?? 0}
                 dependents={contract?.dependent_count ?? 0}
-                version={contract?.version ?? 1}
+                version={versions.length > 0 ? Math.max(...versions.map(v => v.version)) : (contract?.version ?? 1)}
                 firstDeployed={contract?.first_seen_height ? `Block #${contract.first_seen_height.toLocaleString()}` : 'Unknown'}
                 totalSupply={tokenMeta?.total_supply}
                 kind={contract?.kind}

@@ -216,8 +216,8 @@ export default function SourceTab({ contract, contractName, contractId, versions
     [versions],
   );
 
-  // Default to latest version (highest version number)
-  const latestVersion = contract?.version ?? (sortedVersions.length > 0 ? sortedVersions[0].version : 1);
+  // Latest = highest version number from the versions list (don't trust contract.version — may be stale)
+  const latestVersion = sortedVersions.length > 0 ? sortedVersions[0].version : (contract?.version ?? 1);
 
   // Current code to display
   const displayCode = selectedVersion != null && versionCode ? versionCode : (contract?.code || '');
