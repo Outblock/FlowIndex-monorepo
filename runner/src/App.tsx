@@ -1213,7 +1213,10 @@ export default function App() {
             </button>
           )}
           <h1 className="text-sm font-semibold tracking-tight">{isMobile ? 'Runner' : 'Cadence Runner'}</h1>
-          <a href="/deploy" className="ml-2 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300 rounded border border-zinc-700 hover:border-zinc-600 transition-colors">Deploy</a>
+          <nav className="flex items-center gap-1 ml-3">
+            <span className="px-3 py-1 text-xs rounded-md bg-zinc-800 text-zinc-100">Editor</span>
+            <a href="/deploy" className="px-3 py-1 text-xs rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors">Deploy</a>
+          </nav>
 
           {/* LSP status indicator */}
           <div className="relative group/lsp">
