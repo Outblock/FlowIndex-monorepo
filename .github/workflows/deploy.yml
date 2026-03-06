@@ -306,6 +306,17 @@ jobs:
           echo "::add-mask::$ANON_KEY"
           echo "anon_key=$ANON_KEY" >> "$GITHUB_OUTPUT"
 
+          SERVICE_KEY=$(python3 -c "
+          import json,hmac,hashlib,base64,os
+          def b(d): return base64.urlsafe_b64encode(d).rstrip(b'=').decode()
+          s=os.environ['SUPABASE_JWT_SECRET']
+          h=b(json.dumps({'alg':'HS256','typ':'JWT'}).encode())
+          p=b(json.dumps({'role':'service_role','iss':'supabase','iat':1672531200,'exp':1988150400}).encode())
+          print(h+'.'+p+'.'+b(hmac.new(s.encode(),(h+'.'+p).encode(),hashlib.sha256).digest()))
+          ")
+          echo "::add-mask::$SERVICE_KEY"
+          echo "service_key=$SERVICE_KEY" >> "$GITHUB_OUTPUT"
+
       - name: Build & push runner
         uses: docker/build-push-action@v6
         with:
@@ -341,6 +352,9 @@ jobs:
               -e GITHUB_APP_CLIENT_ID="${{ secrets.GH_APP_CLIENT_ID }}" \
               -e GITHUB_APP_CLIENT_SECRET="${{ secrets.GH_APP_CLIENT_SECRET }}" \
               -e GITHUB_APP_SLUG="${{ secrets.GH_APP_SLUG }}" \
+              -e GITHUB_APP_WEBHOOK_SECRET="${{ secrets.GH_APP_WEBHOOK_SECRET }}" \
+              -e SUPABASE_URL="http://10.128.0.4:54321" \
+              -e SUPABASE_SERVICE_ROLE_KEY="${{ steps.supabase-keys.outputs.service_key }}" \
               -e FRONTEND_URL="https://run.flowindex.io" \
               -e HTTP_PORT=3003 \
               ${{ env.REGISTRY }}/runner:${{ github.sha }}
