@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { Plus, Trash2, Wallet, Loader2 } from 'lucide-react';
-import * as fcl from '@onflow/fcl';
+import { fcl, configureFcl } from '../flow/fclConfig';
 import type { VerifiedAddress } from './api';
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,8 @@ export default function AddressSidebar({
     setError(null);
     setAdding(true);
     try {
-      // 1. Authenticate with FCL wallet
+      // 1. Configure FCL for selected network, then authenticate
+      configureFcl(network);
       await fcl.authenticate();
       const user = await fcl.currentUser.snapshot();
       const addr = user.addr;

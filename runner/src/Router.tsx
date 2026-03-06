@@ -1,5 +1,6 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { configureFcl } from './flow/fclConfig';
 
 const App = lazy(() => import('./App'));
 const DeployDashboard = lazy(() => import('./deploy/DeployDashboard'));
@@ -13,6 +14,12 @@ function LoadingSpinner() {
 }
 
 export default function Router() {
+  // Configure FCL with mainnet defaults so the deploy page wallet works
+  // (Editor reconfigures FCL when its own network selector changes)
+  useEffect(() => {
+    configureFcl('mainnet');
+  }, []);
+
   return (
     <BrowserRouter>
       <Suspense fallback={<LoadingSpinner />}>
