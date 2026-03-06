@@ -4,7 +4,7 @@
 // Source, Events, NFT Items, Transactions, Deployment
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -61,6 +61,7 @@ import ContractCharts from './ContractCharts';
 import DependencyGraph from './DependencyGraph';
 import SourceTab from './SourceTab';
 import DeploySection from './DeploySection';
+import { useShikiHighlighter, highlightCode } from '../hooks/useShiki';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -141,7 +142,7 @@ const ALL_TABS: TabDef[] = [
   { id: 'events', label: 'Events', icon: Zap },
   { id: 'holders', label: 'Holders', icon: Users, condition: (c) => c?.kind === 'FT' || c?.kind === 'NFT' },
   { id: 'nfts', label: 'NFT Items', icon: Image, condition: (c) => c?.kind === 'NFT' },
-  { id: 'scripts', label: 'Scripts', icon: FileCode },
+  { id: 'scripts', label: 'Common Tx', icon: FileCode },
   { id: 'transactions', label: 'Transactions', icon: Activity },
   { id: 'deployment', label: 'Deployment', icon: Rocket },
 ];
@@ -207,6 +208,13 @@ export default function ContractDetail() {
   const [scriptTextLoading, setScriptTextLoading] = useState(false);
 
   const network: string = 'mainnet';
+  const shikiHighlighter = useShikiHighlighter();
+
+  // Syntax-highlighted script HTML
+  const scriptHighlightedHtml = useMemo(() => {
+    if (!shikiHighlighter || !selectedScriptText) return '';
+    return highlightCode(shikiHighlighter, selectedScriptText, 'cadence', 'cadence-editor');
+  }, [shikiHighlighter, selectedScriptText]);
 
   // Resolve active tab (validate against available tabs)
   const visibleTabs = ALL_TABS.filter((t) => !t.condition || t.condition(contract));
@@ -985,9 +993,16 @@ export default function ContractDetail() {
                         </div>
                         {/* Code */}
                         <div className="flex-1 overflow-auto">
-                          <pre className="p-4 text-[11px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap">
-                            {selectedScriptText}
-                          </pre>
+                          {scriptHighlightedHtml ? (
+                            <div
+                              className="shiki-source-view [&_pre]:!bg-transparent [&_pre]:!m-0 [&_pre]:!p-4 [&_code]:!text-[11px] [&_code]:leading-relaxed"
+                              dangerouslySetInnerHTML={{ __html: scriptHighlightedHtml }}
+                            />
+                          ) : (
+                            <pre className="p-4 text-[11px] leading-relaxed font-mono text-zinc-300 whitespace-pre-wrap">
+                              {selectedScriptText}
+                            </pre>
+                          )}
                         </div>
                       </>
                     ) : selectedScriptHash ? (
