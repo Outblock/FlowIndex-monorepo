@@ -468,6 +468,10 @@ export default function AuditTab({ code, contractName, network }: Props) {
 
           try {
             const evt = JSON.parse(data);
+            // Log every event type except high-frequency deltas
+            if (!['reasoning-delta', 'text-delta', 'tool-input-delta'].includes(evt.type)) {
+              console.log('[audit] event:', evt.type, evt.toolCallId || '', evt.toolName || '', evt.output ? `output:${JSON.stringify(evt.output).slice(0, 120)}` : '');
+            }
             switch (evt.type) {
               case 'reasoning-delta': {
                 const part = getOrCreatePart('thinking');
@@ -547,7 +551,9 @@ export default function AuditTab({ code, contractName, network }: Props) {
                 break;
               }
             }
-          } catch { /* ignore non-JSON lines */ }
+          } catch (parseErr) {
+            console.warn('[audit] JSON parse error:', parseErr, 'data:', data.slice(0, 200));
+          }
         }
       }
 
