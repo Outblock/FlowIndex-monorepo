@@ -210,9 +210,9 @@ export default function SourceTab({ contract, contractName, contractId, versions
   const [diffCodeB, setDiffCodeB] = useState('');
   const [diffLoading, setDiffLoading] = useState(false);
 
-  // Sort versions by block_height descending (most recently deployed first)
+  // Sort versions by version number descending (highest/latest first)
   const sortedVersions = useMemo(
-    () => [...versions].sort((a, b) => (b.block_height ?? 0) - (a.block_height ?? 0)),
+    () => [...versions].sort((a, b) => b.version - a.version),
     [versions],
   );
 
