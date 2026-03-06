@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useShikiHighlighter, highlightCode } from '../hooks/useShiki';
+import { AnimatedMarkdown } from '@outblock/flowtoken';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,7 +52,14 @@ type AuditStatus = 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
 interface ToolCallInfo {
   name: string;
   done: boolean;
+  output?: string;
 }
+
+// Ordered stream parts — rendered sequentially as they arrive
+type StreamPart =
+  | { kind: 'thinking'; text: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'tool'; toolCallId: string; name: string; done: boolean; output?: string };
 
 // ---------------------------------------------------------------------------
 // Severity config
@@ -128,6 +136,64 @@ const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   'best-practice': { label: 'Best Practice', className: 'bg-teal-500/10 text-teal-400' },
   'ai-review': { label: 'AI Review', className: 'bg-amber-500/10 text-amber-400' },
 };
+
+// ---------------------------------------------------------------------------
+// Markdown components for audit output (dark theme, compact)
+// ---------------------------------------------------------------------------
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const auditMarkdownComponents: Record<string, any> = {
+  h1: ({ children }: any) => <h1 className="text-xs font-bold text-white mt-2 mb-1">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-[11px] font-bold text-white mt-2 mb-1">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-[11px] font-semibold text-zinc-200 mt-1.5 mb-0.5">{children}</h3>,
+  p: ({ children }: any) => <p className="mb-1.5 last:mb-0">{children}</p>,
+  strong: ({ children }: any) => <strong className="font-bold text-white">{children}</strong>,
+  em: ({ children }: any) => <em className="italic">{children}</em>,
+  ul: ({ children }: any) => <ul className="ml-3 mb-1.5 space-y-0.5">{children}</ul>,
+  ol: ({ children }: any) => <ol className="ml-3 mb-1.5 space-y-0.5 list-decimal list-inside">{children}</ol>,
+  li: ({ children }: any) => (
+    <li className="flex gap-1.5">
+      <span className="text-emerald-500 shrink-0 mt-[1px]">-</span>
+      <span className="flex-1">{children}</span>
+    </li>
+  ),
+  code: ({ className, children }: any) => {
+    const match = /language-(\w+)/.exec(className || '');
+    const codeString = String(children).replace(/\n$/, '');
+    if (match || codeString.includes('\n')) {
+      return <pre className="bg-zinc-950/70 rounded p-2 my-1 overflow-x-auto"><code className="text-[10px] font-mono text-zinc-300">{codeString}</code></pre>;
+    }
+    return <code className="text-[10px] bg-zinc-700/60 px-1 py-0.5 rounded font-mono text-purple-400">{children}</code>;
+  },
+  pre: ({ children }: any) => <>{children}</>,
+};
+
+const auditAnimatedComponents: Record<string, any> = {
+  h1: ({ animateText, children }: any) => <h1 className="text-xs font-bold text-white mt-2 mb-1">{animateText(children)}</h1>,
+  h2: ({ animateText, children }: any) => <h2 className="text-[11px] font-bold text-white mt-2 mb-1">{animateText(children)}</h2>,
+  h3: ({ animateText, children }: any) => <h3 className="text-[11px] font-semibold text-zinc-200 mt-1.5 mb-0.5">{animateText(children)}</h3>,
+  p: ({ animateText, children }: any) => <p className="mb-1.5 last:mb-0">{animateText(children)}</p>,
+  strong: ({ animateText, children }: any) => <strong className="font-bold text-white">{animateText(children)}</strong>,
+  em: ({ animateText, children }: any) => <em className="italic">{animateText(children)}</em>,
+  ul: ({ children }: any) => <ul className="ml-3 mb-1.5 space-y-0.5">{children}</ul>,
+  ol: ({ children }: any) => <ol className="ml-3 mb-1.5 space-y-0.5 list-decimal list-inside">{children}</ol>,
+  li: ({ animateText, children }: any) => (
+    <li className="flex gap-1.5">
+      <span className="text-emerald-500 shrink-0 mt-[1px]">-</span>
+      <span className="flex-1">{animateText(children)}</span>
+    </li>
+  ),
+  code: ({ className, children }: any) => {
+    const match = /language-(\w+)/.exec(className || '');
+    const codeString = String(children).replace(/\n$/, '');
+    if (match || codeString.includes('\n')) {
+      return <pre className="bg-zinc-950/70 rounded p-2 my-1 overflow-x-auto"><code className="text-[10px] font-mono text-zinc-300">{codeString}</code></pre>;
+    }
+    return <code className="text-[10px] bg-zinc-700/60 px-1 py-0.5 rounded font-mono text-purple-400">{children}</code>;
+  },
+  pre: ({ children }: any) => <>{children}</>,
+};
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ---------------------------------------------------------------------------
 // Parse structured JSON from AI response text
@@ -298,18 +364,26 @@ export default function AuditTab({ code, contractName, network }: Props) {
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Streaming state — refs for accumulation, state for rendering
-  const [reasoningText, setReasoningText] = useState('');
-  const [toolCalls, setToolCalls] = useState<ToolCallInfo[]>([]);
-  const [assistantText, setAssistantText] = useState('');
+  // Ordered stream parts — rendered sequentially as they arrive
+  const [streamParts, setStreamParts] = useState<StreamPart[]>([]);
 
-  const reasoningRef = useRef('');
-  const textRef = useRef('');
-  const toolMapRef = useRef(new Map<string, ToolCallInfo>());
+  // Refs for accumulation (avoid re-render per delta)
+  const partsRef = useRef<StreamPart[]>([]);
+  const fullTextRef = useRef(''); // accumulates all text-delta for JSON parsing
   const abortRef = useRef<AbortController | null>(null);
 
   const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // Helper: get or create the last part of a given kind
+  const getOrCreatePart = (kind: 'thinking' | 'text'): { kind: 'thinking' | 'text'; text: string } => {
+    const parts = partsRef.current;
+    const last = parts[parts.length - 1];
+    if (last && last.kind === kind) return last as { kind: 'thinking' | 'text'; text: string };
+    const newPart = { kind, text: '' } as { kind: 'thinking' | 'text'; text: string };
+    parts.push(newPart);
+    return newPart;
+  };
 
   // Run audit — raw SSE fetch
   const runAudit = useCallback(async () => {
@@ -321,12 +395,9 @@ export default function AuditTab({ code, contractName, network }: Props) {
     setScore('');
     setSelectedId(null);
     setThinkingExpanded(false);
-    setReasoningText('');
-    setToolCalls([]);
-    setAssistantText('');
-    reasoningRef.current = '';
-    textRef.current = '';
-    toolMapRef.current = new Map();
+    setStreamParts([]);
+    partsRef.current = [];
+    fullTextRef.current = '';
 
     // Abort previous request
     abortRef.current?.abort();
@@ -373,11 +444,13 @@ export default function AuditTab({ code, contractName, network }: Props) {
         if (rafId) return;
         rafId = requestAnimationFrame(() => {
           rafId = null;
-          setReasoningText(reasoningRef.current);
-          setAssistantText(textRef.current);
-          setToolCalls(Array.from(toolMapRef.current.values()));
+          // Snapshot current parts array for React
+          setStreamParts([...partsRef.current]);
         });
       };
+
+      // Map toolCallId → index in partsRef for in-place updates
+      const toolIndexMap = new Map<string, number>();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -396,48 +469,75 @@ export default function AuditTab({ code, contractName, network }: Props) {
           try {
             const evt = JSON.parse(data);
             switch (evt.type) {
-              // Thinking / reasoning — server sends `delta` field
-              case 'reasoning-delta':
-                reasoningRef.current += evt.delta || '';
+              case 'reasoning-delta': {
+                const part = getOrCreatePart('thinking');
+                part.text += evt.delta || '';
                 scheduleUpdate();
                 break;
+              }
 
-              // Response text — server sends `delta` field
-              case 'text-delta':
-                textRef.current += evt.delta || '';
+              case 'text-delta': {
+                const delta = evt.delta || '';
+                fullTextRef.current += delta;
+                const part = getOrCreatePart('text');
+                part.text += delta;
                 scheduleUpdate();
                 break;
+              }
 
-              // Tool call started (streaming input)
-              case 'tool-input-start':
-                toolMapRef.current.set(evt.toolCallId, {
+              case 'tool-input-start': {
+                const toolPart: StreamPart = {
+                  kind: 'tool',
+                  toolCallId: evt.toolCallId,
                   name: evt.toolName,
                   done: false,
-                });
+                };
+                partsRef.current.push(toolPart);
+                toolIndexMap.set(evt.toolCallId, partsRef.current.length - 1);
                 scheduleUpdate();
                 break;
+              }
 
-              // Tool input fully available (args parsed)
-              case 'tool-input-available':
-                if (!toolMapRef.current.has(evt.toolCallId)) {
-                  toolMapRef.current.set(evt.toolCallId, {
+              case 'tool-input-available': {
+                // Ensure tool part exists (in case we missed tool-input-start)
+                if (!toolIndexMap.has(evt.toolCallId)) {
+                  const toolPart: StreamPart = {
+                    kind: 'tool',
+                    toolCallId: evt.toolCallId,
                     name: evt.toolName,
                     done: false,
-                  });
+                  };
+                  partsRef.current.push(toolPart);
+                  toolIndexMap.set(evt.toolCallId, partsRef.current.length - 1);
                   scheduleUpdate();
                 }
                 break;
+              }
 
-              // Tool output received
               case 'tool-output-available': {
-                const existing = toolMapRef.current.get(evt.toolCallId);
-                if (existing) {
-                  toolMapRef.current.set(evt.toolCallId, { ...existing, done: true });
+                let outputText = '';
+                if (evt.output?.content) {
+                  for (const p of evt.output.content) {
+                    if (p.type === 'text' && p.text) outputText += p.text;
+                  }
+                } else if (typeof evt.output === 'string') {
+                  outputText = evt.output;
+                }
+
+                const idx = toolIndexMap.get(evt.toolCallId);
+                if (idx !== undefined) {
+                  const existing = partsRef.current[idx] as Extract<StreamPart, { kind: 'tool' }>;
+                  partsRef.current[idx] = { ...existing, done: true, output: outputText };
                 } else {
-                  toolMapRef.current.set(evt.toolCallId, {
+                  const toolPart: StreamPart = {
+                    kind: 'tool',
+                    toolCallId: evt.toolCallId,
                     name: evt.toolName || 'unknown',
                     done: true,
-                  });
+                    output: outputText,
+                  };
+                  partsRef.current.push(toolPart);
+                  toolIndexMap.set(evt.toolCallId, partsRef.current.length - 1);
                 }
                 scheduleUpdate();
                 break;
@@ -449,12 +549,10 @@ export default function AuditTab({ code, contractName, network }: Props) {
 
       // Final flush
       if (rafId) cancelAnimationFrame(rafId);
-      setReasoningText(reasoningRef.current);
-      setAssistantText(textRef.current);
-      setToolCalls(Array.from(toolMapRef.current.values()));
+      setStreamParts([...partsRef.current]);
 
       // Parse findings from the complete response text
-      const result = parseAuditResponse(textRef.current);
+      const result = parseAuditResponse(fullTextRef.current);
       if (result) {
         setFindings(result.findings);
         setSummary(result.summary || '');
@@ -471,6 +569,16 @@ export default function AuditTab({ code, contractName, network }: Props) {
 
   const isStreaming = status === 'streaming' || status === 'connecting';
   const hasStarted = status !== 'idle';
+
+  // Derived: tool call stats from stream parts
+  const toolParts = useMemo(
+    () => streamParts.filter((p): p is Extract<StreamPart, { kind: 'tool' }> => p.kind === 'tool'),
+    [streamParts],
+  );
+  const reasoningText = useMemo(
+    () => streamParts.filter(p => p.kind === 'thinking').map(p => p.text).join(''),
+    [streamParts],
+  );
 
   // Per-line Shiki HTML (expensive — only depends on code)
   const highlightedLines = useMemo(() => {
@@ -587,83 +695,110 @@ export default function AuditTab({ code, contractName, network }: Props) {
         </button>
       </div>
 
-      {/* Streaming progress — shown INSTEAD of code during streaming */}
+      {/* Streaming progress — sequential parts rendered in order */}
       {isStreaming && (
         <div className="flex-1 flex flex-col overflow-auto">
           {/* Status bar */}
           <div className="px-4 py-2.5 border-b border-zinc-800 bg-zinc-950/30 flex items-center gap-3">
             <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />
             <span className="text-xs text-zinc-300 font-medium">
-              {toolCalls.length > 0
-                ? toolCalls.some(t => !t.done)
-                  ? `Running ${formatToolName(toolCalls.filter(t => !t.done)[0]?.name || '')}...`
-                  : assistantText
-                    ? 'Generating report...'
-                    : 'Processing results...'
+              {toolParts.length > 0
+                ? toolParts.some(t => !t.done)
+                  ? `Running ${formatToolName(toolParts.filter(t => !t.done)[0]?.name || '')}...`
+                  : 'Processing results...'
                 : reasoningText
                   ? 'Thinking...'
                   : 'Connecting to AI...'}
             </span>
             <span className="text-[10px] text-zinc-600 ml-auto">
-              {toolCalls.length > 0 && `${toolCalls.filter(t => t.done).length}/${toolCalls.length} checks`}
+              {toolParts.length > 0 && `${toolParts.filter(t => t.done).length}/${toolParts.length} checks`}
             </span>
           </div>
 
-          {/* Tool calls — each as a card */}
-          {toolCalls.length > 0 && (
-            <div className="px-4 py-3 border-b border-zinc-800/50 space-y-2">
-              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-2">Tool Calls</div>
-              {toolCalls.map((tc, i) => (
-                <div key={i} className={`flex items-center gap-2.5 px-3 py-2 rounded-md border ${
-                  tc.done
-                    ? 'border-emerald-500/20 bg-emerald-500/5'
-                    : 'border-amber-500/20 bg-amber-500/5'
-                }`}>
-                  {tc.done
-                    ? <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    : <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />}
-                  <span className={`text-xs font-medium ${tc.done ? 'text-emerald-300' : 'text-amber-300'}`}>
-                    {formatToolName(tc.name)}
-                  </span>
-                  <span className={`text-[10px] ml-auto ${tc.done ? 'text-emerald-500' : 'text-amber-500'}`}>
-                    {tc.done ? 'Complete' : 'Running...'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Thinking — auto-shown live during streaming */}
-          {reasoningText && (
-            <div className="px-4 py-3 flex-1">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Sparkles className="w-3 h-3 text-amber-500/60" />
-                <span className="text-[10px] text-amber-500/60 uppercase tracking-widest font-bold">
-                  Thinking
-                </span>
-                <span className="text-[10px] text-zinc-600">
-                  ({reasoningText.length.toLocaleString()} chars)
-                </span>
+          {/* Sequential stream parts */}
+          <div className="flex-1 px-4 py-3 space-y-3 overflow-y-auto">
+            {streamParts.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 className="w-8 h-8 text-emerald-400/40 animate-spin" />
+                <p className="text-xs text-zinc-500">Connecting to AI auditor...</p>
               </div>
-              <div className="max-h-80 overflow-y-auto rounded-md border border-zinc-800/50 bg-zinc-950/50 p-3">
-                <p className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap font-mono">
-                  {reasoningText}
-                </p>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Placeholder when no thinking yet */}
-          {!reasoningText && toolCalls.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center py-16 gap-3">
-              <Loader2 className="w-8 h-8 text-emerald-400/40 animate-spin" />
-              <p className="text-xs text-zinc-500">Connecting to AI auditor...</p>
-            </div>
-          )}
+            {streamParts.map((part, i) => {
+              if (part.kind === 'thinking') {
+                return (
+                  <div key={`thinking-${i}`}>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <Sparkles className="w-3 h-3 text-amber-500/60" />
+                      <span className="text-[10px] text-amber-500/60 uppercase tracking-widest font-bold">Thinking</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto rounded-md border border-zinc-800/50 bg-zinc-950/50 p-3">
+                      <p className="text-[11px] text-zinc-400 leading-relaxed whitespace-pre-wrap font-mono">
+                        {part.text}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (part.kind === 'tool') {
+                return (
+                  <div key={`tool-${part.toolCallId}`} className={`rounded-md border overflow-hidden ${
+                    part.done
+                      ? 'border-emerald-500/20 bg-emerald-500/5'
+                      : 'border-amber-500/20 bg-amber-500/5'
+                  }`}>
+                    <div className="flex items-center gap-2.5 px-3 py-2">
+                      {part.done
+                        ? <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                        : <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />}
+                      <span className={`text-xs font-medium ${part.done ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        {formatToolName(part.name)}
+                      </span>
+                      <span className={`text-[10px] ml-auto ${part.done ? 'text-emerald-500' : 'text-amber-500'}`}>
+                        {part.done ? 'Complete' : 'Running...'}
+                      </span>
+                    </div>
+                    {part.done && part.output && (
+                      <div className="px-3 pb-2.5 pt-0">
+                        <div className="text-[11px] leading-relaxed text-zinc-300 bg-zinc-950/50 rounded p-2.5 max-h-64 overflow-y-auto">
+                          <AnimatedMarkdown
+                            content={part.output}
+                            animation={['colorTransition', 'blurIn']}
+                            animationDuration="0.5s"
+                            animationTimingFunction="ease-out"
+                            sep="diff"
+                            customComponents={auditAnimatedComponents}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (part.kind === 'text') {
+                return (
+                  <div key={`text-${i}`} className="text-[11px] leading-relaxed text-zinc-300">
+                    <AnimatedMarkdown
+                      content={part.text}
+                      animation={['colorTransition', 'blurIn']}
+                      animationDuration="0.5s"
+                      animationTimingFunction="ease-out"
+                      sep="diff"
+                      customComponents={auditAnimatedComponents}
+                    />
+                  </div>
+                );
+              }
+
+              return null;
+            })}
+          </div>
         </div>
       )}
 
-      {/* Thinking accordion — shown after streaming completes */}
+      {/* After streaming: thinking accordion + tool summary */}
       {!isStreaming && reasoningText && (
         <div className="border-b border-zinc-800/50">
           <button
@@ -689,11 +824,10 @@ export default function AuditTab({ code, contractName, network }: Props) {
         </div>
       )}
 
-      {/* Tool calls summary — shown after streaming completes */}
-      {!isStreaming && toolCalls.length > 0 && (
+      {!isStreaming && toolParts.length > 0 && (
         <div className="px-4 py-1.5 border-b border-zinc-800/50 flex items-center gap-1.5 flex-wrap">
-          {toolCalls.map((tc, i) => (
-            <span key={i} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-400">
+          {toolParts.map((tc) => (
+            <span key={tc.toolCallId} className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-500/10 text-emerald-400">
               <Wrench className="w-2.5 h-2.5" />
               {formatToolName(tc.name)} {'\u2713'}
             </span>
