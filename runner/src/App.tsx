@@ -19,6 +19,7 @@ import type { FlowNetwork } from './flow/networks';
 import { useAuth } from './auth/AuthContext';
 import { useKeys } from './auth/useKeys';
 import { useLocalKeys } from './auth/useLocalKeys';
+import { usePasskeyWallet } from './auth/usePasskeyWallet';
 import { PasswordPrompt } from './components/PasswordPrompt';
 import SignerSelector, { type SignerOption } from './components/SignerSelector';
 import ConnectModal from './components/ConnectModal';
@@ -306,6 +307,14 @@ export default function App() {
     importKeystore, deleteLocalKey, exportKeystore,
     signWithLocalKey, refreshAccounts, createAccount, getPrivateKey, revealSecret,
   } = useLocalKeys();
+  const {
+    login: passkeyLogin,
+    sign: passkeySign,
+    accounts: passkeyAccounts,
+    selectedAccount: selectedPasskeyAccount,
+    loading: passkeyLoading,
+    hasPasskeySupport,
+  } = usePasskeyWallet();
   const [showKeyManager, setShowKeyManager] = useState(false);
   const [keyManagerInitialMode, setKeyManagerInitialMode] = useState<'create' | 'import' | undefined>();
   const [showNetworkMenu, setShowNetworkMenu] = useState(false);
@@ -366,6 +375,13 @@ export default function App() {
         }));
       } else if (signer.type === 'fcl') {
         localStorage.setItem('flow-selected-signer', JSON.stringify({ type: 'fcl' }));
+      } else if (signer.type === 'passkey') {
+        localStorage.setItem('flow-selected-signer', JSON.stringify({
+          type: 'passkey',
+          credentialId: signer.credentialId,
+          flowAddress: signer.flowAddress,
+          publicKeySec1Hex: signer.publicKeySec1Hex,
+        }));
       } else {
         localStorage.removeItem('flow-selected-signer');
       }
@@ -433,6 +449,14 @@ export default function App() {
           }
         } else if (parsed.type === 'fcl') {
           setSelectedSigner({ type: 'fcl' });
+          return;
+        } else if (parsed.type === 'passkey' && parsed.credentialId && parsed.flowAddress) {
+          setSelectedSigner({
+            type: 'passkey',
+            credentialId: parsed.credentialId,
+            flowAddress: parsed.flowAddress,
+            publicKeySec1Hex: parsed.publicKeySec1Hex || '',
+          });
           return;
         }
       }
@@ -725,6 +749,9 @@ export default function App() {
       if (selectedSigner.type === 'local') {
         const { key, account } = selectedSigner;
         await deployContract(activeCode, account.flowAddress, account.keyIndex, buildLocalSignFn(key, account), onResult, account.sigAlgo, account.hashAlgo);
+      } else if (selectedSigner.type === 'passkey') {
+        const passkeySignFn = async (message: string) => await passkeySign(message);
+        await deployContract(activeCode, selectedSigner.flowAddress, 0, passkeySignFn, onResult, 'ECDSA_P256', 'SHA2_256');
       } else {
         setResults([{ type: 'error', data: 'Deploy requires a local key signer. Please select one.' }]);
       }
@@ -733,10 +760,19 @@ export default function App() {
     } else if (selectedSigner.type === 'local') {
       const { key, account } = selectedSigner;
       await executeCustodialTransaction(activeCode, paramValues, account.flowAddress, account.keyIndex, buildLocalSignFn(key, account), onResult, account.sigAlgo, account.hashAlgo);
+    } else if (selectedSigner.type === 'passkey') {
+      const passkeySignFn = async (message: string) => {
+        return await passkeySign(message);
+      };
+      if (codeType === 'contract') {
+        await deployContract(activeCode, selectedSigner.flowAddress, 0, passkeySignFn, onResult, 'ECDSA_P256', 'SHA2_256');
+      } else {
+        await executeCustodialTransaction(activeCode, paramValues, selectedSigner.flowAddress, 0, passkeySignFn, onResult, 'ECDSA_P256', 'SHA2_256');
+      }
     }
 
     setLoading(false);
-  }, [activeCode, codeType, paramValues, loading, selectedSigner, signWithLocalKey, promptForPassword, autoSign]);
+  }, [activeCode, codeType, paramValues, loading, selectedSigner, signWithLocalKey, promptForPassword, autoSign, passkeySign]);
 
   // Auto-retry run after connecting wallet from the modal
   useEffect(() => {
@@ -1313,6 +1349,7 @@ export default function App() {
             onSelect={persistSigner}
             localKeys={localKeys}
             accountsMap={accountsMap}
+            passkeyAccounts={passkeyAccounts}
             onViewAccount={handleViewAccount}
             onOpenKeyManager={() => setShowKeyManager(true)}
             onOpenConnectModal={() => setConnectModalOpen(true)}
@@ -1937,7 +1974,7 @@ export default function App() {
         onRefreshAccounts={refreshAccounts}
       />
       <Suspense fallback={null}>
-        <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
+        <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} onPasskeyLogin={passkeyLogin} hasPasskeySupport={hasPasskeySupport} />
       </Suspense>
     </div>
   );
