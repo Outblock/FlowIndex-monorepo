@@ -677,34 +677,64 @@ export default function ContractDetail() {
                     ];
 
                     return (
-                      <div>
-                        <div className="flex items-start gap-6">
-                          {/* Left: KPI cards */}
-                          <div className="flex-1 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              {tokenMeta?.holder_count != null && tokenMeta.holder_count > 0 && (
-                                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-                                  <div className="text-[10px] text-zinc-500 mb-1">Total Holders</div>
-                                  <div className="text-lg font-semibold text-zinc-100">{formatNumber(tokenMeta.holder_count)}</div>
-                                </div>
-                              )}
-                              {tokenMeta?.total_supply != null && tokenMeta.total_supply > 0 && (
-                                <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-                                  <div className="text-[10px] text-zinc-500 mb-1">Total Supply</div>
-                                  <div className="text-lg font-semibold text-zinc-100">{formatNumber(tokenMeta.total_supply)}</div>
-                                </div>
-                              )}
-                              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-                                <div className="text-[10px] text-zinc-500 mb-1">Top {chartTopN} Concentration</div>
-                                <div className="text-lg font-semibold text-emerald-400">{((topPct) * 100).toFixed(1)}%</div>
-                              </div>
-                              <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
-                                <div className="text-[10px] text-zinc-500 mb-1">Others</div>
-                                <div className="text-lg font-semibold text-zinc-400">{((othersPct) * 100).toFixed(1)}%</div>
-                              </div>
+                      <div className="space-y-3">
+                        {/* KPI cards row */}
+                        <div className="grid grid-cols-4 gap-3">
+                          {tokenMeta?.holder_count != null && tokenMeta.holder_count > 0 && (
+                            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                              <div className="text-[10px] text-zinc-500 mb-1">Total Holders</div>
+                              <div className="text-lg font-semibold text-zinc-100">{formatNumber(tokenMeta.holder_count)}</div>
                             </div>
-                            {/* Top N selector */}
-                            <div className="flex items-center gap-1">
+                          )}
+                          {tokenMeta?.total_supply != null && tokenMeta.total_supply > 0 && (
+                            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                              <div className="text-[10px] text-zinc-500 mb-1">Total Supply</div>
+                              <div className="text-lg font-semibold text-zinc-100">{formatNumber(tokenMeta.total_supply)}</div>
+                            </div>
+                          )}
+                          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                            <div className="text-[10px] text-zinc-500 mb-1">Top {chartTopN} Concentration</div>
+                            <div className="text-lg font-semibold text-emerald-400">{((topPct) * 100).toFixed(1)}%</div>
+                          </div>
+                          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                            <div className="text-[10px] text-zinc-500 mb-1">Others</div>
+                            <div className="text-lg font-semibold text-zinc-400">{((othersPct) * 100).toFixed(1)}%</div>
+                          </div>
+                        </div>
+
+                        {/* Pie chart + Legend side by side */}
+                        <div className="flex items-start gap-4">
+                          {/* Pie chart */}
+                          <div className="w-[220px] h-[220px] shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={pieData}
+                                  dataKey="value"
+                                  nameKey="name"
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={50}
+                                  outerRadius={100}
+                                  paddingAngle={1}
+                                  stroke="none"
+                                >
+                                  {pieData.map((entry, idx) => (
+                                    <Cell key={idx} fill={entry.fill} />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, fontSize: 11 }}
+                                  itemStyle={{ color: '#d4d4d8' }}
+                                  formatter={(value: number | undefined) => `${value ?? 0}%`}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+
+                          {/* Legend + Top N selector */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1 mb-2">
                               <span className="text-xs text-zinc-500 mr-2">Distribution</span>
                               {([50, 100, 200] as const).map((n) => (
                                 <button
@@ -721,44 +751,15 @@ export default function ContractDetail() {
                               ))}
                               {chartHoldersLoading && <Loader2 className="w-3 h-3 text-zinc-500 animate-spin ml-2" />}
                             </div>
-                            {/* Legend */}
-                            <div className="space-y-1">
+                            <div className="space-y-1 max-h-[190px] overflow-y-auto">
                               {pieData.map((entry, i) => (
                                 <div key={i} className="flex items-center gap-2 text-xs">
                                   <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: entry.fill }} />
                                   <span className="text-zinc-400 font-mono truncate">{entry.name}</span>
-                                  <span className="text-zinc-500 ml-auto">{entry.value}%</span>
+                                  <span className="text-zinc-500 ml-auto shrink-0">{entry.value}%</span>
                                 </div>
                               ))}
                             </div>
-                          </div>
-
-                          {/* Right: Pie chart */}
-                          <div className="w-[260px] h-[260px] shrink-0">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={pieData}
-                                  dataKey="value"
-                                  nameKey="name"
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={60}
-                                  outerRadius={110}
-                                  paddingAngle={1}
-                                  stroke="none"
-                                >
-                                  {pieData.map((entry, idx) => (
-                                    <Cell key={idx} fill={entry.fill} />
-                                  ))}
-                                </Pie>
-                                <Tooltip
-                                  contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8, fontSize: 11 }}
-                                  itemStyle={{ color: '#d4d4d8' }}
-                                  formatter={(value: number | undefined) => `${value ?? 0}%`}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
                           </div>
                         </div>
                       </div>
