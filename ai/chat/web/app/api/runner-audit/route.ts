@@ -105,6 +105,16 @@ After your analysis, output ONLY this JSON block. No extra text before or after.
 - If the contract looks clean, say so honestly. Don't invent issues.
 - Output ONLY the JSON block. No prose, no explanation.`;
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
 export async function POST(req: Request) {
   const {
     messages,
@@ -161,5 +171,5 @@ ${diagnostics}`;
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return result.toUIMessageStreamResponse({ headers: CORS_HEADERS });
 }
