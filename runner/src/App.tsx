@@ -35,8 +35,6 @@ import { useGitHub } from './github/useGitHub';
 import GitHubConnect from './components/GitHubConnect';
 import GitCommitPanel from './components/GitCommitPanel';
 import DeployStatus from './components/DeployStatus';
-import DeployPanel from './components/DeployPanel';
-import DeploySettings from './components/DeploySettings';
 import { useDeployEvents } from './github/useDeployEvents';
 import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn, Share2, X, MessageSquare, Settings, Cpu, Server, ChevronDown, Globe, Sparkles, Github } from 'lucide-react';
 import type { LspMode } from './editor/useLsp';
@@ -483,7 +481,6 @@ export default function App() {
     return undefined;
   });
   const [showGitHubConnect, setShowGitHubConnect] = useState(false);
-  const [showDeploySettings, setShowDeploySettings] = useState(false);
   const [gitPushing, setGitPushing] = useState(false);
   const [lastPulledFiles, setLastPulledFiles] = useState<Map<string, string>>(new Map());
   const [hasPulled, setHasPulled] = useState(false);
@@ -1217,6 +1214,7 @@ export default function App() {
             </button>
           )}
           <h1 className="text-sm font-semibold tracking-tight">{isMobile ? 'Runner' : 'Cadence Runner'}</h1>
+          <a href="/deploy" className="ml-2 px-2 py-0.5 text-[10px] text-zinc-500 hover:text-zinc-300 rounded border border-zinc-700 hover:border-zinc-600 transition-colors">Deploy</a>
 
           {/* LSP status indicator */}
           <div className="relative group/lsp">
@@ -1511,28 +1509,28 @@ export default function App() {
                   )}
                 </div>
               )}
-              {/* GitHub integration */}
-              {user && cloudMeta.id && (
+              {/* GitHub integration — compact link to deploy page */}
+              {user && cloudMeta.id && github.connection && (
                 <div className="shrink-0 border-t border-zinc-700">
-                  {github.connection ? (
-                    <DeployPanel
-                      connection={github.connection}
-                      environments={github.environments}
-                      deployments={github.deployments}
-                      onPromote={github.promote}
-                      onDispatch={github.dispatchWorkflow}
-                      onRefresh={() => { github.fetchDeployments(); github.fetchRuns(); }}
-                      onOpenSettings={() => setShowDeploySettings(true)}
-                    />
-                  ) : (
-                    <button
-                      onClick={() => setShowGitHubConnect(true)}
-                      className="flex items-center gap-1.5 w-full px-3 py-2 text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-                    >
-                      <Github className="w-3 h-3" />
-                      <span>GitHub</span>
-                    </button>
-                  )}
+                  <a
+                    href="/deploy"
+                    className="flex items-center gap-1.5 w-full px-3 py-2 text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  >
+                    <Github className="w-3 h-3" />
+                    <span className="truncate">{github.connection.repo_owner}/{github.connection.repo_name}</span>
+                    <span className="ml-auto text-emerald-500 text-[9px]">&#9679;</span>
+                  </a>
+                </div>
+              )}
+              {user && cloudMeta.id && !github.connection && (
+                <div className="shrink-0 border-t border-zinc-700">
+                  <button
+                    onClick={() => setShowGitHubConnect(true)}
+                    className="flex items-center gap-1.5 w-full px-3 py-2 text-[11px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  >
+                    <Github className="w-3 h-3" />
+                    <span>GitHub</span>
+                  </button>
                 </div>
               )}
               {/* Settings */}
@@ -1860,24 +1858,6 @@ export default function App() {
         />
       )}
 
-      {/* Deploy Settings Modal */}
-      {showDeploySettings && github.connection && (
-        <DeploySettings
-          connection={github.connection}
-          environments={github.environments}
-          onUpsertEnv={github.upsertEnvironment}
-          onDeleteEnv={github.deleteEnvironment}
-          onConfigureSecrets={github.configureSecrets}
-          onSetupWorkflow={async (net) => {
-            await github.setupWorkflow(net);
-          }}
-          onDisconnect={async () => {
-            await github.disconnect();
-            setShowDeploySettings(false);
-          }}
-          onClose={() => setShowDeploySettings(false)}
-        />
-      )}
 
       {/* Key Manager Panel (overlay) */}
       {showKeyManager && (
