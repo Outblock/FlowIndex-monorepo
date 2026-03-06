@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import Router from './Router';
 import { AuthProvider } from './auth/AuthContext';
 import './index.css';
 
@@ -10,7 +10,7 @@ document.getElementById('loading')?.remove();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AuthProvider>
-      <App />
+      <Router />
     </AuthProvider>
   </React.StrictMode>
 );
