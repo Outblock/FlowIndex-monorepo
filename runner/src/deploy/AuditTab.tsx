@@ -59,7 +59,7 @@ interface ToolCallInfo {
 type StreamPart =
   | { kind: 'thinking'; text: string }
   | { kind: 'text'; text: string }
-  | { kind: 'tool'; toolCallId: string; name: string; done: boolean; output?: string };
+  | { kind: 'tool'; toolCallId: string; name: string; done: boolean; output?: string; inputChars: number; inputReady: boolean };
 
 // ---------------------------------------------------------------------------
 // Severity config
@@ -496,6 +496,8 @@ export default function AuditTab({ code, contractName, network }: Props) {
                   toolCallId: evt.toolCallId,
                   name: evt.toolName,
                   done: false,
+                  inputChars: 0,
+                  inputReady: false,
                 };
                 partsRef.current.push(toolPart);
                 toolIndexMap.set(evt.toolCallId, partsRef.current.length - 1);
@@ -503,19 +505,38 @@ export default function AuditTab({ code, contractName, network }: Props) {
                 break;
               }
 
+              case 'tool-input-delta': {
+                // Track input streaming progress
+                const tidx = toolIndexMap.get(evt.toolCallId);
+                if (tidx !== undefined) {
+                  const tp = partsRef.current[tidx] as Extract<StreamPart, { kind: 'tool' }>;
+                  tp.inputChars += (evt.inputTextDelta || '').length;
+                  scheduleUpdate();
+                }
+                break;
+              }
+
               case 'tool-input-available': {
-                // Ensure tool part exists (in case we missed tool-input-start)
-                if (!toolIndexMap.has(evt.toolCallId)) {
+                console.log('[audit] tool-input-available', evt.toolCallId, evt.toolName);
+                const tidx2 = toolIndexMap.get(evt.toolCallId);
+                if (tidx2 !== undefined) {
+                  const tp = partsRef.current[tidx2] as Extract<StreamPart, { kind: 'tool' }>;
+                  tp.inputReady = true;
+                } else {
                   const toolPart: StreamPart = {
                     kind: 'tool',
                     toolCallId: evt.toolCallId,
                     name: evt.toolName,
                     done: false,
+                    inputChars: 0,
+                    inputReady: true,
                   };
                   partsRef.current.push(toolPart);
                   toolIndexMap.set(evt.toolCallId, partsRef.current.length - 1);
-                  scheduleUpdate();
                 }
+                // Force immediate update — important state change
+                if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+                setStreamParts([...partsRef.current]);
                 break;
               }
 
@@ -533,7 +554,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
                 const idx = toolIndexMap.get(evt.toolCallId);
                 if (idx !== undefined) {
                   const existing = partsRef.current[idx] as Extract<StreamPart, { kind: 'tool' }>;
-                  partsRef.current[idx] = { ...existing, done: true, output: outputText };
+                  partsRef.current[idx] = { ...existing, done: true, output: outputText, inputReady: true };
                 } else {
                   const toolPart: StreamPart = {
                     kind: 'tool',
@@ -541,6 +562,8 @@ export default function AuditTab({ code, contractName, network }: Props) {
                     name: evt.toolName || 'unknown',
                     done: true,
                     output: outputText,
+                    inputChars: 0,
+                    inputReady: true,
                   };
                   partsRef.current.push(toolPart);
                   toolIndexMap.set(evt.toolCallId, partsRef.current.length - 1);
@@ -752,21 +775,36 @@ export default function AuditTab({ code, contractName, network }: Props) {
               }
 
               if (part.kind === 'tool') {
+                const statusText = part.done
+                  ? 'Complete'
+                  : part.inputReady
+                    ? 'Analyzing...'
+                    : part.inputChars > 0
+                      ? `Sending ${(part.inputChars / 1000).toFixed(1)}k chars...`
+                      : 'Starting...';
                 return (
                   <div key={`tool-${part.toolCallId}`} className={`rounded-md border overflow-hidden ${
                     part.done
                       ? 'border-emerald-500/20 bg-emerald-500/5'
-                      : 'border-amber-500/20 bg-amber-500/5'
+                      : part.inputReady
+                        ? 'border-blue-500/20 bg-blue-500/5'
+                        : 'border-amber-500/20 bg-amber-500/5'
                   }`}>
                     <div className="flex items-center gap-2.5 px-3 py-2">
                       {part.done
                         ? <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                        : <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />}
-                      <span className={`text-xs font-medium ${part.done ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        : part.inputReady
+                          ? <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                          : <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />}
+                      <span className={`text-xs font-medium ${
+                        part.done ? 'text-emerald-300' : part.inputReady ? 'text-blue-300' : 'text-amber-300'
+                      }`}>
                         {formatToolName(part.name)}
                       </span>
-                      <span className={`text-[10px] ml-auto ${part.done ? 'text-emerald-500' : 'text-amber-500'}`}>
-                        {part.done ? 'Complete' : 'Running...'}
+                      <span className={`text-[10px] ml-auto ${
+                        part.done ? 'text-emerald-500' : part.inputReady ? 'text-blue-500' : 'text-amber-500'
+                      }`}>
+                        {statusText}
                       </span>
                     </div>
                     {part.done && part.output && (
