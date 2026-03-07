@@ -205,9 +205,9 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
                   rel="noopener noreferrer"
                   className="text-emerald-400 hover:text-emerald-300 transition-colors"
                 >
-                  self-custody
+                  passkey
                 </a>
-                {' '}wallet
+                <span className="text-zinc-600">(self-custody)</span> wallet
               </p>
             </div>
 
