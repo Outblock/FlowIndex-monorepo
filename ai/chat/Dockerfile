@@ -35,11 +35,8 @@ RUN npx next build
 
 # Standalone install: strip workspace:* deps then npm install for portable node_modules
 # (bun's node_modules symlinks break when copied between Docker stages)
-RUN node -e "\
-const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));\
-for(const t of ['dependencies','devDependencies','peerDependencies'])\
-  for(const k of Object.keys(p[t]||{})){if(String(p[t][k]).startsWith('workspace:'))delete p[t][k];}\
-require('fs').writeFileSync('package.json',JSON.stringify(p,null,2));" \
+RUN node -e 'var p=JSON.parse(require("fs").readFileSync("package.json","utf8"));["dependencies","devDependencies","peerDependencies"].forEach(function(t){Object.keys(p[t]||{}).forEach(function(k){if(String(p[t][k]).startsWith("workspace:"))delete p[t][k]})});require("fs").writeFileSync("package.json",JSON.stringify(p,null,2))' \
+ && cat package.json \
  && rm -f bun.lock bun.lockb package-lock.json \
  && npm install --omit=dev --legacy-peer-deps
 
