@@ -198,7 +198,7 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
             <div className="px-6 pt-8 pb-4 text-center">
               <h1 className="text-base font-semibold text-white tracking-tight">Sign in</h1>
               <p className="text-[11px] text-zinc-500 mt-1 font-mono">
-                Save projects, sync across devices
+                Save projects, self-custody wallet
               </p>
             </div>
 
