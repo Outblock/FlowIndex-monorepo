@@ -45,7 +45,14 @@ function RootComponent() {
         <RootDocument>
             <ThemeProvider>
               <FontProvider>
-              <AuthProvider>
+              <AuthProvider config={{
+                gotrueUrl: import.meta.env.VITE_GOTRUE_URL || 'http://localhost:9999',
+                passkeyAuthUrl: `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/passkey-auth`,
+                cookieDomain: '.flowindex.io',
+                enableRoles: true,
+                rpId: import.meta.env.VITE_PASSKEY_RP_ID || (typeof window !== 'undefined' ? window.location.hostname : 'localhost'),
+                rpName: import.meta.env.VITE_PASSKEY_RP_NAME || 'FlowIndex Developer Portal',
+              }}>
                 <WebSocketProvider>
                     <MobileMenuProvider>
                     <div className="bg-gray-50 dark:bg-black min-h-screen text-zinc-700 dark:text-zinc-300 antialiased selection:bg-nothing-green selection:text-black flex transition-colors duration-300">

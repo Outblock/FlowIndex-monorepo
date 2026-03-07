@@ -1,8 +1,26 @@
 FROM oven/bun:1 AS frontend-builder
 WORKDIR /app
-COPY runner/package.json runner/bun.lock* ./
-RUN bun install --frozen-lockfile
-COPY runner/ .
+
+# Workspace root config + lockfile
+COPY package.json bun.lock ./
+
+# Shared monorepo packages (needed for workspace:* resolution)
+COPY packages/ ./packages/
+
+# Runner package.json
+COPY runner/package.json ./runner/
+
+# Install all workspace deps
+RUN cd runner && bun install
+
+# Build shared packages (generate dist/ via tsup)
+RUN cd packages/flow-passkey && bun run build \
+ && cd ../auth-core && bun run build \
+ && cd ../auth-ui && bun run build
+
+# Copy runner source and build
+COPY runner/ ./runner/
+WORKDIR /app/runner
 ARG VITE_AI_CHAT_URL=https://ai.flowindex.io
 ARG VITE_SUPABASE_URL=
 ARG VITE_SUPABASE_ANON_KEY=
@@ -16,7 +34,7 @@ RUN bun run build
 FROM oven/bun:1 AS server-builder
 WORKDIR /app/server
 COPY runner/server/package.json runner/server/bun.lock* ./
-RUN bun install --frozen-lockfile
+RUN bun install
 COPY runner/server/ .
 RUN bun run build
 
@@ -34,7 +52,7 @@ RUN FLOW_CLI_VERSION=v2.14.3 \
     && chmod +x /usr/local/bin/flow \
     && rm -f /tmp/flow-cli.tar.gz
 # Copy frontend static files
-COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+COPY --from=frontend-builder /app/runner/dist /usr/share/nginx/html
 # Copy server
 COPY --from=server-builder /app/server/dist /app/server
 COPY --from=server-builder /app/server/node_modules /app/server/node_modules

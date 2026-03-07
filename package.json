@@ -1,0 +1,19 @@
+{
+  "name": "flowindex",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "frontend",
+    "runner",
+    "ai/chat/web"
+  ],
+  "devDependencies": {
+    "nx": "^21.3.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build:packages": "nx run-many -t build --projects=tag:package",
+    "lint:packages": "nx run-many -t lint --projects=tag:package"
+  }
+}

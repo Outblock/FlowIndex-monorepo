@@ -77,15 +77,18 @@ jobs:
               - '.github/workflows/deploy.yml'
             frontend:
               - 'frontend/**'
+              - 'packages/**'
               - '.github/workflows/deploy.yml'
             runner:
               - 'runner/**'
+              - 'packages/**'
               - '.github/workflows/deploy.yml'
             docs:
               - 'devportal/**'
               - 'docs/**'
             ai-chat:
               - 'ai/chat/**'
+              - 'packages/**'
               - '.github/workflows/deploy.yml'
             supabase:
               - 'supabase/**'
