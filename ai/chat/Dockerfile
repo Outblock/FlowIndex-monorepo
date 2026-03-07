@@ -1,12 +1,29 @@
 # Stage 1: Build Next.js frontend
 FROM node:22-slim AS frontend
 RUN npm install -g bun
-WORKDIR /app/web
-COPY ai/chat/web/package.json ai/chat/web/bun.lock ./
-RUN bun install
-COPY ai/chat/web/ .
+WORKDIR /app
+
+# Workspace root config + lockfile
+COPY package.json bun.lock ./
+
+# Shared monorepo packages (needed for workspace:* resolution)
+COPY packages/ ./packages/
+
+# AI chat web package.json
+COPY ai/chat/web/package.json ./ai/chat/web/
+
+# Install all workspace deps
+RUN cd ai/chat/web && bun install
+
+# Build shared packages (generate dist/ via tsup)
+RUN cd packages/flow-passkey && bun run build \
+ && cd ../auth-core && bun run build
+
+# Copy app source and build
+COPY ai/chat/web/ ./ai/chat/web/
 # Skills directory (loadSkill tool reads at runtime via path walk-up)
 COPY skills/ /app/skills/
+WORKDIR /app/ai/chat/web
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
@@ -28,9 +45,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ai/chat/ .
 
 # Copy built frontend assets + node_modules from stage 1
-COPY --from=frontend /app/web/.next ./web/.next
-COPY --from=frontend /app/web/node_modules ./web/node_modules
-COPY --from=frontend /app/web/package.json ./web/package.json
+COPY --from=frontend /app/ai/chat/web/.next ./web/.next
+COPY --from=frontend /app/ai/chat/web/node_modules ./web/node_modules
+COPY --from=frontend /app/ai/chat/web/package.json ./web/package.json
 
 # Skills for runtime loadSkill tool (Next.js SSR reads these on request)
 COPY --from=frontend /app/skills ./skills

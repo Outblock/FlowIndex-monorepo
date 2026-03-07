@@ -3,11 +3,27 @@ FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-COPY frontend/package.json frontend/bun.lock ./
-COPY frontend/packages/ ./packages/
-RUN bun install
+# Workspace root config + lockfile
+COPY package.json bun.lock ./
 
-COPY frontend/ .
+# Shared monorepo packages (needed for workspace:* resolution)
+COPY packages/ ./packages/
+
+# Frontend package.json (+ local packages dir inside frontend)
+COPY frontend/package.json ./frontend/
+COPY frontend/packages/ ./frontend/packages/
+
+# Install all workspace deps
+RUN cd frontend && bun install
+
+# Build shared packages (generate dist/ via tsup)
+RUN cd packages/flow-passkey && bun run build \
+ && cd ../auth-core && bun run build \
+ && cd ../auth-ui && bun run build
+
+# Copy frontend source and build
+COPY frontend/ ./frontend/
+WORKDIR /app/frontend
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 ARG VITE_DOCS_URL
@@ -38,7 +54,7 @@ WORKDIR /app
 RUN apk add --no-cache nginx gettext
 
 # SSR build output produced by Nitro
-COPY --from=builder /app/.output /app/.output
+COPY --from=builder /app/frontend/.output /app/.output
 
 # Nginx config template + entrypoint
 COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
