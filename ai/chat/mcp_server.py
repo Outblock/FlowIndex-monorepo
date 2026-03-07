@@ -94,6 +94,14 @@ from starlette.responses import JSONResponse
 async def auth_middleware(request: Request, call_next):
     """ASGI middleware that checks API key auth before forwarding to FastMCP."""
 
+    # Allow in-container direct calls (e.g. /api/chat -> http://localhost:8085/mcp)
+    # without requiring an API key. External traffic proxied by nginx includes
+    # X-Forwarded-For and will still go through normal auth checks.
+    client_host = (request.client.host if request.client else "") or ""
+    xff = request.headers.get("x-forwarded-for", "").strip()
+    if not xff and client_host in ("127.0.0.1", "::1", "0:0:0:0:0:0:0:1", "localhost"):
+        return await call_next(request)
+
     # Skip auth if disabled
     if not config.MCP_AUTH_ENABLED:
         return await call_next(request)
