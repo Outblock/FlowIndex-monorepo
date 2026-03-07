@@ -1,5 +1,5 @@
 import { useAuth } from '@flowindex/auth-ui';
-import type { PasskeyAccount } from '@flowindex/auth-ui';
+import type { PasskeyAccount, ProvisionResult } from '@flowindex/auth-ui';
 import type { PasskeySignResult } from '@flowindex/flow-passkey';
 
 export type { PasskeyAccount, PasskeySignResult };
@@ -16,7 +16,9 @@ export interface ProvisionState {
   testnet: ProvisionStatus;
 }
 
-const noop = async () => { throw new Error('Passkey not configured'); };
+function notConfigured(name: string): never {
+  throw new Error(`Passkey not configured: ${name}`);
+}
 
 export function usePasskeyWallet() {
   const { passkey } = useAuth();
@@ -33,14 +35,14 @@ export function usePasskeyWallet() {
     hasPasskeySupport: passkey?.hasSupport ?? false,
     hasBoundPasskey: passkey?.hasBoundPasskey ?? false,
 
-    register: passkey?.register ?? noop,
-    createPasskey: passkey?.register ?? noop,
-    login: passkey?.login ?? noop,
+    register: passkey?.register ?? (async (_n?: string): Promise<{ credentialId: string; publicKeySec1Hex: string }> => notConfigured('register')),
+    createPasskey: passkey?.register ?? (async (_n?: string): Promise<{ credentialId: string; publicKeySec1Hex: string }> => notConfigured('createPasskey')),
+    login: passkey?.login ?? (async (): Promise<void> => notConfigured('login')),
     startConditionalLogin: passkey?.startConditionalLogin ?? (() => new AbortController()),
-    sign: passkey?.sign ?? (noop as any),
-    provisionAccounts: passkey?.provisionAccounts ?? (noop as any),
-    pollProvisionTx: passkey?.pollProvisionTx ?? (noop as any),
-    saveProvisionedAddress: passkey?.saveProvisionedAddress ?? (noop as any),
+    sign: passkey?.sign ?? (async (_msg: string): Promise<PasskeySignResult> => notConfigured('sign')),
+    provisionAccounts: passkey?.provisionAccounts ?? (async (_id: string): Promise<ProvisionResult> => notConfigured('provisionAccounts')),
+    pollProvisionTx: passkey?.pollProvisionTx ?? (async (_txId: string, _net: 'mainnet' | 'testnet'): Promise<string> => notConfigured('pollProvisionTx')),
+    saveProvisionedAddress: passkey?.saveProvisionedAddress ?? (async (_id: string, _net: string, _addr: string): Promise<void> => notConfigured('saveProvisionedAddress')),
     refreshPasskeyState: passkey?.refreshState ?? (async () => {}),
 
     provisionAccount: async (credentialId?: string) => {
