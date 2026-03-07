@@ -198,7 +198,16 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
             <div className="px-6 pt-8 pb-4 text-center">
               <h1 className="text-base font-semibold text-white tracking-tight">Sign in</h1>
               <p className="text-[11px] text-zinc-500 mt-1 font-mono">
-                Save projects, self-custody wallet
+                Save projects, create{' '}
+                <a
+                  href="https://developers.flow.com/build/cadence/advanced-concepts/passkeys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-400 hover:text-emerald-300 transition-colors"
+                >
+                  self-custody
+                </a>
+                {' '}wallet
               </p>
             </div>
 
