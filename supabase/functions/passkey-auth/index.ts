@@ -240,6 +240,7 @@ serve(async (req: Request) => {
             expectedOrigin: allowedOrigins,
             expectedRPID: rpId as string,
             supportedAlgorithmIDs: SUPPORTED_ALGORITHMS,
+            requireUserVerification: false,
           });
 
           if (!verification.verified || !verification.registrationInfo) {
@@ -400,6 +401,7 @@ serve(async (req: Request) => {
             expectedChallenge: challenge.challenge,
             expectedOrigin: allowedOrigins,
             expectedRPID: rpId as string,
+            requireUserVerification: false,
             credential: {
               id: credential.id,
               publicKey: publicKeyBytes,
