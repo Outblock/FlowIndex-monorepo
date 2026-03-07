@@ -295,15 +295,22 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
               <p className="text-[11px] text-zinc-500 mt-1 font-mono">
                 Save projects, sync across devices
               </p>
-              {/* Passkey conditional UI — visible input triggers browser autofill */}
+              {/* Passkey conditional UI — input triggers browser autofill on focus */}
               {hasPasskeySupport && (
-                <input
-                  type="text"
-                  autoComplete="webauthn"
-                  placeholder="Passkey"
-                  readOnly
-                  className="w-full mt-3 px-3 py-2 bg-zinc-950 border border-zinc-700/50 text-zinc-400 placeholder:text-zinc-600 text-xs font-mono rounded-none focus:outline-none focus:border-emerald-500/40 cursor-default"
-                />
+                <div className="relative mt-3">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" />
+                    <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+                  </svg>
+                  <input
+                    type="text"
+                    autoComplete="webauthn"
+                    autoFocus
+                    placeholder="Use a passkey…"
+                    className="w-full pl-9 pr-3 py-2.5 bg-zinc-950 border border-zinc-700 text-zinc-300 placeholder:text-zinc-500 text-xs font-mono focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/10 cursor-default caret-transparent"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handlePasskey(); }}
+                  />
+                </div>
               )}
             </div>
 
@@ -385,7 +392,7 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
                     transition={{ duration: 0.15 }}
                     className="space-y-2"
                   >
-                    {/* Passkey */}
+                    {/* Passkey button fallback (if conditional UI doesn't trigger) */}
                     {hasPasskeySupport && (
                       <button
                         type="button"
@@ -398,7 +405,7 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
                           <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
                         </svg>
                         <span className="flex-1 text-left">
-                          {passkeyLoading ? 'Authenticating...' : 'Continue with Passkey'}
+                          {passkeyLoading ? 'Authenticating...' : 'Sign in with Passkey'}
                         </span>
                         {!passkeyLoading && (
                           <ArrowRight className="w-3.5 h-3.5 text-zinc-600 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
