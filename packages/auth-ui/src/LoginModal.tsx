@@ -27,11 +27,10 @@ interface LoginModalProps {
   open: boolean;
   onClose: () => void;
   redirectTo?: string;
-  showPasskey?: boolean;
   className?: string;
 }
 
-export default function LoginModal({ open, onClose, redirectTo: redirectToProp, showPasskey, className }: LoginModalProps) {
+export default function LoginModal({ open, onClose, redirectTo: redirectToProp, className }: LoginModalProps) {
   const { signInWithProvider, sendMagicLink, verifyOtp, passkey } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -251,20 +250,6 @@ export default function LoginModal({ open, onClose, redirectTo: redirectToProp, 
                     transition={{ duration: 0.15 }}
                     className="space-y-2"
                   >
-                    {/* Passkey */}
-                    {showPasskey && passkey && passkey.hasSupport && (
-                      <button
-                        type="button"
-                        onClick={handlePasskeyLogin}
-                        disabled={loading}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 bg-[var(--auth-accent,#10b981)] hover:opacity-90 text-white font-medium rounded-lg transition-all text-xs group active:scale-[0.98] disabled:opacity-50"
-                      >
-                        <KeyRound className="w-4 h-4 shrink-0" />
-                        <span className="flex-1 text-left">Sign in with Passkey</span>
-                        <ArrowRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
-                      </button>
-                    )}
-
                     {/* GitHub */}
                     <button
                       type="button"
@@ -354,6 +339,26 @@ export default function LoginModal({ open, onClose, redirectTo: redirectToProp, 
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Passkey login — always shown when supported */}
+              {passkey && passkey.hasSupport && (
+                <>
+                  <div className="flex items-center gap-3 my-3">
+                    <div className="flex-1 h-px bg-zinc-800" />
+                    <span className="text-[10px] text-zinc-600 font-mono uppercase tracking-wider">or</span>
+                    <div className="flex-1 h-px bg-zinc-800" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePasskeyLogin}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-zinc-400 hover:text-[var(--auth-accent,#10b981)] transition-colors text-[11px] font-mono disabled:opacity-50"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    Already have a passkey? Sign in
+                  </button>
+                </>
+              )}
             </div>
           </motion.div>
         )}
