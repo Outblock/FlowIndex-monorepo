@@ -570,32 +570,73 @@ serve(async (req: Request) => {
           break;
         }
 
-        const ACCOUNT_API = Deno.env.get('FLOW_ACCOUNT_API') || 'https://lilico.app/api/proxy/account';
+        // Use the same Lilico/FRW OpenAPI as flow-keys edge function
+        const lilicoBase = 'https://openapi.lilico.app';
+        const lilicoEndpoint = `${lilicoBase}/v1/address`;
         const trimmedKey = cred.public_key_sec1_hex.startsWith('04')
           ? cred.public_key_sec1_hex.slice(2)
           : cred.public_key_sec1_hex;
 
-        const accountRes = await fetch(ACCOUNT_API, {
+        const accountRes = await fetch(lilicoEndpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: Deno.env.get('LILICO_API_KEY') || '',
+          },
           body: JSON.stringify({
             publicKey: trimmedKey,
             signatureAlgorithm: 'ECDSA_P256',
             hashAlgorithm: 'SHA2_256',
+            weight: 1000,
           }),
         });
 
         if (!accountRes.ok) {
           const errBody = await accountRes.text();
-          result = error('PROVISION_FAILED', `Account creation failed: ${errBody}`);
+          console.error('[passkey-auth] Lilico API error:', accountRes.status, errBody);
+          result = error('PROVISION_FAILED', `Account creation failed (${accountRes.status})`);
           break;
         }
 
         const accountJson = await accountRes.json();
-        const flowAddress = accountJson.address;
+        const txId = accountJson.txId || accountJson.data?.txId;
+        if (!txId) {
+          console.error('[passkey-auth] Lilico API: no txId:', JSON.stringify(accountJson));
+          result = error('PROVISION_FAILED', 'No txId in account creation response');
+          break;
+        }
+
+        // Poll for sealed transaction to extract new account address
+        const accessNode = 'https://rest-mainnet.onflow.org';
+        let flowAddress: string | null = null;
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const txRes = await fetch(`${accessNode}/v1/transaction_results/${txId}`);
+          if (!txRes.ok) continue;
+          const txResult = await txRes.json();
+          if (txResult.status !== 'SEALED') continue;
+          if (txResult.error_message) {
+            result = error('PROVISION_FAILED', `Account tx failed: ${txResult.error_message}`);
+            break;
+          }
+          for (const event of txResult.events || []) {
+            if (event.type === 'flow.AccountCreated') {
+              try {
+                const payload = JSON.parse(atob(event.payload));
+                const addr = payload?.value?.fields?.find(
+                  (f: { name: string }) => f.name === 'address',
+                )?.value?.value;
+                if (addr) { flowAddress = addr.replace(/^0x/, ''); break; }
+              } catch { /* try next event */ }
+            }
+          }
+          if (flowAddress) break;
+        }
 
         if (!flowAddress) {
-          result = error('PROVISION_FAILED', 'No address in account creation response');
+          if (!result || result.success !== false) {
+            result = error('PROVISION_FAILED', 'Account creation timed out');
+          }
           break;
         }
 
@@ -603,6 +644,7 @@ serve(async (req: Request) => {
           .update({ flow_address: flowAddress })
           .eq('id', provCredId);
 
+        console.log('[passkey-auth] Account provisioned:', flowAddress, 'for credential:', provCredId);
         result = success({ address: flowAddress });
         break;
       }
