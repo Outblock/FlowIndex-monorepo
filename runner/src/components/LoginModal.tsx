@@ -350,7 +350,7 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
                           <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
                         </svg>
                         <span className="flex-1 text-left">
-                          {passkeyLoading ? 'Authenticating...' : 'Sign in with Passkey'}
+                          {passkeyLoading ? 'Authenticating...' : 'Continue with Passkey'}
                         </span>
                         {!passkeyLoading && (
                           <ArrowRight className="w-3.5 h-3.5 text-zinc-600 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
