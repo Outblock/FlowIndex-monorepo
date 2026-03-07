@@ -34,8 +34,10 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        working-directory: frontend
         run: bun install --frozen-lockfile
+
+      - name: Build shared packages
+        run: bun run build:packages
 
       - name: Lint
         working-directory: frontend
