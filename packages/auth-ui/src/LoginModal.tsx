@@ -345,17 +345,18 @@ export default function LoginModal({ open, onClose, redirectTo: redirectToProp, 
                 <>
                   <div className="flex items-center gap-3 my-3">
                     <div className="flex-1 h-px bg-zinc-800" />
-                    <span className="text-[10px] text-zinc-600 font-mono uppercase tracking-wider">or</span>
+                    <span className="text-[10px] text-zinc-600 font-mono uppercase tracking-wider">Already have a passkey?</span>
                     <div className="flex-1 h-px bg-zinc-800" />
                   </div>
                   <button
                     type="button"
                     onClick={handlePasskeyLogin}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-zinc-400 hover:text-[var(--auth-accent,#10b981)] transition-colors text-[11px] font-mono disabled:opacity-50"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 bg-white hover:bg-zinc-100 text-zinc-900 font-medium rounded-lg transition-all text-xs group active:scale-[0.98] disabled:opacity-50"
                   >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    Already have a passkey? Sign in
+                    <KeyRound className="w-4 h-4 shrink-0" />
+                    <span className="flex-1 text-left">Sign in with Passkey</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-zinc-400 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                   </button>
                 </>
               )}
