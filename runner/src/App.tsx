@@ -61,14 +61,6 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
-function getPasskeyErrorCode(err: unknown): string | null {
-  if (!err || typeof err !== 'object') return null;
-  if ('code' in err && typeof (err as { code?: unknown }).code === 'string') {
-    return (err as { code: string }).code;
-  }
-  return null;
-}
-
 /* ── Draggable resize handle (horizontal) ── */
 
 function useHorizontalResize(initialWidth: number, minWidth: number, maxWidth: number, side: 'left' | 'right') {
@@ -318,6 +310,10 @@ export default function App() {
   } = useLocalKeys();
   const {
     register: passkeyRegister,
+    createPasskey,
+    provisionAccounts,
+    pollProvisionTx,
+    saveProvisionedAddress,
     login: passkeyLogin,
     sign: passkeySign,
     accounts: passkeyAccounts,
@@ -329,8 +325,6 @@ export default function App() {
   const [showNetworkMenu, setShowNetworkMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showPasskeyOnboarding, setShowPasskeyOnboarding] = useState(false);
-  const [passkeyOnboardingBusy, setPasskeyOnboardingBusy] = useState(false);
-  const [passkeyOnboardingError, setPasskeyOnboardingError] = useState<string | null>(null);
   const networkMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     try {
@@ -402,7 +396,6 @@ export default function App() {
 
   const skipPasskeyOnboarding = useCallback(() => {
     setShowPasskeyOnboarding(false);
-    setPasskeyOnboardingError(null);
   }, []);
 
   const permanentlyDismissPasskey = useCallback(() => {
@@ -412,47 +405,16 @@ export default function App() {
       } catch {}
     }
     setShowPasskeyOnboarding(false);
-    setPasskeyOnboardingError(null);
   }, [user]);
 
-  const handleCreatePasskeyWallet = useCallback(async () => {
-    if (!user) return;
-    setPasskeyOnboardingError(null);
-    setPasskeyOnboardingBusy(true);
-    try {
-      const account = await passkeyRegister(user.email || 'FlowIndex Wallet');
-      if (account?.flowAddress) {
-        persistSigner({
-          type: 'passkey',
-          credentialId: account.credentialId,
-          flowAddress: account.flowAddress,
-          publicKeySec1Hex: account.publicKeySec1Hex,
-        });
-      }
-      try {
-        localStorage.removeItem(`runner:passkey-onboarding-dismissed:${user.id}`);
-      } catch {
-        // ignore localStorage errors
-      }
-      setShowPasskeyOnboarding(false);
-    } catch (err) {
-      const code = getPasskeyErrorCode(err);
-      if (code === 'USER_CANCELLED' || code === 'REQUEST_ABORTED') return;
-      if (code === 'CREDENTIAL_ALREADY_EXISTS') {
-        await refreshPasskeyState().catch(() => {});
-        setShowPasskeyOnboarding(false);
-        return;
-      }
-      setPasskeyOnboardingError(err instanceof Error ? err.message : 'Failed to create passkey wallet');
-    } finally {
-      setPasskeyOnboardingBusy(false);
-    }
-  }, [user, passkeyRegister, persistSigner, refreshPasskeyState]);
+  const handlePasskeyOnboardingDone = useCallback(() => {
+    setShowPasskeyOnboarding(false);
+    refreshPasskeyState().catch(() => {});
+  }, [refreshPasskeyState]);
 
   useEffect(() => {
     if (authLoading || !user || !hasPasskeySupport) {
       setShowPasskeyOnboarding(false);
-      setPasskeyOnboardingError(null);
       return;
     }
 
@@ -2064,9 +2026,11 @@ export default function App() {
         <PasskeyOnboardingModal
           open={showPasskeyOnboarding}
           email={user?.email}
-          loading={passkeyOnboardingBusy}
-          error={passkeyOnboardingError}
-          onCreate={handleCreatePasskeyWallet}
+          onCreatePasskey={createPasskey}
+          onProvisionAccounts={provisionAccounts}
+          onPollTx={pollProvisionTx}
+          onSaveAddress={saveProvisionedAddress}
+          onDone={handlePasskeyOnboardingDone}
           onSkip={skipPasskeyOnboarding}
           onDontShowAgain={permanentlyDismissPasskey}
         />

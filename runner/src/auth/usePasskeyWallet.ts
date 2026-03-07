@@ -37,6 +37,7 @@ function asPasskeyError(err: unknown, fallbackMessage: string): PasskeyError {
 export interface PasskeyAccount {
   credentialId: string;
   flowAddress: string;
+  flowAddressTestnet?: string;
   publicKeySec1Hex: string;
   authenticatorName?: string;
 }
@@ -44,6 +45,18 @@ export interface PasskeyAccount {
 export interface PasskeySignResult {
   signature: string;
   extensionData: string;
+}
+
+export interface ProvisionStatus {
+  txId?: string;
+  address?: string;
+  error?: string;
+  status: 'idle' | 'pending' | 'polling' | 'sealed' | 'error';
+}
+
+export interface ProvisionState {
+  mainnet: ProvisionStatus;
+  testnet: ProvisionStatus;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,82 +173,125 @@ export function usePasskeyWallet() {
     }
   }, [user]);
 
-  const register = useCallback(async (walletName?: string) => {
+  /** Step 1: Create passkey credential only (WebAuthn). Returns credentialId + publicKey. */
+  const createPasskey = useCallback(async (walletName?: string) => {
     if (!user || !accessToken) {
       throw new PasskeyError('Please sign in first, then bind a passkey', 'UNAUTHORIZED');
     }
 
+    const startData = await passkeyApi('/register/start', {
+      rpId: RP_ID,
+      rpName: RP_NAME,
+      walletName: walletName || user.email || 'FlowIndex Wallet',
+    }, accessToken);
+
+    const { options, challengeId } = startData;
+
+    const publicKeyOptions: PublicKeyCredentialCreationOptions = {
+      ...options,
+      challenge: base64UrlToBytes(options.challenge),
+      user: { ...options.user, id: base64UrlToBytes(options.user.id) },
+      excludeCredentials: (options.excludeCredentials || []).map((c: any) => ({
+        ...c, id: base64UrlToBytes(c.id),
+      })),
+      rp: { id: RP_ID, name: RP_NAME },
+    };
+
+    let credential: PublicKeyCredential;
+    try {
+      credential = await navigator.credentials.create({ publicKey: publicKeyOptions }) as PublicKeyCredential;
+    } catch (err) {
+      throw asPasskeyError(err, 'Passkey creation failed');
+    }
+    if (!credential) throw new PasskeyError('Passkey creation cancelled', 'USER_CANCELLED');
+
+    const attestation = credential.response as AuthenticatorAttestationResponse;
+    const finishData = await passkeyApi('/register/finish', {
+      rpId: RP_ID, challengeId,
+      response: {
+        id: credential.id,
+        rawId: bytesToBase64Url(new Uint8Array(credential.rawId)),
+        response: {
+          attestationObject: bytesToBase64Url(new Uint8Array(attestation.attestationObject)),
+          clientDataJSON: bytesToBase64Url(new Uint8Array(attestation.clientDataJSON)),
+        },
+        type: credential.type,
+        clientExtensionResults: credential.getClientExtensionResults(),
+        authenticatorAttachment: (credential as any).authenticatorAttachment,
+      },
+    }, accessToken);
+
+    return { credentialId: credential.id, publicKeySec1Hex: finishData.publicKeySec1Hex as string };
+  }, [user, accessToken]);
+
+  /** Step 2: Fire Lilico account creation for mainnet + testnet. Returns txIds immediately. */
+  const provisionAccounts = useCallback(async (credentialId: string): Promise<{
+    networks: Record<string, { txId?: string; address?: string; error?: string }>;
+    publicKeySec1Hex: string;
+  }> => {
+    if (!accessToken) throw new PasskeyError('Not authenticated', 'UNAUTHORIZED');
+    return passkeyApi('/wallet/provision-start', { credentialId }, accessToken);
+  }, [accessToken]);
+
+  /** Step 3: Poll Flow REST API for a sealed tx and extract flow.AccountCreated address. */
+  const pollProvisionTx = useCallback(async (
+    txId: string,
+    network: 'mainnet' | 'testnet',
+    onStatus?: (status: string) => void,
+  ): Promise<string> => {
+    const accessNode = network === 'testnet'
+      ? 'https://rest-testnet.onflow.org'
+      : 'https://rest-mainnet.onflow.org';
+
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      onStatus?.('polling');
+      try {
+        const res = await fetch(`${accessNode}/v1/transaction_results/${txId}`);
+        if (!res.ok) continue;
+        const txResult = await res.json();
+        if (txResult.status !== 'SEALED') continue;
+        if (txResult.error_message) throw new Error(`Tx failed: ${txResult.error_message}`);
+        for (const event of txResult.events || []) {
+          if (event.type === 'flow.AccountCreated') {
+            try {
+              const payload = JSON.parse(atob(event.payload));
+              const addr = payload?.value?.fields?.find(
+                (f: { name: string }) => f.name === 'address',
+              )?.value?.value;
+              if (addr) return addr.replace(/^0x/, '');
+            } catch { /* try next event */ }
+          }
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('Tx failed:')) throw e;
+      }
+    }
+    throw new Error('Polling timed out');
+  }, []);
+
+  /** Step 4: Save a provisioned address back to DB. */
+  const saveProvisionedAddress = useCallback(async (
+    credentialId: string, network: 'mainnet' | 'testnet', address: string,
+  ) => {
+    if (!accessToken) return;
+    await passkeyApi('/wallet/provision-save', { credentialId, network, address }, accessToken);
+  }, [accessToken]);
+
+  /** Legacy: all-in-one register + provision (kept for backwards compat). */
+  const register = useCallback(async (walletName?: string) => {
+    if (!user || !accessToken) {
+      throw new PasskeyError('Please sign in first, then bind a passkey', 'UNAUTHORIZED');
+    }
     setLoading(true);
     try {
-      // 1. Start registration for current authenticated user
-      const startData = await passkeyApi('/register/start', {
-        rpId: RP_ID,
-        rpName: RP_NAME,
-        walletName: walletName || user.email || 'FlowIndex Wallet',
-      }, accessToken);
-
-      const { options, challengeId } = startData;
-
-      // 2. Create credential via WebAuthn
-      const publicKeyOptions: PublicKeyCredentialCreationOptions = {
-        ...options,
-        challenge: base64UrlToBytes(options.challenge),
-        user: {
-          ...options.user,
-          id: base64UrlToBytes(options.user.id),
-        },
-        excludeCredentials: (options.excludeCredentials || []).map((c: any) => ({
-          ...c,
-          id: base64UrlToBytes(c.id),
-        })),
-        rp: { id: RP_ID, name: RP_NAME },
-      };
-
-      let credential: PublicKeyCredential;
-      try {
-        credential = await navigator.credentials.create({
-          publicKey: publicKeyOptions,
-        }) as PublicKeyCredential;
-      } catch (err) {
-        throw asPasskeyError(err, 'Passkey creation failed');
-      }
-
-      if (!credential) throw new PasskeyError('Passkey creation cancelled', 'USER_CANCELLED');
-
-      const attestation = credential.response as AuthenticatorAttestationResponse;
-
-      // 3. Finish registration
-      const finishData = await passkeyApi('/register/finish', {
-        rpId: RP_ID,
-        challengeId,
-        response: {
-          id: credential.id,
-          rawId: bytesToBase64Url(new Uint8Array(credential.rawId)),
-          response: {
-            attestationObject: bytesToBase64Url(new Uint8Array(attestation.attestationObject)),
-            clientDataJSON: bytesToBase64Url(new Uint8Array(attestation.clientDataJSON)),
-          },
-          type: credential.type,
-          clientExtensionResults: credential.getClientExtensionResults(),
-          authenticatorAttachment: (credential as any).authenticatorAttachment,
-        },
-      }, accessToken);
-
-      const { publicKeySec1Hex } = finishData;
-
-      // 4. Provision Flow wallet immediately so passkey is self-custody + usable signer.
-      const provisionData = await passkeyApi('/wallet/provision', {
-        credentialId: credential.id,
-      }, accessToken);
-
+      const { credentialId, publicKeySec1Hex } = await createPasskey(walletName);
+      const provisionData = await passkeyApi('/wallet/provision', { credentialId }, accessToken);
       const newAccount: PasskeyAccount = {
-        credentialId: credential.id,
-        flowAddress: provisionData.address || '',
-        publicKeySec1Hex: publicKeySec1Hex || '',
+        credentialId, flowAddress: provisionData.address || '', publicKeySec1Hex: publicKeySec1Hex || '',
       };
-
       setAccounts(prev => {
-        const next = prev.filter((a) => a.credentialId !== credential.id);
+        const next = prev.filter((a) => a.credentialId !== credentialId);
         next.unshift(newAccount);
         return next;
       });
@@ -247,7 +303,7 @@ export function usePasskeyWallet() {
     } finally {
       setLoading(false);
     }
-  }, [user, accessToken, refreshPasskeyState]);
+  }, [user, accessToken, createPasskey, refreshPasskeyState]);
 
   const loginOnly = useCallback(async (opts?: { signal?: AbortSignal; mediation?: CredentialMediationRequirement }) => {
     console.log('[passkey] loginOnly start, mediation:', opts?.mediation || 'modal');
@@ -430,6 +486,10 @@ export function usePasskeyWallet() {
 
   return {
     register,
+    createPasskey,
+    provisionAccounts,
+    pollProvisionTx,
+    saveProvisionedAddress,
     login,
     startConditionalLogin,
     sign,

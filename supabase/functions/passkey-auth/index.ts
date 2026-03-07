@@ -551,6 +551,102 @@ serve(async (req: Request) => {
         break;
       }
 
+      case '/wallet/provision-start': {
+        // Fire Lilico account creation for mainnet + testnet, save txIds, return immediately.
+        const user = await getAuthenticatedUser();
+        if (!user) { result = error('UNAUTHORIZED', 'Authentication required'); break; }
+
+        const { credentialId: psCredId } = data as { credentialId: string };
+        const { data: psCred } = await supabaseAdmin.from('passkey_credentials')
+          .select('public_key_sec1_hex, flow_address, flow_address_testnet, provision_tx_mainnet, provision_tx_testnet')
+          .eq('id', psCredId).eq('user_id', user.id).single();
+
+        if (!psCred?.public_key_sec1_hex) {
+          result = error('NO_PUBLIC_KEY', 'Credential has no public key');
+          break;
+        }
+
+        const trimKey = psCred.public_key_sec1_hex.startsWith('04')
+          ? psCred.public_key_sec1_hex.slice(2) : psCred.public_key_sec1_hex;
+        const lilicoApiKey = Deno.env.get('LILICO_API_KEY') || '';
+        const lilicoBase = 'https://openapi.lilico.app';
+
+        const networks: Array<{ network: 'mainnet' | 'testnet'; addrCol: string; txCol: string; endpoint: string }> = [
+          { network: 'mainnet', addrCol: 'flow_address', txCol: 'provision_tx_mainnet', endpoint: `${lilicoBase}/v1/address` },
+          { network: 'testnet', addrCol: 'flow_address_testnet', txCol: 'provision_tx_testnet', endpoint: `${lilicoBase}/v1/address/testnet` },
+        ];
+
+        const results: Record<string, { txId?: string; address?: string; error?: string }> = {};
+
+        await Promise.all(networks.map(async ({ network, addrCol, txCol, endpoint }) => {
+          // Skip if already has address
+          if (psCred[addrCol as keyof typeof psCred]) {
+            results[network] = { address: psCred[addrCol as keyof typeof psCred] as string };
+            return;
+          }
+          // Skip if already has pending tx
+          if (psCred[txCol as keyof typeof psCred]) {
+            results[network] = { txId: psCred[txCol as keyof typeof psCred] as string };
+            return;
+          }
+
+          try {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: lilicoApiKey },
+              body: JSON.stringify({ publicKey: trimKey, signatureAlgorithm: 'ECDSA_P256', hashAlgorithm: 'SHA2_256', weight: 1000 }),
+            });
+            if (!res.ok) {
+              const body = await res.text();
+              console.error(`[passkey-auth] Lilico ${network} error:`, res.status, body);
+              results[network] = { error: `Account creation failed (${res.status})` };
+              return;
+            }
+            const json = await res.json();
+            const txId = json.txId || json.data?.txId;
+            if (!txId) {
+              console.error(`[passkey-auth] Lilico ${network}: no txId:`, JSON.stringify(json));
+              results[network] = { error: 'No txId in response' };
+              return;
+            }
+            // Save txId to DB
+            await supabaseAdmin.from('passkey_credentials')
+              .update({ [txCol]: txId }).eq('id', psCredId);
+            console.log(`[passkey-auth] ${network} provision tx:`, txId);
+            results[network] = { txId };
+          } catch (e) {
+            console.error(`[passkey-auth] Lilico ${network} fetch error:`, e);
+            results[network] = { error: e instanceof Error ? e.message : 'Unknown error' };
+          }
+        }));
+
+        result = success({ networks: results, publicKeySec1Hex: psCred.public_key_sec1_hex });
+        break;
+      }
+
+      case '/wallet/provision-save': {
+        // Client calls this after polling confirms the tx sealed and address extracted.
+        const user = await getAuthenticatedUser();
+        if (!user) { result = error('UNAUTHORIZED', 'Authentication required'); break; }
+
+        const { credentialId: saveCredId, network: saveNetwork, address: saveAddress } =
+          data as { credentialId: string; network: 'mainnet' | 'testnet'; address: string };
+
+        if (!saveCredId || !saveNetwork || !saveAddress) {
+          result = error('INVALID_INPUT', 'Missing credentialId, network, or address');
+          break;
+        }
+
+        const col = saveNetwork === 'testnet' ? 'flow_address_testnet' : 'flow_address';
+        await supabaseAdmin.from('passkey_credentials')
+          .update({ [col]: saveAddress.replace(/^0x/, '') })
+          .eq('id', saveCredId).eq('user_id', user.id);
+
+        console.log(`[passkey-auth] Saved ${saveNetwork} address:`, saveAddress, 'for credential:', saveCredId);
+        result = success({ network: saveNetwork, address: saveAddress });
+        break;
+      }
+
       case '/wallet/provision': {
         const authHeader = req.headers.get('Authorization');
         const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
