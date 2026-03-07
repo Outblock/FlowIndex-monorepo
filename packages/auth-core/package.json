@@ -1,0 +1,30 @@
+{
+  "name": "@flowindex/auth-core",
+  "version": "0.1.0",
+  "description": "FlowIndex auth core — JWT, cookie, token refresh, GoTrue, passkey client",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@flowindex/flow-passkey": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  },
+  "nx": {
+    "tags": ["package"]
+  }
+}
