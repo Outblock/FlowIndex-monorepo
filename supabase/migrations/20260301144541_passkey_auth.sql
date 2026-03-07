@@ -170,6 +170,16 @@ GRANT EXECUTE ON FUNCTION public.cleanup_expired_passkey_challenges() TO service
 GRANT EXECUTE ON FUNCTION public.check_passkey_rate_limit(TEXT, VARCHAR, VARCHAR, INTEGER, INTEGER) TO service_role;
 GRANT EXECUTE ON FUNCTION public.log_passkey_audit_event(public.passkey_audit_event, UUID, TEXT, TEXT, INET, TEXT, TEXT, JSONB, TEXT, TEXT) TO service_role;
 
+-- Table permissions for service_role (edge functions use service_role key)
+GRANT ALL ON public.passkey_credentials TO service_role;
+GRANT ALL ON public.passkey_challenges TO service_role;
+GRANT ALL ON public.passkey_rate_limits TO service_role;
+GRANT ALL ON public.passkey_audit_log TO service_role;
+
+-- Permissions for authenticated users (user-facing queries via RLS)
+GRANT SELECT, DELETE ON public.passkey_credentials TO authenticated;
+GRANT SELECT ON public.passkey_audit_log TO authenticated;
+
 -- Passkey wallet: Flow account association
 ALTER TABLE public.passkey_credentials
   ADD COLUMN IF NOT EXISTS public_key_sec1_hex TEXT,
