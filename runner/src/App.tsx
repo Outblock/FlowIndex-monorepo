@@ -315,7 +315,7 @@ export default function App() {
     selectedAccount: selectedPasskeyAccount,
     loading: passkeyLoading,
     hasPasskeySupport,
-    hasRegistered: hasPasskeyRegistered,
+    // hasRegistered not needed — LoginModal always tries login first
   } = usePasskeyWallet();
   const [showKeyManager, setShowKeyManager] = useState(false);
   const [keyManagerInitialMode, setKeyManagerInitialMode] = useState<'create' | 'import' | undefined>();
@@ -1976,7 +1976,7 @@ export default function App() {
         onRefreshAccounts={refreshAccounts}
       />
       <Suspense fallback={null}>
-        <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} onPasskeyLogin={passkeyLogin} onPasskeyRegister={passkeyRegister} hasPasskeySupport={hasPasskeySupport} hasPasskeyRegistered={hasPasskeyRegistered} />
+        <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} onPasskeyLogin={passkeyLogin} onPasskeyRegister={passkeyRegister} hasPasskeySupport={hasPasskeySupport} />
       </Suspense>
     </div>
   );

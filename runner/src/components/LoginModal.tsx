@@ -38,10 +38,9 @@ interface LoginModalProps {
   onPasskeyLogin?: () => Promise<void>;
   onPasskeyRegister?: (walletName?: string) => Promise<void>;
   hasPasskeySupport?: boolean;
-  hasPasskeyRegistered?: boolean;
 }
 
-export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyRegister, hasPasskeySupport, hasPasskeyRegistered }: LoginModalProps) {
+export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyRegister, hasPasskeySupport }: LoginModalProps) {
   const { signInWithProvider, sendMagicLink, verifyOtp } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -97,24 +96,21 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
   }
 
   async function handlePasskey() {
-    if (hasPasskeyRegistered) {
-      // Returning user — login directly with existing passkey
-      setError(null);
-      setPasskeyLoading(true);
-      try {
-        if (onPasskeyLogin) {
-          await onPasskeyLogin();
-          onClose();
-        }
-      } catch (err) {
-        // Login failed — maybe passkey was deleted? Show create form
-        setPasskeyLoading(false);
-        setShowPasskeySetup(true);
+    // Always try login first — works even on new devices if passkey is synced (iCloud, Chrome)
+    setError(null);
+    setPasskeyLoading(true);
+    try {
+      if (onPasskeyLogin) {
+        await onPasskeyLogin();
+        onClose();
+        return;
       }
-    } else {
-      // New user — show wallet name input
-      setShowPasskeySetup(true);
+    } catch {
+      // Login failed or cancelled — fall through to registration
     }
+    // No passkey found or user cancelled — show create form
+    setPasskeyLoading(false);
+    setShowPasskeySetup(true);
   }
 
   async function handlePasskeyCreate(e: React.FormEvent) {
