@@ -335,10 +335,12 @@ serve(async (req: Request) => {
       }
 
       case '/login/start': {
+        console.log('[passkey-auth] login/start email:', email || '(none/discoverable)', 'rpId:', rpId);
         const ipBlocked = await supabaseAdmin.rpc('check_passkey_rate_limit', {
           p_identifier: clientIP, p_identifier_type: 'ip', p_endpoint: endpoint, p_max_attempts: RATE_LIMITS.ip.maxAttempts
         });
         if (ipBlocked.error || ipBlocked.data) {
+          console.log('[passkey-auth] login/start RATE_LIMITED ip:', clientIP);
           result = error('RATE_LIMITED', 'Too many requests');
           break;
         }
@@ -376,6 +378,8 @@ serve(async (req: Request) => {
           challenge: options.challenge, email: userEmail, type: 'authentication', expires_at: expiresAt.toISOString()
         }).select().single();
 
+        console.log('[passkey-auth] login/start challengeId:', challenge?.id, 'allowCredentials:', allowCredentials?.length ?? 'none(discoverable)');
+
         await supabaseAdmin.rpc('log_passkey_audit_event', {
           p_event_type: 'authentication_started', p_email: userEmail, p_ip_address: clientIP
         });
@@ -385,17 +389,20 @@ serve(async (req: Request) => {
       }
 
       case '/login/finish': {
+        console.log('[passkey-auth] login/finish challengeId:', challengeId, 'origin:', origin);
         const { data: challenge } = await supabaseAdmin.from('passkey_challenges')
           .select('*').eq('id', challengeId).eq('type', 'authentication').single();
 
         await supabaseAdmin.from('passkey_challenges').delete().eq('id', challengeId);
 
         if (!challenge) {
+          console.error('[passkey-auth] login/finish CHALLENGE_MISMATCH id:', challengeId);
           result = error('CHALLENGE_MISMATCH', 'Invalid or expired challenge');
           break;
         }
 
         if (new Date(challenge.expires_at) < new Date()) {
+          console.error('[passkey-auth] login/finish CHALLENGE_EXPIRED');
           result = error('CHALLENGE_EXPIRED', 'Challenge has expired');
           break;
         }
@@ -404,6 +411,7 @@ serve(async (req: Request) => {
         const { data: credential, error: credError } = await supabaseAdmin.from('passkey_credentials')
           .select('*').eq('id', credentialId).single();
 
+        console.log('[passkey-auth] login/finish credentialId:', credentialId, 'found:', !!credential, 'error:', credError?.message);
         if (credError || !credential) {
           result = error('CREDENTIAL_NOT_FOUND', 'Credential not found');
           break;
@@ -450,8 +458,10 @@ serve(async (req: Request) => {
             p_event_type: 'authentication_completed', p_user_id: credential.user_id, p_credential_id: credentialId, p_ip_address: clientIP
           });
 
+          console.log('[passkey-auth] login/finish SUCCESS user:', credential.user_id);
           result = success({ verified: true, tokenHash: linkData.properties?.hashed_token, email: userEmail });
         } catch (e) {
+          console.error('[passkey-auth] login/finish VERIFY_FAILED:', e instanceof Error ? e.message : e);
           await supabaseAdmin.rpc('log_passkey_audit_event', {
             p_event_type: 'authentication_failed', p_credential_id: credentialId, p_ip_address: clientIP, p_error_message: e instanceof Error ? e.message : 'Unknown'
           });

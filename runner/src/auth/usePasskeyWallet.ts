@@ -196,10 +196,12 @@ export function usePasskeyWallet() {
   }, [accessToken, applyTokenData]);
 
   const loginOnly = useCallback(async (opts?: { signal?: AbortSignal; mediation?: CredentialMediationRequirement }) => {
+    console.log('[passkey] loginOnly start, mediation:', opts?.mediation || 'modal');
     // 1. Start authentication
     const startData = await passkeyApi('/login/start', {
       rpId: RP_ID,
     });
+    console.log('[passkey] loginOnly got challenge, allowCredentials:', startData.options?.allowCredentials?.length ?? 'none');
 
     const { options, challengeId } = startData;
 
@@ -220,9 +222,11 @@ export function usePasskeyWallet() {
       ...(opts?.mediation && { mediation: opts.mediation }),
     };
 
+    console.log('[passkey] calling navigator.credentials.get, mediation:', opts?.mediation || 'modal');
     const assertion = await navigator.credentials.get(credentialRequest) as PublicKeyCredential;
 
     if (!assertion) throw new Error('Passkey authentication cancelled');
+    console.log('[passkey] got assertion, credentialId:', assertion.id);
 
     const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
 
@@ -284,14 +288,16 @@ export function usePasskeyWallet() {
   /** Start conditional UI login — browser shows passkey in autofill.
    *  Returns an AbortController so callers can cancel when the modal closes. */
   const startConditionalLogin = useCallback((onSuccess?: () => void): AbortController => {
+    console.log('[passkey] startConditionalLogin');
     const controller = new AbortController();
     loginOnly({ signal: controller.signal, mediation: 'conditional' as CredentialMediationRequirement })
       .then(() => {
+        console.log('[passkey] conditional login SUCCESS');
         try { localStorage.setItem('passkey_registered', '1'); } catch {}
         onSuccess?.();
       })
-      .catch(() => {
-        // Aborted or no passkey selected — that's fine
+      .catch((err) => {
+        console.log('[passkey] conditional login ended:', err instanceof Error ? err.message : err);
       });
     return controller;
   }, [loginOnly]);

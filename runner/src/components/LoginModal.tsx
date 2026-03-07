@@ -126,7 +126,6 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
     conditionalAbortRef.current?.abort();
     conditionalAbortRef.current = null;
 
-    // Try modal login — works even on new devices if passkey is synced (iCloud, Chrome)
     setError(null);
     setPasskeyLoading(true);
     try {
@@ -135,10 +134,16 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
         onClose();
         return;
       }
-    } catch {
-      // Login failed or cancelled — fall through to registration
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // User cancelled the WebAuthn dialog — don't auto-show register
+      if (msg.includes('cancelled') || msg.includes('canceled') || msg.includes('AbortError') || msg.includes('NotAllowedError') || (err instanceof DOMException && err.name === 'NotAllowedError')) {
+        setPasskeyLoading(false);
+        return;
+      }
+      // Actual server error (credential not found, etc.) — show register
+      console.warn('[passkey] login failed, showing register:', msg);
     }
-    // No passkey found or user cancelled — show create form
     setPasskeyLoading(false);
     setShowPasskeySetup(true);
   }
@@ -284,14 +289,14 @@ export default function LoginModal({ open, onClose, onPasskeyLogin, onPasskeyReg
               <p className="text-[11px] text-zinc-500 mt-1 font-mono">
                 Save projects, sync across devices
               </p>
-              {/* Hidden input triggers browser passkey autofill (conditional UI) */}
+              {/* Passkey conditional UI — visible input triggers browser autofill */}
               {hasPasskeySupport && (
                 <input
                   type="text"
                   autoComplete="webauthn"
-                  className="sr-only"
-                  tabIndex={-1}
-                  aria-hidden="true"
+                  placeholder="Passkey"
+                  readOnly
+                  className="w-full mt-3 px-3 py-2 bg-zinc-950 border border-zinc-700/50 text-zinc-400 placeholder:text-zinc-600 text-xs font-mono rounded-none focus:outline-none focus:border-emerald-500/40 cursor-default"
                 />
               )}
             </div>
