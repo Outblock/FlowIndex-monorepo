@@ -675,6 +675,10 @@ jobs:
             docker run -d --restart=always --name ai-chat \
               --network=host \
               --env-file /mnt/stateful_partition/pgdata/ai-chat.env \
+              -e MCP_ADMIN_KEY=${{ secrets.MCP_ADMIN_KEY }} \
+              -e MCP_AUTH_ENABLED=true \
+              -e MCP_RATE_LIMIT=60 \
+              -e BACKEND_URL=http://localhost:8080 \
               ${{ env.REGISTRY }}/ai-chat:${{ github.sha }}
           '
 
