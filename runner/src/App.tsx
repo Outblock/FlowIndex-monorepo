@@ -400,6 +400,7 @@ export default function App() {
   }, []);
 
   const skipPasskeyOnboarding = useCallback(() => {
+    try { sessionStorage.setItem('runner:passkey-onboarding-skipped', '1'); } catch {}
     setShowPasskeyOnboarding(false);
   }, []);
 
@@ -430,7 +431,8 @@ export default function App() {
         if (cancelled) return;
         const hasExistingPasskey = passkeyList.length > 0;
         const dismissed = localStorage.getItem(`runner:passkey-onboarding-dismissed:${user.id}`) === '1';
-        setShowPasskeyOnboarding(!hasExistingPasskey && !dismissed);
+        const skippedThisSession = sessionStorage.getItem('runner:passkey-onboarding-skipped') === '1';
+        setShowPasskeyOnboarding(!hasExistingPasskey && !dismissed && !skippedThisSession);
       } catch {
         if (!cancelled) setShowPasskeyOnboarding(false);
       }

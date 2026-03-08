@@ -17,14 +17,14 @@ const tabs: { id: SidebarTab; icon: typeof Files; label: string }[] = [
 
 export default function ActivityBar({ activeTab, onTabChange, hasGitHub, gitChangesCount }: ActivityBarProps) {
   return (
-    <div className="flex flex-col items-center w-[42px] shrink-0 bg-zinc-950 border-r border-zinc-800">
+    <div className="flex flex-col items-center w-[42px] shrink-0 bg-zinc-900 border-r border-zinc-700/50">
       {tabs.map(({ id, icon: Icon, label }) => (
         <button
           key={id}
           onClick={() => onTabChange(id)}
           className={`relative flex items-center justify-center w-full h-[42px] transition-colors ${
             activeTab === id
-              ? 'text-zinc-100 border-l-2 border-emerald-400 bg-zinc-900/50'
+              ? 'text-zinc-100 border-l-2 border-emerald-400 bg-zinc-800/60'
               : 'text-zinc-500 hover:text-zinc-300 border-l-2 border-transparent'
           }`}
           title={label}
