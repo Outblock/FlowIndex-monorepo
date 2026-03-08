@@ -1,0 +1,11 @@
+{
+  "title": "Packages",
+  "pages": [
+    "index",
+    "agent-wallet",
+    "auth-core",
+    "auth-ui",
+    "flow-passkey",
+    "flow-ui"
+  ]
+}
