@@ -1,0 +1,13 @@
+{
+  "title": "Outblock Docs",
+  "pages": [
+    "---FlowIndex---",
+    "flowindex",
+    "---Services---",
+    "run",
+    "ai",
+    "wallet",
+    "---Libraries---",
+    "packages"
+  ]
+}
