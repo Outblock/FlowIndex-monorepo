@@ -66,6 +66,57 @@ func (s *Server) handleApprovalCreate(w http.ResponseWriter, r *http.Request) {
 	}, nil, nil)
 }
 
+// handleApprovalDetails returns the details of an approval request for the wallet app.
+// GET /api/v1/wallet/approve/{id} (Supabase JWT auth)
+func (s *Server) handleApprovalDetails(w http.ResponseWriter, r *http.Request) {
+	userID := walletUserIDFromContext(r.Context())
+	if userID == "" {
+		writeAPIError(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	pool, err := getAdminAuthzDBPool()
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "database not available")
+		return
+	}
+
+	requestID := mux.Vars(r)["id"]
+	if requestID == "" {
+		writeAPIError(w, http.StatusBadRequest, "missing request id")
+		return
+	}
+
+	var status, txMessageHex, cadenceScript, cadenceArgs, description string
+	var expiresAt time.Time
+	err = pool.QueryRow(r.Context(), `
+		SELECT status, tx_message_hex, cadence_script, cadence_args, description, expires_at
+		FROM public.wallet_approval_requests
+		WHERE id = $1 AND user_id = $2
+	`, requestID, userID).Scan(&status, &txMessageHex, &cadenceScript, &cadenceArgs, &description, &expiresAt)
+	if err != nil {
+		writeAPIError(w, http.StatusNotFound, "approval request not found")
+		return
+	}
+
+	// Auto-expire if past expires_at and still pending
+	if status == "pending" && time.Now().After(expiresAt) {
+		_, _ = pool.Exec(r.Context(), `
+			UPDATE public.wallet_approval_requests SET status = 'expired' WHERE id = $1 AND status = 'pending'
+		`, requestID)
+		status = "expired"
+	}
+
+	writeAPIResponse(w, map[string]interface{}{
+		"status":          status,
+		"tx_message_hex":  txMessageHex,
+		"cadence_script":  cadenceScript,
+		"cadence_args":    cadenceArgs,
+		"description":     description,
+		"expires_at":      expiresAt.Format(time.RFC3339),
+	}, nil, nil)
+}
+
 // handleApprovalPoll checks the status of an approval request.
 // GET /api/v1/wallet/approve/{id} (wallet auth)
 func (s *Server) handleApprovalPoll(w http.ResponseWriter, r *http.Request) {

@@ -85,7 +85,8 @@ func registerWalletRoutes(r *mux.Router, s *Server) {
 	// Agent login complete
 	sbAuth.HandleFunc("/agent/login/{id}/complete", s.handleAgentLoginComplete).Methods("POST", "OPTIONS")
 
-	// Approval signing (wallet app calls this)
+	// Approval details + signing (wallet app calls these)
+	sbAuth.HandleFunc("/approve/{id}", s.handleApprovalDetails).Methods("GET", "OPTIONS")
 	sbAuth.HandleFunc("/approve/{id}/sign", s.handleApprovalSign).Methods("POST", "OPTIONS")
 
 	// Wallet API key CRUD

@@ -12,6 +12,7 @@ import Send from './pages/Send';
 import Activity from './pages/Activity';
 import Settings from './pages/Settings';
 import AI from './pages/AI';
+import Approve from './pages/Approve';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/authn" element={<Authn />} />
           <Route path="/authz" element={<Authz />} />
           <Route path="/sign-message" element={<SignMessage />} />
+          <Route path="/approve/:requestId" element={<Approve />} />
           <Route path="/test" element={<TestHost />} />
 
           {/* Dashboard routes - with layout */}
