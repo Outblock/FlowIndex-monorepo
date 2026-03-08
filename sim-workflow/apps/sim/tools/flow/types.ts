@@ -355,4 +355,12 @@ export interface FlowSendParams {
   amount?: string
   nftIds?: string
   network?: string
+  /** Decimal places for the token (default: 8 for Flow tokens) */
+  decimal?: number
+  /** EVM contract address for the token (required for EVM-to-EVM non-FLOW transfers) */
+  tokenContractAddr?: string
+  /** Child account addresses if the sender has linked child accounts */
+  childAddrs?: string[]
+  /** COA (Cadence Owned Account) EVM address associated with the proposer */
+  coaAddr?: string
 }

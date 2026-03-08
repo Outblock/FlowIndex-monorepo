@@ -5,7 +5,12 @@ import { checkInternalAuth } from '@/lib/auth/hybrid'
 import { resolveSignerFromParams, extractFiAuthFromRequest } from '@/lib/flow/signer-resolver'
 import type { SignerParams } from '@/lib/flow/signer-resolver'
 import { ACCESS_NODES, formatTxResult } from '@/app/api/tools/flow/tx-helpers'
-import { transferFlowCadence } from '@/app/api/tools/flow/cadence-templates'
+import {
+  createConfiguredCadenceService,
+  configureFclForNetwork,
+  executeTransfer,
+} from '@/lib/flow/cadence-service-adapter'
+import type { SendPayload } from '@/lib/flow/cadence-service-adapter'
 
 const logger = createLogger('FlowSend')
 
@@ -18,12 +23,32 @@ const Schema = z.object({
   amount: z.string().optional(),
   nftIds: z.string().optional(),
   network: z.string().optional().default('mainnet'),
+  /** Decimal places for the token (required for EVM token transfers). Defaults to 8 for Flow tokens. */
+  decimal: z.number().optional().default(8),
+  /** EVM contract address for the token (required for EVM-to-EVM non-FLOW transfers) */
+  tokenContractAddr: z.string().optional(),
+  /** Child account addresses if the sender has linked child accounts */
+  childAddrs: z.array(z.string()).optional().default([]),
+  /** COA (Cadence Owned Account) EVM address associated with the proposer */
+  coaAddr: z.string().optional().default(''),
 })
 
-/** Check whether an address looks like an EVM address (40 hex chars, with or without 0x) */
+/** Check whether an address looks like an EVM address (0x + 40 hex chars) */
 function isEvmAddress(addr: string): boolean {
-  const clean = addr.startsWith('0x') ? addr.slice(2) : addr
-  return /^[0-9a-fA-F]{40}$/.test(clean)
+  return /^0x[0-9a-fA-F]{40}$/.test(addr)
+}
+
+/** Normalize an address to include 0x prefix */
+function normalizeAddress(addr: string): string {
+  if (addr.startsWith('0x')) return addr
+  if (/^[0-9a-fA-F]{40}$/.test(addr)) return `0x${addr}`
+  if (/^[0-9a-fA-F]{16}$/.test(addr)) return `0x${addr}`
+  return addr
+}
+
+/** Detect asset type from sender address format */
+function detectAssetType(sender: string): 'flow' | 'evm' {
+  return isEvmAddress(sender) ? 'evm' : 'flow'
 }
 
 export async function POST(request: NextRequest) {
@@ -34,8 +59,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { signer: signerJson, sendType, sender, receiver, flowIdentifier, amount, nftIds, network } =
-      Schema.parse(body)
+    const {
+      signer: signerJson,
+      sendType,
+      sender: rawSender,
+      receiver: rawReceiver,
+      flowIdentifier,
+      amount,
+      nftIds,
+      network,
+      decimal,
+      tokenContractAddr,
+      childAddrs,
+      coaAddr,
+    } = Schema.parse(body)
 
     // Validate send-type-specific fields
     if (sendType === 'token' && !amount) {
@@ -51,23 +88,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Detect cross-VM (Flow <-> EVM) sends
-    const senderIsEvm = isEvmAddress(sender)
-    const receiverIsEvm = isEvmAddress(receiver)
-    if (senderIsEvm || receiverIsEvm) {
-      return NextResponse.json(
-        { success: false, error: 'Cross-VM (Flow <-> EVM) sends are not yet supported. Coming in a future update.' },
-        { status: 501 }
-      )
-    }
-
-    // NFT sends are not yet implemented
-    if (sendType === 'nft') {
-      return NextResponse.json(
-        { success: false, error: 'NFT sends are not yet supported. Coming in a future update.' },
-        { status: 501 }
-      )
-    }
+    // Normalize addresses
+    const sender = normalizeAddress(rawSender)
+    const receiver = normalizeAddress(rawReceiver)
 
     // Parse signer configuration
     let signerParams: SignerParams
@@ -82,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // Resolve signer
     const fiAuth = extractFiAuthFromRequest(request)
-    const { authz } = await resolveSignerFromParams(signerParams, fiAuth ?? undefined)
+    const { signer, authz } = await resolveSignerFromParams(signerParams, fiAuth ?? undefined)
 
     // Validate network
     const accessNode = ACCESS_NODES[network]
@@ -93,34 +116,66 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Configure FCL
-    const fcl = await import('@onflow/fcl')
-    fcl.config().put('accessNode.api', accessNode)
+    // Auto-detect asset type from sender address
+    const assetType = detectAssetType(sender)
 
-    // Build Cadence transaction for Flow-to-Flow token transfer
-    const cadence = transferFlowCadence(network)
-    const args = [
-      fcl.arg(amount!, fcl.t.UFix64),
-      fcl.arg(receiver, fcl.t.Address),
-    ]
+    // Build proposer address (the Flow account that signs the transaction)
+    const signerInfo = signer.info()
+    const signerAddr = signerInfo.flowAddress ?? sender
+    const proposer = signerAddr.startsWith('0x') ? signerAddr : `0x${signerAddr}`
 
-    logger.info(`Sending ${amount} of ${flowIdentifier} from ${sender} to ${receiver} on ${network}`)
+    // Build NFT IDs array
+    const ids: number[] = nftIds
+      ? nftIds.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+      : []
 
-    // FCL authorization type helper
-    type FclAuthz = Parameters<typeof fcl.mutate>[0] extends { proposer?: infer P } ? P : never
-    const typedAuthz = authz as unknown as FclAuthz
+    // Build the SendPayload
+    const payload: SendPayload = {
+      type: sendType,
+      assetType,
+      proposer,
+      receiver,
+      flowIdentifier,
+      sender,
+      childAddrs,
+      ids,
+      amount: amount ?? '0.0',
+      decimal,
+      coaAddr,
+      tokenContractAddr: tokenContractAddr ?? '',
+    }
 
-    const txId: string = await fcl.mutate({
-      cadence,
-      args: () => args,
-      proposer: typedAuthz,
-      payer: typedAuthz,
-      authorizations: [typedAuthz] as unknown as FclAuthz[],
-      limit: 9999,
-    })
+    logger.info(
+      `Sending ${sendType} via strategy pattern: ${amount ?? ids.join(',')} of ${flowIdentifier} ` +
+        `from ${sender} (${assetType}) to ${receiver} on ${network}`
+    )
+
+    // Configure FCL with network addresses and contract aliases
+    const validNetwork = network === 'testnet' ? 'testnet' : 'mainnet'
+    configureFclForNetwork(validNetwork, accessNode)
+
+    // Create a CadenceService instance configured with our signer
+    const svc = createConfiguredCadenceService(authz, validNetwork)
+
+    // Execute the transfer via the strategy pattern
+    const txId = await executeTransfer(svc, payload)
+
+    if (txId === null) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            `No matching strategy for this transfer combination: ` +
+            `type=${sendType}, assetType=${assetType}, sender=${sender}, receiver=${receiver}`,
+        },
+        { status: 400 }
+      )
+    }
 
     logger.info(`Transaction submitted: ${txId}`)
 
+    // Wait for transaction to seal
+    const fcl = await import('@onflow/fcl')
     const txStatus = await fcl.tx(txId).onceSealed()
 
     return NextResponse.json({

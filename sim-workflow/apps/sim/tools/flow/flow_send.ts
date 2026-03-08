@@ -72,6 +72,10 @@ export const flowSendTool: ToolConfig<FlowSendParams, FlowSendResponse> = {
       amount: params.amount,
       nftIds: params.nftIds,
       network: params.network ?? 'mainnet',
+      decimal: params.decimal ?? 8,
+      tokenContractAddr: params.tokenContractAddr,
+      childAddrs: params.childAddrs ?? [],
+      coaAddr: params.coaAddr ?? '',
     }),
   },
 
