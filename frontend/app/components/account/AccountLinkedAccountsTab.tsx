@@ -5,8 +5,9 @@ import ReactFlow, {
     useNodesState, useEdgesState,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { AddressLink } from '../AddressLink';
-import { User, Shield, Loader2, UserCog, KeyRound, ShieldCheck, Coins, Image as ImageIcon, Globe } from 'lucide-react';
+import Avatar from 'boring-avatars';
+import { AddressLink, colorsFromAddress } from '../AddressLink';
+import { Shield, Loader2, Coins, Image as ImageIcon } from 'lucide-react';
 import { ExpandableFlowContainer } from '../ExpandableFlowContainer';
 import { normalizeAddress } from './accountUtils';
 import type { AccountInfo, AccountManagerInfo, AccountOwnedInfo, TokenInfo } from '../../../cadence/cadence.gen';
@@ -22,11 +23,15 @@ function AccountNode({ data }: { data: any }) {
 
     const bgColor = 'bg-white dark:bg-zinc-900';
 
-    const IconComp = role === 'coa' ? Globe : role === 'parent' ? ShieldCheck : role === 'child' ? UserCog : role === 'owned' ? KeyRound : User;
-    const iconColor = isCurrent ? 'text-nothing-green-dark dark:text-nothing-green' : role === 'parent' ? 'text-blue-500' : role === 'coa' ? 'text-violet-500' : 'text-amber-500';
     const dotColor = isCurrent ? 'bg-nothing-green' : role === 'parent' ? 'bg-blue-400' : role === 'coa' ? 'bg-violet-400' : 'bg-amber-400';
 
     const thumbnail = data.thumbnail;
+    const addr = data.address as string;
+    const avatarColors = colorsFromAddress(addr);
+    const hex = addr.replace(/^0x/, '');
+    const avatarVariant = hex.length <= 16 ? 'beam' : /^0{10,}/.test(hex) ? 'bauhaus' : 'pixel';
+
+    const [imgError, setImgError] = useState(false);
 
     return (
         <div className={`border border-zinc-200 dark:border-white/10 ${bgColor} rounded-lg px-4 py-3 min-w-[220px] max-w-[280px] shadow-sm font-mono relative`}>
@@ -38,17 +43,17 @@ function AccountNode({ data }: { data: any }) {
             <div className={`absolute top-0 left-4 right-4 h-[2px] ${dotColor} rounded-full`} />
 
             <div className="flex items-start gap-3 mt-1">
-                {/* Avatar / Icon */}
-                {thumbnail ? (
+                {/* Avatar */}
+                {thumbnail && !imgError ? (
                     <img
                         src={thumbnail}
                         alt=""
                         className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-zinc-200 dark:border-white/10"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        onError={() => setImgError(true)}
                     />
                 ) : (
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isCurrent ? 'bg-nothing-green-dark/10 dark:bg-nothing-green/10' : role === 'parent' ? 'bg-blue-500/10' : role === 'coa' ? 'bg-violet-500/10' : 'bg-amber-500/10'}`}>
-                        <IconComp className={`h-4 w-4 ${iconColor}`} />
+                    <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 border border-zinc-200 dark:border-white/10">
+                        <Avatar size={36} name={addr} variant={avatarVariant} colors={avatarColors} />
                     </div>
                 )}
 
