@@ -11,9 +11,7 @@ import { formatAbsoluteTime, formatRelativeTime } from '../../lib/time';
 import { useTimeTicker } from '../../hooks/useTimeTicker';
 import { resolveApiBaseUrl } from '../../api';
 import { useState, useEffect, useCallback } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../components/ui/command';
-import { cn } from '../../lib/utils';
+import { Popover, PopoverContent, PopoverTrigger, Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, cn } from '@flowindex/flow-ui';
 
 type Tab = 'accounts' | 'ft_holders' | 'nft_collectors';
 

@@ -4,7 +4,7 @@ import { AddressLink } from '../../../components/AddressLink';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Image, Users, ArrowRightLeft, ArrowLeft, Grid3X3, Search, LayoutGrid, LayoutList } from 'lucide-react';
-import { EVMBridgeBadge } from '../../../components/ui/EVMBridgeBadge';
+import { EVMBridgeBadge, GlassCard, cn } from '@flowindex/flow-ui';
 import { SafeNumberFlow } from '../../../components/SafeNumberFlow';
 import { ensureHeyApiConfigured } from '../../../api/heyapi';
 import {
@@ -17,9 +17,7 @@ import {
 import { Pagination } from '../../../components/Pagination';
 import { RouteErrorBoundary } from '../../../components/RouteErrorBoundary';
 import { PageHeader } from '../../../components/ui/PageHeader';
-import { GlassCard } from '../../../components/ui/GlassCard';
 import { CopyButton } from '@/components/animate-ui/components/buttons/copy';
-import { cn } from '../../../lib/utils';
 import { NFTDetailModal } from '../../../components/NFTDetailModal';
 import { apiItemToCadenceFormat } from '../../../components/NFTDetailContent';
 import { getCollectionPreviewVideo } from '../../../components/account/accountUtils';

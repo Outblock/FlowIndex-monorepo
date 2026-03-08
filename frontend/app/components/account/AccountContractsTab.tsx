@@ -7,7 +7,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Code, FileText, ChevronRight, ExternalLink } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import { normalizeAddress } from './accountUtils';
-import { GlassCard } from '../ui/GlassCard';
+import { GlassCard } from '@flowindex/flow-ui';
 import { motion, AnimatePresence } from 'framer-motion';
 
 SyntaxHighlighter.registerLanguage('swift', swift);

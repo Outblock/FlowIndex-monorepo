@@ -1,5 +1,5 @@
 import { Package, ExternalLink } from 'lucide-react';
-import { ImageWithFallback } from './ui/ImageWithFallback';
+import { ImageWithFallback } from '@flowindex/flow-ui';
 import { getNFTMedia, normalizeAddress } from './account/accountUtils';
 import { AddressLink } from './AddressLink';
 

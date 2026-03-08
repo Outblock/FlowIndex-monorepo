@@ -2,13 +2,12 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import { Info, Clock, ExternalLink, X } from 'lucide-react';
-import { GlassCard } from './ui/GlassCard';
+import { GlassCard, cn } from '@flowindex/flow-ui';
 import { NFTImage, NFTMetadata } from './NFTDetailContent';
 import { NFTTimeline } from './NFTTimeline';
 import { normalizeAddress } from './account/accountUtils';
 import { ensureHeyApiConfigured } from '../api/heyapi';
 import { getFlowV1NftByNftTypeItemByIdTransfer } from '../api/gen/find';
-import { cn } from '../lib/utils';
 
 interface NFTDetailModalProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

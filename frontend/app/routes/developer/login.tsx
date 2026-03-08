@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { KeyRound, Mail, Loader2, Wallet, ArrowLeft, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { FlowIndexLogo } from '../../components/FlowIndexLogo'
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp'
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@flowindex/flow-ui'
 
 const GridScan = lazy(() => import('../../components/GridScan'))
 

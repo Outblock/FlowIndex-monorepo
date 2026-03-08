@@ -9,7 +9,7 @@ import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
 import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { ArrowLeft, Box, Code, FileText, Layers, Activity, GitCompare, ChevronDown, ChevronRight, Clock, Hash, Sparkles, Terminal, GitBranch, ExternalLink } from 'lucide-react';
 import { openAIChat } from '../../components/chat/openAIChat';
-import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
+import { VerifiedBadge } from '@flowindex/flow-ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { formatAbsoluteTime, formatRelativeTime } from '../../lib/time';
 import { useTimeTicker } from '../../hooks/useTimeTicker';

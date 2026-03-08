@@ -3,8 +3,7 @@ import { AddressLink } from '../../components/AddressLink';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Coins, Info, Search, X, Loader2, DollarSign, ArrowLeftRight, AlertTriangle, ListFilter, Check } from 'lucide-react';
-import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
-import { EVMBridgeBadge } from '../../components/ui/EVMBridgeBadge';
+import { VerifiedBadge, EVMBridgeBadge } from '@flowindex/flow-ui';
 import { ensureHeyApiConfigured, getBaseURL } from '../../api/heyapi';
 import { Pagination } from '../../components/Pagination';
 

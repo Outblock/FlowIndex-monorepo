@@ -1,11 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Coins, Filter, Layers, Box, Info, ChevronDown } from 'lucide-react';
-import { VerifiedBadge } from '../ui/VerifiedBadge';
+import { VerifiedBadge, GlassCard, EVMBridgeBadge } from '@flowindex/flow-ui';
 import type { FTVaultInfo } from '../../../cadence/cadence.gen';
 import { normalizeAddress, getTokenLogoURL } from './accountUtils';
-import { GlassCard } from '../ui/GlassCard';
-import { EVMBridgeBadge } from '../ui/EVMBridgeBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFlowV1Ft } from '../../api/gen/find';
 import { UsdValue } from '../UsdValue';

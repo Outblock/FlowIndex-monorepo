@@ -10,7 +10,7 @@ import { useWebSocketStatus } from '../../hooks/useWebSocket';
 import { Pagination } from '../../components/Pagination';
 import { formatRelativeTime } from '../../lib/time';
 import { useTimeTicker } from '../../hooks/useTimeTicker';
-import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
+import { VerifiedBadge } from '@flowindex/flow-ui';
 
 const KIND_TABS = [
     { label: 'All', value: '' },

@@ -7,7 +7,7 @@ import { MessageSquare, X, Send, Trash2, Loader2, Sparkles, Database, Copy, Chec
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+} from '@flowindex/flow-ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { AnimatedMarkdown } from '@outblock/flowtoken';

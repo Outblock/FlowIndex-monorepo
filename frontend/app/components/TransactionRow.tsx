@@ -4,7 +4,7 @@ import { Activity, ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Repeat, FileCode
 import { formatShort, resolveIPFS } from './account/accountUtils';
 import { AddressLink } from './AddressLink';
 import { formatRelativeTime } from '../lib/time';
-import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@flowindex/flow-ui';
 import { AvatarGroup, AvatarGroupTooltip } from '@/components/animate-ui/components/animate/avatar-group';
 import { resolveApiBaseUrl } from '../api';
 import { deriveEnrichments } from '../lib/deriveFromEvents';

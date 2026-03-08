@@ -4,11 +4,10 @@ import { Package, Info, Clock, ArrowLeft } from 'lucide-react';
 import { ensureHeyApiConfigured } from '../../../../api/heyapi';
 import { getFlowV1NftByNftTypeItemById, getFlowV1NftByNftTypeItemByIdTransfer } from '../../../../api/gen/find';
 import { RouteErrorBoundary } from '../../../../components/RouteErrorBoundary';
-import { GlassCard } from '../../../../components/ui/GlassCard';
+import { GlassCard, cn } from '@flowindex/flow-ui';
 import { normalizeAddress } from '../../../../components/account/accountUtils';
 import { NFTImage, NFTMetadata, apiItemToCadenceFormat } from '../../../../components/NFTDetailContent';
 import { NFTTimeline } from '../../../../components/NFTTimeline';
-import { cn } from '../../../../lib/utils';
 import { CopyButton } from '@/components/animate-ui/components/buttons/copy';
 
 type ItemTab = 'detail' | 'history';

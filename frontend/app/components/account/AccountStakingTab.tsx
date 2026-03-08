@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Landmark, Server, Users, Lock, Gift, ArrowDownToLine, ArrowUpFromLine, Clock } from 'lucide-react';
 import { normalizeAddress } from './accountUtils';
-import { GlassCard } from '../ui/GlassCard';
+import { GlassCard } from '@flowindex/flow-ui';
 import { AddressLink } from '../AddressLink';
 import type { StakingInfo, NodeInfo, DelegatorInfo, LockedAccountInfo } from '../../../cadence/cadence.gen';
 

@@ -4,7 +4,7 @@ import { resolveApiBaseUrl } from '../../api';
 import { ensureHeyApiConfigured } from '../../api/heyapi';
 import { getFlowV1Ft } from '../../api/gen/find';
 import { normalizeAddress, getTokenLogoURL } from './accountUtils';
-import { GlassCard } from '../ui/GlassCard';
+import { GlassCard } from '@flowindex/flow-ui';
 import { TrendingUp, TrendingDown, Minus, ChevronDown, Coins, Award, Clock, Wallet, Download, Calendar } from 'lucide-react';
 import type { FTVaultInfo, StakingInfo } from '../../../cadence/cadence.gen';
 

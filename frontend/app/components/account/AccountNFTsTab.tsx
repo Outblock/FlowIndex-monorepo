@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Package, Image as ImageIcon, ExternalLink, Grid, List as ListIcon } from 'lucide-react';
 import type { NFTCollection } from '../../../cadence/cadence.gen';
 import { normalizeAddress, getNFTThumbnail, backfillNFTData, toBackfillItem } from './accountUtils';
-import { GlassCard } from '../ui/GlassCard';
-import { cn } from '../../lib/utils';
-import { ImageWithFallback } from '../ui/ImageWithFallback';
+import { GlassCard, cn, ImageWithFallback } from '@flowindex/flow-ui';
 import { NFTDetailModal } from '../NFTDetailModal';
 
 const NFT_PAGE_SIZE = 30;

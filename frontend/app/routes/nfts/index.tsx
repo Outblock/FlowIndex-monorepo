@@ -2,8 +2,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { AddressLink } from '../../components/AddressLink';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Image, LayoutGrid, LayoutList, Users, Search, X, Loader2, ArrowLeftRight, AlertTriangle, ListFilter, Check } from 'lucide-react';
-import { VerifiedBadge } from '../../components/ui/VerifiedBadge';
-import { EVMBridgeBadge } from '../../components/ui/EVMBridgeBadge';
+import { VerifiedBadge, EVMBridgeBadge } from '@flowindex/flow-ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ensureHeyApiConfigured, getBaseURL } from '../../api/heyapi';
 import { Pagination } from '../../components/Pagination';

@@ -6,7 +6,7 @@ import {
   AvatarGroupTooltip as AvatarGroupTooltipPrimitive,
   AvatarGroupTooltipArrow as AvatarGroupTooltipArrowPrimitive,
 } from '@/components/animate-ui/primitives/animate/avatar-group';
-import { cn } from '@/lib/utils';
+import { cn } from '@flowindex/flow-ui';
 
 function AvatarGroup({
   className,

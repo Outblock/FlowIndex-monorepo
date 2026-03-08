@@ -21,8 +21,7 @@ import 'react-resizable/css/styles.css'
 import '../styles/grid-overrides.css'
 import { GripVertical, RotateCcw, CalendarIcon, AlertTriangle } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover'
-import { Calendar } from '../components/ui/calendar'
+import { Popover, PopoverTrigger, PopoverContent, Calendar } from '@flowindex/flow-ui'
 import {
   fetchAnalyticsDaily,
   fetchAnalyticsDailyModule,

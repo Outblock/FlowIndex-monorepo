@@ -4,7 +4,7 @@ import { AddressLink } from '../../components/AddressLink';
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Coins, Users, ArrowRightLeft, ArrowLeft, ExternalLink, Globe, ChevronDown, ChevronUp } from 'lucide-react';
-import { EVMBridgeBadge } from '../../components/ui/EVMBridgeBadge';
+import { EVMBridgeBadge } from '@flowindex/flow-ui';
 import { CopyButton } from '@/components/animate-ui/components/buttons/copy';
 import { SafeNumberFlow } from '../../components/SafeNumberFlow';
 import { ensureHeyApiConfigured, getBaseURL } from '../../api/heyapi';

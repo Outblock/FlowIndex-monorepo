@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from '@flowindex/flow-ui';
 
 interface PageHeaderProps {
     title: string | React.ReactNode;
