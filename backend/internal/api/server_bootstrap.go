@@ -178,6 +178,7 @@ func NewServer(repo *repository.Repository, client FlowClient, port string, star
 	registerBaseRoutes(r, s)
 	registerAdminRoutes(r, s)
 	registerAPIRoutes(r, s)
+	registerWalletRoutes(r, s)
 
 	s.httpServer = &http.Server{
 		Addr:    ":" + port,

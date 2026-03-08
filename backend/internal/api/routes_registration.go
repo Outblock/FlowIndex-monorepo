@@ -73,6 +73,42 @@ func registerAuthRoutes(r *mux.Router, s *Server) {
 	r.HandleFunc("/auth/verify-key", s.handleVerifyAPIKey).Methods("POST", "OPTIONS")
 }
 
+func registerWalletRoutes(r *mux.Router, s *Server) {
+	// --- Public routes (no auth) ---
+	r.HandleFunc("/api/v1/wallet/agent/login", s.handleAgentLoginCreate).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/wallet/agent/login/{id}", s.handleAgentLoginPoll).Methods("GET", "OPTIONS")
+
+	// --- Supabase JWT auth subrouter (register FIRST for more specific paths) ---
+	sbAuth := r.PathPrefix("/api/v1/wallet").Subrouter()
+	sbAuth.Use(s.supabaseAuthMiddleware)
+
+	// Agent login complete
+	sbAuth.HandleFunc("/agent/login/{id}/complete", s.handleAgentLoginComplete).Methods("POST", "OPTIONS")
+
+	// Approval details + signing (wallet app calls these)
+	sbAuth.HandleFunc("/approve/{id}", s.handleApprovalDetails).Methods("GET", "OPTIONS")
+	sbAuth.HandleFunc("/approve/{id}/sign", s.handleApprovalSign).Methods("POST", "OPTIONS")
+
+	// Wallet API key CRUD
+	sbAuth.HandleFunc("/keys", s.handleWalletKeyCreate).Methods("POST", "OPTIONS")
+	sbAuth.HandleFunc("/keys", s.handleWalletKeyList).Methods("GET", "OPTIONS")
+	sbAuth.HandleFunc("/keys/{id}", s.handleWalletKeyDelete).Methods("DELETE", "OPTIONS")
+
+	// --- Wallet auth subrouter (Bearer JWT or API key) ---
+	wAuth := r.PathPrefix("/api/v1/wallet").Subrouter()
+	wAuth.Use(s.walletAuthMiddleware)
+
+	// Wallet info
+	wAuth.HandleFunc("/me", s.handleWalletMe).Methods("GET", "OPTIONS")
+
+	// Signing proxy
+	wAuth.HandleFunc("/sign", s.handleWalletSign).Methods("POST", "OPTIONS")
+
+	// Approval create + poll
+	wAuth.HandleFunc("/approve", s.handleApprovalCreate).Methods("POST", "OPTIONS")
+	wAuth.HandleFunc("/approve/{id}", s.handleApprovalPoll).Methods("GET", "OPTIONS")
+}
+
 func registerCadenceRoutes(r *mux.Router, s *Server) {
 	r.HandleFunc("/api/cadence/check", s.handleCadenceCheck).Methods("POST", "OPTIONS")
 }

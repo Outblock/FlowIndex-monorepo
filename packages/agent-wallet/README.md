@@ -19,6 +19,27 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
+The agent will use `wallet_login` to generate a login URL. Open it in your browser, authenticate with your FlowIndex account, and the agent receives a wallet token automatically.
+
+### Cloud wallet (pre-authenticated)
+
+Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.io/developer/wallet), then:
+
+```json
+{
+  "mcpServers": {
+    "flow-wallet": {
+      "command": "npx",
+      "args": ["@flowindex/agent-wallet"],
+      "env": {
+        "FLOWINDEX_TOKEN": "wk_your_wallet_api_key_here",
+        "APPROVAL_REQUIRED": "false"
+      }
+    }
+  }
+}
+```
+
 ### Mnemonic (headless, local signing)
 
 ```json
@@ -143,6 +164,18 @@ When `APPROVAL_REQUIRED=true` (the default), transactions follow a two-step flow
 2. **Agent calls `confirm_transaction`** with the `pendingId` -- the transaction is signed, sent, and the result returned
 
 The agent can also call `cancel_transaction` to reject, or `list_pending` to see all queued transactions. Set `APPROVAL_REQUIRED=false` for fully autonomous headless operation.
+
+### Passkey Approval (cloud wallet with passkey signing)
+
+When using cloud wallet with passkey-linked accounts, transactions require browser-based approval:
+
+1. Agent calls `execute_template` -- a passkey approval request is created
+2. The agent receives an `approve_url` (e.g., `wallet.flowindex.io/approve/abc-123`)
+3. The agent shows the URL to the user
+4. User opens the URL, reviews the transaction, and approves with their passkey (WebAuthn)
+5. The agent polls for completion and receives the signature
+
+This flow ensures physical user interaction is required for every transaction signed with a passkey.
 
 ## Template Categories (70 templates)
 
