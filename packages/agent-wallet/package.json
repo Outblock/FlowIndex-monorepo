@@ -24,8 +24,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.22.0",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "@onflow/fcl": "^1.21.9",
     "@onflow/rlp": "^1.2.2",
+    "@scure/bip32": "^2.0.1",
+    "@scure/bip39": "^2.0.1",
     "sha3": "^2.1.4",
     "viem": "^2.39.3",
     "zod": "^3.24.3"
