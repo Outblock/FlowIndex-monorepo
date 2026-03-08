@@ -76,6 +76,7 @@ import { FlowTokenListLookupBlock } from '@/blocks/blocks/flow_token_list_lookup
 import { FlowIncrementFiBlock } from '@/blocks/blocks/flow_increment_fi'
 import { FlowFlowIndexApiBlock } from '@/blocks/blocks/flow_flowindex_api'
 import { FlowFindProfileBlock } from '@/blocks/blocks/flow_find_profile'
+import { FlowSendBlock } from '@/blocks/blocks/flow_send'
 import { FlowTriggerBlock } from '@/blocks/blocks/flow_trigger'
 import {
   FlowAccountEventTriggerBlock,
@@ -327,6 +328,7 @@ export const registry: Record<string, BlockConfig> = {
   flow_increment_fi: FlowIncrementFiBlock,
   flow_flowindex_api: FlowFlowIndexApiBlock,
   flow_find_profile: FlowFindProfileBlock,
+  flow_send: FlowSendBlock,
   flow_trigger: FlowTriggerBlock,
   flow_account_event_trigger: FlowAccountEventTriggerBlock,
   flow_balance_change_trigger: FlowBalanceChangeTriggerBlock,
