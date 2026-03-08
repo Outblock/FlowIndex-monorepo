@@ -30,14 +30,19 @@ export const flowSendTransactionTool: ToolConfig<
       required: false,
       description: 'JSON array of arguments (default: [])',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer (with or without 0x prefix)',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -54,6 +59,7 @@ export const flowSendTransactionTool: ToolConfig<
     body: (params) => ({
       script: params.script,
       arguments: params.arguments ?? '[]',
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

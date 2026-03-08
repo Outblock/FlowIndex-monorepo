@@ -119,6 +119,7 @@ export interface FlowExecuteScriptParams {
 export interface FlowSendTransactionParams {
   script: string
   arguments?: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -217,6 +218,7 @@ export interface FlowFindProfileParams {
 export interface FlowTransferFlowParams {
   recipient: string
   amount: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -228,6 +230,7 @@ export interface FlowTransferFtParams {
   amount: string
   vaultPath: string
   receiverPath: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -239,6 +242,7 @@ export interface FlowTransferNftParams {
   nftId: string
   collectionStoragePath: string
   collectionPublicPath: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -248,6 +252,7 @@ export interface FlowTransferNftParams {
 export interface FlowStakeParams {
   amount: string
   nodeId?: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -256,6 +261,7 @@ export interface FlowStakeParams {
 /** Parameters for unstake tool */
 export interface FlowUnstakeParams {
   amount: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -264,6 +270,7 @@ export interface FlowUnstakeParams {
 /** Parameters for withdraw_rewards tool */
 export interface FlowWithdrawRewardsParams {
   amount: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -283,6 +290,7 @@ export interface FlowEvmSendParams {
   data?: string
   value?: string
   gasLimit?: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -293,6 +301,7 @@ export interface FlowCreateAccountParams {
   publicKey: string
   sigAlgo?: string
   hashAlgo?: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -304,6 +313,7 @@ export interface FlowAddKeyParams {
   sigAlgo?: string
   hashAlgo?: string
   weight?: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -312,6 +322,7 @@ export interface FlowAddKeyParams {
 /** Parameters for remove_key tool */
 export interface FlowRemoveKeyParams {
   keyIndex: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string
@@ -320,6 +331,7 @@ export interface FlowRemoveKeyParams {
 /** Parameters for batch_transfer tool */
 export interface FlowBatchTransferParams {
   recipients: string
+  signer?: string
   signerAddress: string
   signerPrivateKey: string
   network?: string

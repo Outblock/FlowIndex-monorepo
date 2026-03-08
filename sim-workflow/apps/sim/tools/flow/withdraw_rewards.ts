@@ -25,14 +25,19 @@ export const flowWithdrawRewardsTool: ToolConfig<
       required: true,
       description: 'Amount of rewards to withdraw',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -48,6 +53,7 @@ export const flowWithdrawRewardsTool: ToolConfig<
     headers: () => ({ 'Content-Type': 'application/json' }),
     body: (params) => ({
       amount: params.amount,
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

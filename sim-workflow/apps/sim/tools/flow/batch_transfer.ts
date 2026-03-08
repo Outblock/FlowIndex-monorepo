@@ -25,14 +25,19 @@ export const flowBatchTransferTool: ToolConfig<
       required: true,
       description: 'JSON array of {address, amount} objects',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -48,6 +53,7 @@ export const flowBatchTransferTool: ToolConfig<
     headers: () => ({ 'Content-Type': 'application/json' }),
     body: (params) => ({
       recipients: params.recipients,
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

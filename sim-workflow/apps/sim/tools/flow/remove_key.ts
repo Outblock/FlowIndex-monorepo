@@ -22,14 +22,19 @@ export const flowRemoveKeyTool: ToolConfig<FlowRemoveKeyParams, FlowRemoveKeyRes
       required: true,
       description: 'Index of the key to remove',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -45,6 +50,7 @@ export const flowRemoveKeyTool: ToolConfig<FlowRemoveKeyParams, FlowRemoveKeyRes
     headers: () => ({ 'Content-Type': 'application/json' }),
     body: (params) => ({
       keyIndex: params.keyIndex,
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

@@ -23,18 +23,30 @@ export const FlowStakeBlock: BlockConfig = {
       placeholder: 'Node ID hex string',
     },
     {
+      id: 'signer',
+      title: 'Signer',
+      type: 'dropdown',
+      options: [
+        { label: 'Manual Key', id: 'manual' },
+      ],
+      placeholder: 'Select a signer...',
+      defaultValue: 'manual',
+    },
+    {
       id: 'signerAddress',
       title: 'Signer Address',
       type: 'short-input',
       placeholder: '0x...',
-      required: true,
+      condition: { field: 'signer', value: 'manual' },
+      required: { field: 'signer', value: 'manual' },
     },
     {
       id: 'signerPrivateKey',
       title: 'Signer Private Key',
       type: 'short-input',
       placeholder: 'Hex-encoded private key',
-      required: true,
+      condition: { field: 'signer', value: 'manual' },
+      required: { field: 'signer', value: 'manual' },
     },
     {
       id: 'network',
@@ -50,13 +62,42 @@ export const FlowStakeBlock: BlockConfig = {
     access: ['flow_stake'],
     config: {
       tool: () => 'flow_stake',
-      params: (params) => ({
-        amount: params.amount,
-        nodeId: params.nodeId,
-        signerAddress: params.signerAddress,
-        signerPrivateKey: params.signerPrivateKey,
-        network: params.network ?? 'mainnet',
-      }),
+      params: (params) => {
+        let signerJson: string | undefined
+        const signerValue = params.signer as string
+        if (signerValue === 'manual') {
+          signerJson = JSON.stringify({
+            signerMode: 'legacy',
+            signerAddress: params.signerAddress,
+            signerPrivateKey: params.signerPrivateKey,
+          })
+        } else if (typeof signerValue === 'string' && signerValue.startsWith('cloud:')) {
+          signerJson = JSON.stringify({
+            signerMode: 'cloud',
+            signerKeyId: signerValue.replace('cloud:', ''),
+          })
+        } else if (typeof signerValue === 'string' && signerValue.startsWith('passkey:')) {
+          signerJson = JSON.stringify({
+            signerMode: 'passkey',
+            signerCredentialId: signerValue.replace('passkey:', ''),
+          })
+        } else {
+          signerJson = JSON.stringify({
+            signerMode: 'legacy',
+            signerAddress: params.signerAddress,
+            signerPrivateKey: params.signerPrivateKey,
+          })
+        }
+
+        return {
+          amount: params.amount as string,
+          nodeId: params.nodeId as string | undefined,
+          signer: signerJson,
+          signerAddress: params.signerAddress as string,
+          signerPrivateKey: params.signerPrivateKey as string,
+          network: (params.network as string) || 'mainnet',
+        }
+      },
     },
   },
   inputs: {
