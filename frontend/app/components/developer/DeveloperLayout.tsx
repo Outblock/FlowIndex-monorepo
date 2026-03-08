@@ -8,6 +8,7 @@ import {
   GitBranch,
   FileText,
   Sparkles,
+  Wallet,
   LogOut,
   Loader2,
   ChevronDown,
@@ -27,6 +28,7 @@ const navItems: NavItem[] = [
   { label: 'Workflows', path: '/developer/subscriptions', icon: GitBranch },
   { label: 'Delivery Logs', path: '/developer/logs', icon: FileText },
   { label: 'Studio (Beta)', path: '/developer/studio', icon: Sparkles },
+  { label: 'Wallet', path: '/developer/wallet', icon: Wallet },
 ]
 
 export default function DeveloperLayout({ children }: { children: React.ReactNode }) {

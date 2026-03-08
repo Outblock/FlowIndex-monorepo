@@ -317,3 +317,73 @@ export async function testWorkflow(
 export async function getAccountUsage(): Promise<AccountUsage> {
   return request<AccountUsage>('/account/usage');
 }
+
+// ---------------------------------------------------------------------------
+// Wallet API Keys
+// ---------------------------------------------------------------------------
+
+export interface WalletAPIKey {
+  id: string;
+  name: string;
+  key?: string;
+  key_prefix?: string;
+  scopes: string[];
+  is_active?: boolean;
+  created_at: string;
+  last_used?: string | null;
+}
+
+export async function listWalletKeys(): Promise<WalletAPIKey[]> {
+  const data = await request<{ items: WalletAPIKey[]; count: number }>('/wallet/keys');
+  return data.items ?? [];
+}
+
+export async function createWalletKey(name: string): Promise<WalletAPIKey> {
+  return request<WalletAPIKey>('/wallet/keys', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteWalletKey(id: string): Promise<void> {
+  return request<void>(`/wallet/keys/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+// ---------------------------------------------------------------------------
+// Wallet Info
+// ---------------------------------------------------------------------------
+
+export interface WalletInfo {
+  keys: Array<{
+    id: string;
+    flow_address: string;
+    public_key: string;
+    key_index: number;
+    label: string;
+    sig_algo: string;
+    hash_algo: string;
+    source: string;
+    created_at: string;
+  }>;
+  accounts: Array<{
+    credential_id: string;
+    public_key: string;
+    flow_address: string;
+    name: string;
+    created_at: string;
+  }>;
+}
+
+export async function getWalletInfo(): Promise<WalletInfo> {
+  return request<WalletInfo>('/wallet/me');
+}
+
+// ---------------------------------------------------------------------------
+// Agent Auth
+// ---------------------------------------------------------------------------
+
+export async function completeAgentLogin(sessionId: string): Promise<void> {
+  await request<void>(`/wallet/agent/login/${encodeURIComponent(sessionId)}/complete`, {
+    method: 'POST',
+  });
+}
