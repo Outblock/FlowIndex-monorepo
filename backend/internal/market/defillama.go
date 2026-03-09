@@ -5,8 +5,73 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
+
+// FetchDefiLlamaCurrentPrices fetches current USD prices for multiple tokens
+// from DeFi Llama's /prices/current endpoint. Keys are coingecko IDs.
+func FetchDefiLlamaCurrentPrices(ctx context.Context, coingeckoIDs []string) (map[string]PriceQuote, error) {
+	if len(coingeckoIDs) == 0 {
+		return nil, nil
+	}
+	// Build comma-separated "coingecko:id1,coingecko:id2,..." param
+	coins := make([]string, len(coingeckoIDs))
+	for i, id := range coingeckoIDs {
+		coins[i] = "coingecko:" + id
+	}
+	url := fmt.Sprintf("https://coins.llama.fi/prices/current/%s", strings.Join(coins, ","))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "flowscan-clone/1.0")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("defillama current prices status: %s", resp.Status)
+	}
+
+	var result struct {
+		Coins map[string]struct {
+			Price     float64 `json:"price"`
+			Timestamp float64 `json:"timestamp"`
+			Confidence float64 `json:"confidence"`
+		} `json:"coins"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode defillama current: %w", err)
+	}
+
+	now := time.Now()
+	out := make(map[string]PriceQuote, len(result.Coins))
+	for key, data := range result.Coins {
+		if data.Price <= 0 {
+			continue
+		}
+		// key is "coingecko:flow" → extract "flow"
+		cgID := strings.TrimPrefix(key, "coingecko:")
+		ts := now
+		if data.Timestamp > 0 {
+			ts = time.Unix(int64(data.Timestamp), 0).UTC()
+		}
+		out[cgID] = PriceQuote{
+			Asset:    cgID,
+			Currency: "usd",
+			Price:    data.Price,
+			Source:   "defillama",
+			AsOf:     ts,
+		}
+	}
+	return out, nil
+}
 
 // FetchDefiLlamaPriceHistory fetches daily prices from DeFi Llama for a CoinGecko ID.
 // Paginates in 500-day chunks. Returns oldest-first, skipping zero prices.

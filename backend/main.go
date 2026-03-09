@@ -1140,42 +1140,119 @@ func main() {
 	}
 
 	// Start Market Price Poller (Runs every N mins)
+	// Fetches current prices for ALL tokens with coingecko_id from multiple sources.
+	// Priority: CoinGecko → DeFi Llama → GeckoTerminal (first success wins per token).
 	if enablePriceFeed {
-		refreshMin := getEnvInt("PRICE_REFRESH_MIN", 10)
+		refreshMin := getEnvInt("PRICE_REFRESH_MIN", 30)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			fetchAndStore := func() {
-				ctxFetch, cancel := context.WithTimeout(ctx, 10*time.Second)
-				defer cancel()
-
-				quote, err := market.FetchFlowPrice(ctxFetch)
+			fetchAndStoreAll := func() {
+				// Load coingecko_id -> market_symbol mapping
+				cgMap, err := repo.GetCoingeckoToMarketSymbolMap(ctx)
 				if err != nil {
-					log.Printf("Failed to fetch Flow price: %v", err)
+					log.Printf("[price_poller] Failed to load coingecko map: %v", err)
+					return
+				}
+				if len(cgMap) == 0 {
 					return
 				}
 
-				if err := repo.InsertMarketPrice(ctxFetch, repository.MarketPrice{
-					Asset:          quote.Asset,
-					Currency:       quote.Currency,
-					Price:          quote.Price,
-					PriceChange24h: quote.PriceChange24h,
-					MarketCap:      quote.MarketCap,
-					Source:         quote.Source,
-					AsOf:           quote.AsOf,
-				}); err != nil {
-					log.Printf("Failed to store Flow price: %v", err)
-				} else {
-					apiServer.PriceCache().Append(strings.ToUpper(quote.Asset), []market.DailyPrice{
-						{Date: quote.AsOf.UTC().Truncate(24 * time.Hour), Price: quote.Price},
-					})
+				cgIDs := make([]string, 0, len(cgMap))
+				for id := range cgMap {
+					cgIDs = append(cgIDs, id)
 				}
+
+				// Track which tokens we've successfully fetched
+				fetched := make(map[string]market.PriceQuote) // key: coingecko_id
+
+				// Source 1: CoinGecko batch
+				ctxCG, cancelCG := context.WithTimeout(ctx, 15*time.Second)
+				cgPrices, err := market.FetchMultiTokenPrices(ctxCG, cgIDs)
+				cancelCG()
+				if err != nil {
+					log.Printf("[price_poller] CoinGecko batch error: %v", err)
+				} else {
+					for id, q := range cgPrices {
+						fetched[id] = q
+					}
+				}
+
+				// Source 2: DeFi Llama for any missing
+				var missing []string
+				for _, id := range cgIDs {
+					if _, ok := fetched[id]; !ok {
+						missing = append(missing, id)
+					}
+				}
+				if len(missing) > 0 {
+					ctxDL, cancelDL := context.WithTimeout(ctx, 15*time.Second)
+					dlPrices, err := market.FetchDefiLlamaCurrentPrices(ctxDL, missing)
+					cancelDL()
+					if err != nil {
+						log.Printf("[price_poller] DeFi Llama error: %v", err)
+					} else {
+						for id, q := range dlPrices {
+							fetched[id] = q
+						}
+					}
+				}
+
+				// Source 3: GeckoTerminal for Flow EVM tokens still missing
+				missing = missing[:0]
+				for _, id := range cgIDs {
+					if _, ok := fetched[id]; !ok {
+						missing = append(missing, id)
+					}
+				}
+				if len(missing) > 0 {
+					ctxGT, cancelGT := context.WithTimeout(ctx, 15*time.Second)
+					gtPrices, err := market.FetchGeckoTerminalPrices(ctxGT)
+					cancelGT()
+					if err != nil {
+						log.Printf("[price_poller] GeckoTerminal error: %v", err)
+					} else {
+						// GeckoTerminal keys are token contract IDs, not coingecko IDs.
+						// We can't directly map them, so just log availability for now.
+						if len(gtPrices) > 0 {
+							log.Printf("[price_poller] GeckoTerminal returned %d Flow EVM token prices", len(gtPrices))
+						}
+					}
+				}
+
+				// Store all fetched prices
+				stored := 0
+				for cgID, q := range fetched {
+					marketSym, ok := cgMap[cgID]
+					if !ok {
+						continue
+					}
+					asset := strings.ToUpper(marketSym)
+					if err := repo.InsertMarketPrice(ctx, repository.MarketPrice{
+						Asset:          asset,
+						Currency:       "USD",
+						Price:          q.Price,
+						PriceChange24h: q.PriceChange24h,
+						MarketCap:      q.MarketCap,
+						Source:         q.Source,
+						AsOf:           q.AsOf,
+					}); err != nil {
+						log.Printf("[price_poller] Failed to store %s: %v", asset, err)
+						continue
+					}
+					apiServer.PriceCache().Append(asset, []market.DailyPrice{
+						{Date: q.AsOf.UTC().Truncate(24 * time.Hour), Price: q.Price},
+					})
+					stored++
+				}
+				log.Printf("[price_poller] Updated %d/%d token prices (sources: coingecko=%d, defillama+gt=%d)",
+					stored, len(cgMap), len(cgPrices), len(fetched)-len(cgPrices))
 			}
 
 			// Run immediately
-			fetchAndStore()
+			fetchAndStoreAll()
 
 			ticker := time.NewTicker(time.Duration(refreshMin) * time.Minute)
 			defer ticker.Stop()
@@ -1185,7 +1262,7 @@ func main() {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					fetchAndStore()
+					fetchAndStoreAll()
 				}
 			}
 		}()

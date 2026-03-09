@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -61,6 +62,63 @@ func FetchFlowPrice(ctx context.Context) (PriceQuote, error) {
 	}
 
 	return PriceQuote{}, fmt.Errorf("coingecko payload missing flow")
+}
+
+// FetchMultiTokenPrices fetches current USD prices for multiple tokens in one
+// CoinGecko API call. Keys in the returned map are the coingecko IDs passed in.
+func FetchMultiTokenPrices(ctx context.Context, coingeckoIDs []string) (map[string]PriceQuote, error) {
+	if len(coingeckoIDs) == 0 {
+		return nil, nil
+	}
+	ids := strings.Join(coingeckoIDs, ",")
+	url := fmt.Sprintf(
+		"https://api.coingecko.com/api/v3/simple/price?ids=%s&vs_currencies=usd&include_24hr_change=true&include_market_cap=true",
+		ids,
+	)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "flowscan-clone/1.0")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("coingecko batch status: %s", resp.Status)
+	}
+
+	var result map[string]struct {
+		USD          float64 `json:"usd"`
+		USDChange24h float64 `json:"usd_24h_change"`
+		USDMarketCap float64 `json:"usd_market_cap"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	out := make(map[string]PriceQuote, len(result))
+	for id, data := range result {
+		if data.USD <= 0 {
+			continue
+		}
+		out[id] = PriceQuote{
+			Asset:          id,
+			Currency:       "usd",
+			Price:          data.USD,
+			PriceChange24h: data.USDChange24h,
+			MarketCap:      data.USDMarketCap,
+			Source:         "coingecko",
+			AsOf:           now,
+		}
+	}
+	return out, nil
 }
 
 // FetchFlowPriceHistory fetches daily FLOW/USD prices for the last N days
