@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Landmark, Server, Users, Lock, Gift, ArrowDownToLine, ArrowUpFromLine, Clock } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Landmark, Server, Users, Lock, Gift, ArrowDownToLine, ArrowUpFromLine, Clock, History, ExternalLink, Loader2 } from 'lucide-react';
+import { resolveApiBaseUrl } from '../../api';
 import { normalizeAddress } from './accountUtils';
 import { GlassCard } from '@flowindex/flow-ui';
 import { AddressLink } from '../AddressLink';
@@ -23,6 +24,31 @@ const ROLE_COLORS: Record<number, string> = {
     3: 'text-orange-500 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/30',
     4: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30',
     5: 'text-cyan-500 bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/30',
+};
+
+const EVENT_LABELS: Record<string, string> = {
+    TokensCommitted: 'Staked',
+    DelegatorTokensCommitted: 'Staked',
+    TokensStaked: 'Restaked',
+    DelegatorTokensStaked: 'Restaked',
+    TokensUnstaking: 'Unstaking',
+    DelegatorTokensUnstaking: 'Unstaking',
+    TokensUnstaked: 'Unstaked',
+    DelegatorTokensUnstaked: 'Unstaked',
+    RewardsPaid: 'Reward',
+    DelegatorRewardsPaid: 'Reward',
+    NewNodeCreated: 'Node Created',
+    NewDelegatorCreated: 'Delegator Created',
+};
+
+const EVENT_COLORS: Record<string, string> = {
+    Staked: 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30',
+    Restaked: 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30',
+    Unstaking: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30',
+    Unstaked: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-500/10 border-red-200 dark:border-red-500/30',
+    Reward: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30',
+    'Node Created': 'text-zinc-500 bg-zinc-50 dark:text-zinc-400 dark:bg-white/5 border-zinc-200 dark:border-white/10',
+    'Delegator Created': 'text-zinc-500 bg-zinc-50 dark:text-zinc-400 dark:bg-white/5 border-zinc-200 dark:border-white/10',
 };
 
 function formatFlow(value: string | number | undefined): string {
@@ -146,6 +172,131 @@ function DelegatorInfoCard({ delegator, index }: { delegator: DelegatorInfo; ind
                 </div>
             </div>
         </GlassCard>
+    );
+}
+
+function StakingActivitySection({ address }: { address: string }) {
+    const [events, setEvents] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [offset, setOffset] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const loadingRef = useRef(false);
+
+    const loadMore = useCallback(async () => {
+        if (loadingRef.current || !hasMore) return;
+        loadingRef.current = true;
+        setLoading(true);
+        try {
+            const baseUrl = await resolveApiBaseUrl();
+            const res = await fetch(`${baseUrl}/flow/account/${encodeURIComponent(address)}/staking/activity?limit=50&offset=${offset}`);
+            if (!res.ok) throw new Error('Failed to load staking activity');
+            const json = await res.json();
+            const items: any[] = json?.data ?? [];
+            setEvents(prev => [...prev, ...items]);
+            setOffset(prev => prev + items.length);
+            setHasMore(items.length >= 50);
+        } catch (err) {
+            console.error('Failed to load staking activity', err);
+        } finally {
+            loadingRef.current = false;
+            setLoading(false);
+        }
+    }, [address, offset, hasMore]);
+
+    useEffect(() => {
+        loadMore();
+    }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (events.length === 0 && !loading) return null;
+
+    // Group events by epoch
+    const grouped = new Map<number | string, { epoch: number | null; epochStart?: string; epochEnd?: string; events: any[] }>();
+    for (const evt of events) {
+        const epoch = evt.epoch ?? null;
+        const key = epoch ?? 'unknown';
+        if (!grouped.has(key)) {
+            grouped.set(key, { epoch, epochStart: evt.epoch_start, epochEnd: evt.epoch_end, events: [] });
+        }
+        grouped.get(key)!.events.push(evt);
+    }
+
+    return (
+        <div className="space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                <History className="w-3.5 h-3.5" />
+                Staking Activity
+            </h4>
+
+            {[...grouped.entries()].map(([key, group]) => (
+                <div key={String(key)}>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="h-px flex-1 bg-zinc-200 dark:bg-white/10" />
+                        <span className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">
+                            {group.epoch != null ? `Epoch #${group.epoch}` : 'Unknown Epoch'}
+                            {group.epochStart && group.epochEnd && (
+                                <> &middot; {new Date(group.epochStart).toLocaleDateString()} – {new Date(group.epochEnd).toLocaleDateString()}</>
+                            )}
+                        </span>
+                        <div className="h-px flex-1 bg-zinc-200 dark:bg-white/10" />
+                    </div>
+
+                    <div className="space-y-1">
+                        {group.events.map((evt: any, i: number) => {
+                            const label = EVENT_LABELS[evt.event_type] || evt.event_type;
+                            const colorClass = EVENT_COLORS[label] || EVENT_COLORS['Node Created'];
+                            const amount = parseFloat(evt.amount) || 0;
+                            return (
+                                <div key={`${evt.block_height}-${evt.event_index}-${i}`}
+                                    className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-black/20 border border-zinc-100 dark:border-white/5 rounded-sm hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                                >
+                                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm border shrink-0 ${colorClass}`}>
+                                        {label}
+                                    </span>
+
+                                    {amount > 0 && (
+                                        <span className="text-sm font-mono font-bold text-zinc-900 dark:text-white shrink-0">
+                                            {amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                                            <span className="text-[10px] font-normal text-zinc-500 ml-1">FLOW</span>
+                                        </span>
+                                    )}
+
+                                    <span className="text-[10px] text-zinc-400 font-mono truncate">
+                                        {evt.node_id ? `Node ${evt.node_id.slice(0, 12)}...` : ''}
+                                        {evt.delegator_id > 0 ? ` · Delegator #${evt.delegator_id}` : ''}
+                                    </span>
+
+                                    <div className="flex-1" />
+
+                                    <span className="text-[10px] text-zinc-400 shrink-0">
+                                        {new Date(evt.timestamp).toLocaleString()}
+                                    </span>
+                                    <a href={`/txs/${evt.transaction_id}`}
+                                        className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+
+            {loading && (
+                <div className="flex justify-center py-4">
+                    <Loader2 className="w-5 h-5 text-zinc-400 animate-spin" />
+                </div>
+            )}
+            {hasMore && !loading && events.length > 0 && (
+                <button
+                    onClick={loadMore}
+                    className="w-full py-2 text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 border border-zinc-200 dark:border-white/10 rounded-sm hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                >
+                    Load more
+                </button>
+            )}
+        </div>
     );
 }
 
@@ -309,6 +460,9 @@ export function AccountStakingTab({ address }: Props) {
                             <div className="text-[10px] text-zinc-400 mt-1">This account is not running a node or delegating tokens</div>
                         </GlassCard>
                     )}
+
+                    {/* Staking Activity History */}
+                    <StakingActivitySection address={normalizedAddress} />
                 </>
             )}
         </div>
