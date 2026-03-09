@@ -1,4 +1,17 @@
 @import 'tailwindcss';
-@import 'fumadocs-ui/css/emerald.css';
+@import 'fumadocs-ui/css/neutral.css';
 @import 'fumadocs-ui/css/preset.css';
 @import 'fumadocs-openapi/css/preset.css';
+
+/* Flow green accent for links, selections, and highlights */
+:root {
+  --color-fd-primary: hsl(160, 84%, 39%);
+  --color-fd-primary-foreground: hsl(0, 0%, 100%);
+  --color-fd-ring: hsl(160, 84%, 39%);
+}
+
+.dark {
+  --color-fd-primary: hsl(160, 84%, 55%);
+  --color-fd-primary-foreground: hsl(0, 0%, 7%);
+  --color-fd-ring: hsl(160, 84%, 55%);
+}
