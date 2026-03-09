@@ -14,10 +14,13 @@ import ReactFlow, {
     type EdgeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { formatShort } from '../account/accountUtils';
+import Avatar from 'boring-avatars';
+import { normalizeAddress, formatShort } from '../account/accountUtils';
+import { colorsFromAddress, addressType } from '../AddressLink';
 import { extractLogoUrl } from '../TransactionRow';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ExpandableFlowContainer } from '../ExpandableFlowContainer';
+import { decodeEVMCallData } from '../../lib/deriveFromEvents';
 
 /* ── Custom edge that reliably renders React element labels ── */
 
@@ -139,28 +142,58 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         cursor: 'grab',
     };
 
-    const isSynthetic = (addr: string) => addr.startsWith('MINT:') || addr.startsWith('BURN:') || addr.startsWith('DEX:') || addr.startsWith('STAKE:');
+    const isSynthetic = (addr: string) => addr.startsWith('MINT:') || addr.startsWith('BURN:') || addr.startsWith('DEX:') || addr.startsWith('STAKE:') || addr.startsWith('BRIDGE:');
+
+    const syntheticColor = (addr: string) =>
+        addr.startsWith('MINT:') ? (isDark ? '#4ade80' : '#16a34a')
+        : addr.startsWith('BURN:') ? (isDark ? '#f87171' : '#dc2626')
+        : addr.startsWith('STAKE:') ? (isDark ? '#60a5fa' : '#2563eb')
+        : addr.startsWith('BRIDGE:') ? (isDark ? '#38bdf8' : '#0284c7')
+        : (isDark ? '#e4e4e7' : '#27272a');
+
+    const syntheticBorder = (addr: string) =>
+        addr.startsWith('MINT:') ? (isDark ? '1px solid rgba(74,222,128,0.3)' : '1px solid rgba(22,163,74,0.3)')
+        : addr.startsWith('BURN:') ? (isDark ? '1px solid rgba(248,113,113,0.3)' : '1px solid rgba(220,38,38,0.3)')
+        : addr.startsWith('STAKE:') ? (isDark ? '1px solid rgba(96,165,250,0.3)' : '1px solid rgba(37,99,235,0.3)')
+        : addr.startsWith('BRIDGE:') ? (isDark ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(2,132,199,0.3)')
+        : nodeStyle.border;
+
+    const avatarVariant = (addr: string): 'beam' | 'bauhaus' | 'pixel' => {
+        const t = addressType(addr);
+        return t === 'flow' ? 'beam' : t === 'coa' ? 'bauhaus' : 'pixel';
+    };
 
     const placeColumn = (addrs: string[], col: number): Node[] =>
         addrs.map((addr, row) => {
             const synthetic = isSynthetic(addr);
             const info = seen.get(addr)!;
+            const normalized = normalizeAddress(addr);
             return {
                 id: addr,
                 data: {
                     label: synthetic ? (
                         <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: addr.startsWith('MINT:') ? (isDark ? '#4ade80' : '#16a34a') : addr.startsWith('BURN:') ? (isDark ? '#f87171' : '#dc2626') : addr.startsWith('STAKE:') ? (isDark ? '#60a5fa' : '#2563eb') : (isDark ? '#e4e4e7' : '#27272a') }}>
+                            <div style={{ fontWeight: 700, fontSize: '11px', color: syntheticColor(addr) }}>
                                 {info.label}
                             </div>
                         </div>
                     ) : (
-                        <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
-                                {info.label}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flexShrink: 0 }}>
+                                <Avatar
+                                    size={24}
+                                    name={normalized}
+                                    variant={avatarVariant(normalized)}
+                                    colors={colorsFromAddress(normalized)}
+                                />
                             </div>
-                            <div style={{ fontSize: '9px', color: isDark ? '#71717a' : '#a1a1aa', fontFamily: 'ui-monospace, monospace', marginTop: '2px' }}>
-                                {formatShort(addr, 8, 4)}
+                            <div>
+                                <div style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
+                                    {info.label}
+                                </div>
+                                <div style={{ fontSize: '9px', color: isDark ? '#71717a' : '#a1a1aa', fontFamily: 'ui-monospace, monospace', marginTop: '2px' }}>
+                                    {formatShort(addr, 8, 4)}
+                                </div>
                             </div>
                         </div>
                     ),
@@ -171,13 +204,7 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
                 draggable: true,
                 style: synthetic ? {
                     ...nodeStyle,
-                    border: addr.startsWith('MINT:')
-                        ? (isDark ? '1px solid rgba(74,222,128,0.3)' : '1px solid rgba(22,163,74,0.3)')
-                        : addr.startsWith('BURN:')
-                            ? (isDark ? '1px solid rgba(248,113,113,0.3)' : '1px solid rgba(220,38,38,0.3)')
-                            : addr.startsWith('STAKE:')
-                                ? (isDark ? '1px solid rgba(96,165,250,0.3)' : '1px solid rgba(37,99,235,0.3)')
-                                : nodeStyle.border,
+                    border: syntheticBorder(addr),
                     minWidth: 100,
                 } : nodeStyle,
             };
@@ -360,6 +387,22 @@ function transfersToFlows(detail: any): Flow[] {
         }
     }
 
+    // Detect bridge-in: EVMVMBridgedToken with empty from_address + EVM execution with ERC-20 transfer.
+    // This means tokens were bridged from EVM → Cadence, not minted.
+    const evmExecs: any[] = detail?.evm_executions || [];
+    const bridgeFromMap = new Map<string, string>(); // token key → EVM from address (COA)
+    for (const exec of evmExecs) {
+        if (!exec.data || !exec.from) continue;
+        const decoded = decodeEVMCallData(exec.data);
+        if (decoded.callType === 'erc20_transfer' || decoded.callType === 'erc20_transferFrom') {
+            // The EVM 'from' is the source COA
+            const fromCOA = `0x${(exec.from as string).replace(/^0x/, '').padStart(40, '0')}`;
+            // Match by EVM contract address (the 'to' of the execution = token contract)
+            const evmContract = (exec.to as string)?.replace(/^0x/, '').toLowerCase() || '';
+            bridgeFromMap.set(evmContract, fromCOA);
+        }
+    }
+
     // Detect staking transactions: if events include FlowIDTableStaking, relabel burns as "Stake"
     const isStakingTx = (detail?.events || []).some((evt: any) =>
         typeof evt?.type === 'string' && evt.type.includes('FlowIDTableStaking')
@@ -371,12 +414,22 @@ function transfersToFlows(detail: any): Flow[] {
     for (let i = 0; i < ftTransfers.length; i++) {
         if (mergedMints.has(i)) continue; // skip COA legs already merged
         const ft = ftTransfers[i];
-        const rawFrom = ft.from_address || '';
+        let rawFrom = ft.from_address || '';
         const rawTo = ft.to_address || '';
         if (!rawFrom && !rawTo) continue;
         const sym = ft.token_symbol || ft.token?.split('.').pop() || 'FT';
         const amount = parseFloat(ft.amount) || 0;
         const usdValue = parseFloat(ft.usd_value) || 0;
+
+        // Detect EVMVMBridgedToken bridge-in: empty from_address but EVM execution shows the source COA
+        if (!rawFrom && rawTo && ft.token?.includes?.('EVMVMBridgedToken')) {
+            const match = ft.token.match(/EVMVMBridgedToken_([a-f0-9]+)/i);
+            if (match) {
+                const evmContract = match[1].toLowerCase();
+                const bridgeFrom = bridgeFromMap.get(evmContract);
+                if (bridgeFrom) rawFrom = bridgeFrom;
+            }
+        }
 
         // Use synthetic nodes for mint (no from) and burn (no to)
         const from = rawFrom || `MINT:${sym}`;

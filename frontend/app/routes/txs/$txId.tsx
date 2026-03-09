@@ -215,24 +215,48 @@ function NFTDetailRow({ nt, onClick, isAdmin }: { nt: any; onClick?: () => void;
 
 /** Simple Cadence code formatter — normalizes indentation based on brace nesting. */
 function formatCadenceScript(script: string): string {
-    const lines = script.split('\n');
+    const TAB = '    ';
+
+    // Phase 1: Expand inline blocks — split lines like `fun foo() {stmt1;stmt2;return x}`
+    // into multi-line form before re-indenting.
+    const expanded: string[] = [];
+    for (const rawLine of script.split('\n')) {
+        const trimmed = rawLine.trim();
+        if (!trimmed) { expanded.push(''); continue; }
+        // Match pattern: `prefix { body }` where body has `;` (multiple statements)
+        const m = trimmed.match(/^(.+?)\s*\{(.+)\}\s*$/);
+        if (m && m[2].includes(';')) {
+            const prefix = m[1];
+            const body = m[2].trim();
+            // Split on `;` preserving the semicolons
+            const stmts = body.split(';').map(s => s.trim()).filter(Boolean);
+            expanded.push(`${prefix} {`);
+            for (let i = 0; i < stmts.length; i++) {
+                const stmt = stmts[i];
+                // Last statement might not need semicolon (e.g. "return x")
+                const needsSemi = i < stmts.length - 1 || (!stmt.startsWith('return ') && !stmt.startsWith('return;'));
+                expanded.push(`    ${stmt}${needsSemi ? ';' : ''}`);
+            }
+            expanded.push('}');
+        } else {
+            expanded.push(trimmed);
+        }
+    }
+
+    // Phase 2: Re-indent based on brace nesting
     let indent = 0;
-    const TAB = '    '; // 4 spaces
     const result: string[] = [];
-    for (const rawLine of lines) {
+    for (const rawLine of expanded) {
         const trimmed = rawLine.trim();
         if (!trimmed) { result.push(''); continue; }
-        // Decrease indent for closing braces/parens at start of line
         const leadingClose = trimmed.match(/^[}\])]+/);
         if (leadingClose) indent = Math.max(0, indent - leadingClose[0].length);
         result.push(TAB.repeat(indent) + trimmed);
-        // Count net brace change for next line
         let net = 0;
         for (const ch of trimmed) {
-            if (ch === '{' || ch === '(') net++;
-            else if (ch === '}' || ch === ')') net--;
+            if (ch === '{') net++;
+            else if (ch === '}') net--;
         }
-        // If line ends with opening brace, the closing on same line was already counted
         indent = Math.max(0, indent + net);
     }
     return result.join('\n');
@@ -1852,6 +1876,14 @@ function TransactionDetail() {
                                             <Braces className="h-4 w-4" /> Cadence Script
                                         </h3>
                                         <div className="flex items-center gap-2">
+                                        {transaction.script && (
+                                            <CopyButton
+                                                content={scriptFormatted ? formatCadenceScript(transaction.script) : transaction.script}
+                                                variant="ghost"
+                                                size="xs"
+                                                className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold border border-zinc-300 dark:border-white/10 text-zinc-500 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                                            />
+                                        )}
                                         {transaction.script && (
                                             <button
                                                 onClick={() => setScriptFormatted(prev => !prev)}
