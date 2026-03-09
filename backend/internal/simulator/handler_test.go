@@ -33,13 +33,27 @@ func TestHandleSimulate_Success(t *testing.T) {
 	payloadBytes, _ := json.Marshal(eventPayload)
 	payloadB64 := base64.StdEncoding.EncodeToString(payloadBytes)
 
-	emulator := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Admin server handles snapshots
+	adminSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == "POST" && r.URL.Path == "/emulator/snapshots":
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]string{"block_height": "1"})
 		case r.Method == "PUT" && strings.HasPrefix(r.URL.Path, "/emulator/snapshots/"):
 			w.WriteHeader(http.StatusOK)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer adminSrv.Close()
+
+	emulator := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/v1/blocks":
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode([]map[string]interface{}{
+				{"header": map[string]interface{}{"id": "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234", "height": "100"}},
+			})
 		case r.Method == "POST" && r.URL.Path == "/v1/transactions":
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(map[string]string{"id": txID})
@@ -66,7 +80,7 @@ func TestHandleSimulate_Success(t *testing.T) {
 	}))
 	defer emulator.Close()
 
-	client := NewClient(emulator.URL)
+	client := NewClientWithAdmin(emulator.URL, adminSrv.URL)
 	handler := NewHandler(client)
 
 	body, _ := json.Marshal(SimulateRequest{

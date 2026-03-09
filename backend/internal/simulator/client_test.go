@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
@@ -74,8 +73,16 @@ func TestClientSendTransaction(t *testing.T) {
 	payloadBytes, _ := json.Marshal(eventPayload)
 	payloadB64 := base64.StdEncoding.EncodeToString(payloadBytes)
 
+	expectedBlockID := "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == "GET" && r.URL.Path == "/v1/blocks":
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode([]map[string]interface{}{
+				{"header": map[string]interface{}{"id": expectedBlockID, "height": "100"}},
+			})
+
 		case r.Method == "POST" && r.URL.Path == "/v1/transactions":
 			// Verify the request body has expected fields
 			var body map[string]interface{}
@@ -83,7 +90,7 @@ func TestClientSendTransaction(t *testing.T) {
 			if body["gas_limit"] != "9999" {
 				t.Errorf("expected gas_limit=9999, got %v", body["gas_limit"])
 			}
-			if body["reference_block_id"] != strings.Repeat("0", 64) {
+			if body["reference_block_id"] != expectedBlockID {
 				t.Errorf("unexpected reference_block_id: %v", body["reference_block_id"])
 			}
 			w.WriteHeader(http.StatusOK)

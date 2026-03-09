@@ -3,6 +3,10 @@ package simulator
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -38,14 +42,34 @@ type TxResult struct {
 
 // Client talks to a Flow Emulator REST API.
 type Client struct {
-	baseURL    string
+	baseURL    string // REST API (default port 8888)
+	adminURL   string // Admin API (default port 8080) — snapshots live here
 	httpClient *http.Client
 }
 
-// NewClient creates a new emulator client pointed at the given base URL.
+// NewClient creates a new emulator client pointed at the given REST API base URL.
+// The admin URL defaults to port 8080 on the same host.
 func NewClient(baseURL string) *Client {
+	base := strings.TrimRight(baseURL, "/")
+	// Derive admin URL: replace port with 8080
+	admin := base
+	if idx := strings.LastIndex(base, ":"); idx > 0 {
+		admin = base[:idx] + ":8080"
+	}
 	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
+		baseURL:  base,
+		adminURL: admin,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// NewClientWithAdmin creates a client with explicit REST and admin URLs.
+func NewClientWithAdmin(baseURL, adminURL string) *Client {
+	return &Client{
+		baseURL:  strings.TrimRight(baseURL, "/"),
+		adminURL: strings.TrimRight(adminURL, "/"),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -93,11 +117,43 @@ type emulatorSignature struct {
 	Signature string `json:"signature"`
 }
 
+// getLatestBlockID fetches the latest sealed block ID from the emulator.
+func (c *Client) getLatestBlockID(ctx context.Context) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/v1/blocks?height=sealed", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var blocks []struct {
+		Header struct {
+			ID string `json:"id"`
+		} `json:"header"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&blocks); err != nil {
+		return "", err
+	}
+	if len(blocks) == 0 {
+		return "", fmt.Errorf("no sealed blocks")
+	}
+	return blocks[0].Header.ID, nil
+}
+
 // SendTransaction submits a transaction to the emulator and waits for the result.
 func (c *Client) SendTransaction(ctx context.Context, tx *TxRequest) (*TxResult, error) {
 	payer := tx.Payer
 	if payer == "" {
 		payer = "f8d6e0586b0a20c7" // emulator service account
+	}
+
+	// Fetch latest block ID for reference
+	refBlockID, err := c.getLatestBlockID(ctx)
+	if err != nil {
+		log.Printf("[simulator] warning: could not fetch latest block ID, using zeros: %v", err)
+		refBlockID = strings.Repeat("0", 64)
 	}
 
 	// Base64-encode the script
@@ -114,12 +170,12 @@ func (c *Client) SendTransaction(ctx context.Context, tx *TxRequest) (*TxResult,
 		authorizers = []string{payer}
 	}
 
-	dummySig := base64.StdEncoding.EncodeToString([]byte("dummy"))
+	dummySig := generateDummySignature()
 
 	body := emulatorTxBody{
 		Script:           scriptB64,
 		Arguments:        args,
-		ReferenceBlockID: strings.Repeat("0", 64),
+		ReferenceBlockID: refBlockID,
 		GasLimit:         "9999",
 		Payer:            payer,
 		ProposalKey: emulatorProposalKey{
@@ -213,7 +269,8 @@ func (c *Client) waitForResult(ctx context.Context, txID string) (*TxResult, err
 			return nil, fmt.Errorf("parsing result: %w", err)
 		}
 
-		if result.Status == "SEALED" || result.Status == "EXECUTED" {
+		status := strings.ToUpper(result.Status)
+		if status == "SEALED" || status == "EXECUTED" {
 			txResult := &TxResult{
 				TxID:    txID,
 				Success: result.ErrorMessage == "",
@@ -251,7 +308,7 @@ func (c *Client) waitForResult(ctx context.Context, txID string) (*TxResult, err
 // Returns the snapshot block height or an error.
 func (c *Client) CreateSnapshot(ctx context.Context, name string) (string, error) {
 	body, _ := json.Marshal(map[string]string{"name": name})
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/emulator/snapshots", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.adminURL+"/emulator/snapshots", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("building snapshot request: %w", err)
 	}
@@ -282,7 +339,7 @@ func (c *Client) CreateSnapshot(ctx context.Context, name string) (string, error
 
 // RevertSnapshot reverts the emulator state to a named snapshot.
 func (c *Client) RevertSnapshot(ctx context.Context, name string) error {
-	req, err := http.NewRequestWithContext(ctx, "PUT", fmt.Sprintf("%s/emulator/snapshots/%s", c.baseURL, name), nil)
+	req, err := http.NewRequestWithContext(ctx, "PUT", fmt.Sprintf("%s/emulator/snapshots/%s", c.adminURL, name), nil)
 	if err != nil {
 		return fmt.Errorf("building revert request: %w", err)
 	}
@@ -299,4 +356,25 @@ func (c *Client) RevertSnapshot(ctx context.Context, name string) error {
 	}
 
 	return nil
+}
+
+// generateDummySignature creates a valid ECDSA P256 signature for use with --skip-tx-validation.
+// The emulator requires valid signature format even when skipping verification.
+func generateDummySignature() string {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return base64.StdEncoding.EncodeToString(make([]byte, 64))
+	}
+	hash := sha256.Sum256([]byte("simulator-dummy"))
+	r, s, err := ecdsa.Sign(rand.Reader, key, hash[:])
+	if err != nil {
+		return base64.StdEncoding.EncodeToString(make([]byte, 64))
+	}
+	// Flow uses raw r||s encoding, 32 bytes each for P256
+	sig := make([]byte, 64)
+	rBytes := r.Bytes()
+	sBytes := s.Bytes()
+	copy(sig[32-len(rBytes):32], rBytes)
+	copy(sig[64-len(sBytes):64], sBytes)
+	return base64.StdEncoding.EncodeToString(sig)
 }

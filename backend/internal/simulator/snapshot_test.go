@@ -37,7 +37,7 @@ func TestSnapshotCreateAndRevert(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewClient(srv.URL)
+	client := NewClientWithAdmin(srv.URL, srv.URL)
 	ctx := context.Background()
 
 	snapName := "test-snap"

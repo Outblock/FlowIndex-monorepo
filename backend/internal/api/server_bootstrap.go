@@ -175,9 +175,15 @@ func NewServer(repo *repository.Repository, client FlowClient, port string, star
 	}
 
 	if simURL := os.Getenv("SIMULATOR_URL"); simURL != "" {
-		simClient := simulator.NewClient(simURL)
+		var simClient *simulator.Client
+		if adminURL := os.Getenv("SIMULATOR_ADMIN_URL"); adminURL != "" {
+			simClient = simulator.NewClientWithAdmin(simURL, adminURL)
+			log.Printf("[api] simulator enabled, URL=%s, admin=%s", simURL, adminURL)
+		} else {
+			simClient = simulator.NewClient(simURL)
+			log.Printf("[api] simulator enabled, URL=%s", simURL)
+		}
 		s.simulatorHandler = simulator.NewHandler(simClient)
-		log.Printf("[api] simulator enabled, URL=%s", simURL)
 	}
 
 	r.Use(commonMiddleware)

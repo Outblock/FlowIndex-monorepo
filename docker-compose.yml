@@ -26,6 +26,7 @@ services:
       - FLOW_ACCESS_NODE=access-001.mainnet28.nodes.onflow.org:9000
       - FLOW_ACCESS_NODES=access-001.mainnet28.nodes.onflow.org:9000,access.mainnet.nodes.onflow.org:9000
       - SIMULATOR_URL=http://simulator:8888
+      - SIMULATOR_ADMIN_URL=http://simulator:8080
       - PORT=8080
       - START_BLOCK=140900000
       - LATEST_WORKER_COUNT=1
@@ -294,23 +295,13 @@ services:
       - "8000:80"
 
   simulator:
-    image: gcr.io/flow-container-registry/emulator:latest
-    command: >
-      emulator start
-      --rpc-host access.mainnet.nodes.onflow.org:9000
-      --skip-tx-validation
-      --snapshot
-      --persist
-      --dbpath /data
-      --chain-id mainnet
-      --rest-port 8888
-      --port 3569
-      -v
-    volumes:
-      - simulator_data:/data
+    build:
+      context: ./simulator
+      dockerfile: Dockerfile
     ports:
       - "8888:8888"
       - "3569:3569"
+      - "18080:8080"
     restart: unless-stopped
 
   docs:
