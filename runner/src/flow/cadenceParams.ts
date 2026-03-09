@@ -23,22 +23,12 @@ export function parseMainParams(code: string): CadenceParam[] {
 }
 
 /**
- * Map a Cadence type string to the FCL type constructor name.
+ * Resolve a primitive type name to the actual fcl.t.X constructor.
  */
-function fclTypeName(cadenceType: string): string {
-  const t = cadenceType.trim();
-  if (t.endsWith('?')) return 'Optional';
-  if (t.startsWith('[') && t.endsWith(']')) return 'Array';
-  if (t.startsWith('{') && t.endsWith('}')) return 'Dictionary';
-  return t;
-}
-
-/**
- * Resolve a type name string to the actual fcl.t.X constructor.
- */
-function resolveType(t: any, typeName: string): any {
+function resolvePrimitiveType(t: any, typeName: string): any {
   const map: Record<string, any> = {
     String: t.String,
+    Character: t.String,
     Int: t.Int,
     Int8: t.Int8,
     Int16: t.Int16,
@@ -53,15 +43,51 @@ function resolveType(t: any, typeName: string): any {
     UInt64: t.UInt64,
     UInt128: t.UInt128,
     UInt256: t.UInt256,
+    Word8: t.UInt8,
+    Word16: t.UInt16,
+    Word32: t.UInt32,
+    Word64: t.UInt64,
     Fix64: t.Fix64,
     UFix64: t.UFix64,
     Bool: t.Bool,
     Address: t.Address,
     Path: t.Path,
-    Optional: t.Optional(t.String),
-    Array: t.Array(t.String),
   };
   return map[typeName] || t.String;
+}
+
+/**
+ * Resolve a full Cadence type string (including Optional, Array, Dictionary)
+ * to the actual fcl.t.X constructor.
+ */
+function resolveType(t: any, cadenceType: string): any {
+  const trimmed = cadenceType.trim();
+
+  // Optional: e.g. "UInt32?" → t.Optional(t.UInt32)
+  if (trimmed.endsWith('?')) {
+    const innerType = trimmed.slice(0, -1);
+    return t.Optional(resolveType(t, innerType));
+  }
+
+  // Array: e.g. "[UInt64]" → t.Array(t.UInt64)
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    const innerType = trimmed.slice(1, -1);
+    return t.Array(resolveType(t, innerType));
+  }
+
+  // Dictionary: e.g. "{String: UInt64}" → t.Dictionary({key: t.String, value: t.UInt64})
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    const inner = trimmed.slice(1, -1);
+    const colonIdx = inner.indexOf(':');
+    if (colonIdx !== -1) {
+      const keyType = inner.slice(0, colonIdx).trim();
+      const valueType = inner.slice(colonIdx + 1).trim();
+      return t.Dictionary({ key: resolveType(t, keyType), value: resolveType(t, valueType) });
+    }
+    return t.Dictionary({ key: t.String, value: t.String });
+  }
+
+  return resolvePrimitiveType(t, trimmed);
 }
 
 /**
@@ -70,7 +96,11 @@ function resolveType(t: any, typeName: string): any {
 function coerceValue(raw: string, cadenceType: string): any {
   const t = cadenceType.trim();
 
-  if (t.endsWith('?') && raw === '') return null;
+  // Optional: null for empty, otherwise coerce the inner type
+  if (t.endsWith('?')) {
+    if (raw === '') return null;
+    return coerceValue(raw, t.slice(0, -1));
+  }
   if (t === 'Bool') return raw === 'true';
   if (t === 'UFix64' || t === 'Fix64') return raw.includes('.') ? raw : `${raw}.0`;
   if (t.startsWith('[') && t.endsWith(']')) {
@@ -90,8 +120,7 @@ export function buildFclArgs(
   return (arg: any, t: any) => {
     return params.map((p) => {
       const raw = values[p.name] || '';
-      const typeName = fclTypeName(p.type);
-      const fclType = resolveType(t, typeName);
+      const fclType = resolveType(t, p.type);
       const value = coerceValue(raw, p.type);
       return arg(value, fclType);
     });
