@@ -25,6 +25,7 @@ services:
       - DB_URL=postgres://flowscan:flowscan-local@db:5432/flowscan?sslmode=disable
       - FLOW_ACCESS_NODE=access-001.mainnet28.nodes.onflow.org:9000
       - FLOW_ACCESS_NODES=access-001.mainnet28.nodes.onflow.org:9000,access.mainnet.nodes.onflow.org:9000
+      - SIMULATOR_URL=http://simulator:8888
       - PORT=8080
       - START_BLOCK=140900000
       - LATEST_WORKER_COUNT=1
@@ -292,6 +293,25 @@ services:
     ports:
       - "8000:80"
 
+  simulator:
+    image: ghcr.io/onflow/flow-emulator:latest
+    command: >
+      emulator
+      --fork-host access.mainnet.nodes.onflow.org:9000
+      --skip-tx-validation
+      --persist
+      --dbpath /data
+      --chain-id flow-mainnet
+      --rest-port 8888
+      --grpc-port 3569
+      --log-level info
+    volumes:
+      - simulator_data:/data
+    ports:
+      - "8888:8888"
+      - "3569:3569"
+    restart: unless-stopped
+
   docs:
     build:
       context: .
@@ -307,3 +327,4 @@ services:
 volumes:
   postgres_data:
   supabase_db_data:
+  simulator_data:
