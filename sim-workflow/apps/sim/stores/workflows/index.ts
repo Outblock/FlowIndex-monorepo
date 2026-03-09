@@ -52,6 +52,7 @@ export function getWorkflowWithValues(workflowId: string) {
       loops: workflowState.loops,
       parallels: workflowState.parallels,
       lastSaved: workflowState.lastSaved,
+      metadata: workflowState.metadata,
       // Get deployment fields from registry for API compatibility
       isDeployed: deploymentStatus?.isDeployed || false,
       deployedAt: deploymentStatus?.deployedAt,
@@ -123,6 +124,7 @@ export function getAllWorkflowsWithValues() {
         loops: workflowState.loops,
         parallels: workflowState.parallels,
         lastSaved: workflowState.lastSaved,
+        metadata: workflowState.metadata,
         // Get deployment fields from registry for API compatibility
         isDeployed: deploymentStatus?.isDeployed || false,
         deployedAt: deploymentStatus?.deployedAt,

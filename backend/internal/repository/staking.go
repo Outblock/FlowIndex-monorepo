@@ -467,6 +467,46 @@ func (r *Repository) ListStakingEventsByTypeLike(ctx context.Context, pattern st
 	return events, rows.Err()
 }
 
+// ListStakingEventsByAddress returns staking events for an account address.
+// Drives from address_transactions (small set per address) and joins to staking_events via PK.
+// This avoids scanning the entire partitioned staking_events table.
+func (r *Repository) ListStakingEventsByAddress(ctx context.Context, address string, limit, offset int) ([]models.StakingEvent, error) {
+	addrBytes := hexToBytes(address)
+	query := `
+		SELECT se.block_height, encode(se.transaction_id, 'hex') AS transaction_id,
+			se.event_index, se.event_type, COALESCE(se.node_id, ''),
+			COALESCE(se.delegator_id, 0), COALESCE(se.amount, 0)::TEXT, se.timestamp
+		FROM (
+			SELECT DISTINCT transaction_id, block_height
+			FROM app.address_transactions
+			WHERE address = $1
+			ORDER BY block_height DESC
+		) at
+		JOIN app.staking_events se ON se.block_height = at.block_height AND se.transaction_id = at.transaction_id
+		ORDER BY se.block_height DESC, se.event_index DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.db.Query(ctx, query, addrBytes, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list staking events by address: %w", err)
+	}
+	defer rows.Close()
+
+	var events []models.StakingEvent
+	for rows.Next() {
+		var e models.StakingEvent
+		if err := rows.Scan(
+			&e.BlockHeight, &e.TransactionID,
+			&e.EventIndex, &e.EventType, &e.NodeID,
+			&e.DelegatorID, &e.Amount, &e.Timestamp,
+		); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
 // GetLatestTokenomicsSnapshot returns the most recent tokenomics snapshot.
 func (r *Repository) GetLatestTokenomicsSnapshot(ctx context.Context) (map[string]interface{}, error) {
 	var totalSupply, circulatingSupply, totalStaked, stakingAPY *float64

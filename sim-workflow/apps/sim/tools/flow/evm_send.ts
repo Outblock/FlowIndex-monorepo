@@ -37,14 +37,19 @@ export const flowEvmSendTool: ToolConfig<FlowEvmSendParams, FlowEvmSendResponse>
       required: false,
       description: 'Gas limit (default: 300000)',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -63,6 +68,7 @@ export const flowEvmSendTool: ToolConfig<FlowEvmSendParams, FlowEvmSendResponse>
       data: params.data ?? '',
       value: params.value ?? '0',
       gasLimit: params.gasLimit ?? '300000',
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

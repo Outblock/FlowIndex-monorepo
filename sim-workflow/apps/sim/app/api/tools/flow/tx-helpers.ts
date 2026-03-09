@@ -55,13 +55,17 @@ export type FclAuthz = Parameters<typeof import('@onflow/fcl').mutate>[0] extend
 
 /**
  * Send a transaction via FCL with a single signer.
+ * Supports two modes:
+ *  - Legacy: provide signerAddress + signerPrivateKey
+ *  - Authz: provide a pre-resolved authz function
  * Returns { txId, txStatus }.
  */
 export async function sendTransaction(opts: {
   cadence: string
   args: unknown[]
-  signerAddress: string
-  signerPrivateKey: string
+  signerAddress?: string
+  signerPrivateKey?: string
+  authz?: unknown
   network: string
 }): Promise<{ txId: string; txStatus: { status: number; errorMessage: string } }> {
   const fcl = await import('@onflow/fcl')
@@ -73,8 +77,15 @@ export async function sendTransaction(opts: {
 
   fcl.config().put('accessNode.api', accessNode)
 
-  const authz = createAuthz(fcl, opts.signerAddress, opts.signerPrivateKey)
-  const typedAuthz = authz as unknown as FclAuthz
+  let typedAuthz: FclAuthz
+  if (opts.authz) {
+    typedAuthz = opts.authz as unknown as FclAuthz
+  } else if (opts.signerAddress && opts.signerPrivateKey) {
+    const authz = createAuthz(fcl, opts.signerAddress, opts.signerPrivateKey)
+    typedAuthz = authz as unknown as FclAuthz
+  } else {
+    throw new Error('Either authz or signerAddress+signerPrivateKey must be provided')
+  }
 
   const txId: string = await fcl.mutate({
     cadence: opts.cadence,

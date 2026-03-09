@@ -511,6 +511,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
           lastSaved: state.lastSaved,
           deploymentStatuses: state.deploymentStatuses,
           needsRedeployment: state.needsRedeployment,
+          metadata: state.metadata,
         }
       },
       replaceWorkflowState: (
@@ -540,6 +541,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
               workflowState.needsRedeployment !== undefined
                 ? workflowState.needsRedeployment
                 : state.needsRedeployment,
+            metadata: workflowState.metadata || state.metadata,
             lastSaved:
               options?.updateLastSaved === true
                 ? Date.now()
@@ -1299,6 +1301,17 @@ export const useWorkflowStore = create<WorkflowStore>()(
         }
 
         set({ blocks: newBlocks, edges: [...get().edges] })
+        get().updateLastSaved()
+      },
+
+      setDefaultSigner: (signerId: string | undefined) => {
+        const currentMetadata = get().metadata || {}
+        set({
+          metadata: {
+            ...currentMetadata,
+            defaultSigner: signerId,
+          },
+        })
         get().updateLastSaved()
       },
     }),

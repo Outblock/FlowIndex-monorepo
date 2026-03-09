@@ -37,14 +37,19 @@ export const flowAddKeyTool: ToolConfig<FlowAddKeyParams, FlowAddKeyResponse> = 
       required: false,
       description: 'Key weight (default: 1000)',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -63,6 +68,7 @@ export const flowAddKeyTool: ToolConfig<FlowAddKeyParams, FlowAddKeyResponse> = 
       sigAlgo: params.sigAlgo ?? 'ECDSA_P256',
       hashAlgo: params.hashAlgo ?? 'SHA3_256',
       weight: params.weight ?? '1000',
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

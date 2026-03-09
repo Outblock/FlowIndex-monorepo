@@ -36,14 +36,19 @@ export const flowCreateAccountTool: ToolConfig<
       required: false,
       description: 'Hash algorithm (default: SHA3_256)',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Payer Flow address',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the payer',
     },
     network: {
@@ -61,6 +66,7 @@ export const flowCreateAccountTool: ToolConfig<
       publicKey: params.publicKey,
       sigAlgo: params.sigAlgo ?? 'ECDSA_P256',
       hashAlgo: params.hashAlgo ?? 'SHA3_256',
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

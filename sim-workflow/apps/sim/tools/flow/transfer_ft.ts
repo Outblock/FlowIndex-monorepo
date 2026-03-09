@@ -37,14 +37,19 @@ export const flowTransferFtTool: ToolConfig<FlowTransferFtParams, FlowTransferFt
       required: true,
       description: 'Public path of the receiver (e.g. /public/flowTokenReceiver)',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -63,6 +68,7 @@ export const flowTransferFtTool: ToolConfig<FlowTransferFtParams, FlowTransferFt
       amount: params.amount,
       vaultPath: params.vaultPath,
       receiverPath: params.receiverPath,
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

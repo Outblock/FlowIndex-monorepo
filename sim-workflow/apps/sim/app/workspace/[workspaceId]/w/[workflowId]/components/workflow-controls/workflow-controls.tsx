@@ -1,9 +1,9 @@
 'use client'
 
-import { memo, useCallback, useRef, useState } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import { createLogger } from '@sim/logger'
 import clsx from 'clsx'
-import { Scan } from 'lucide-react'
+import { Scan, Wallet } from 'lucide-react'
 import { useReactFlow } from 'reactflow'
 import {
   Button,
@@ -23,12 +23,14 @@ import { useSession } from '@/lib/auth/auth-client'
 import { useRegisterGlobalCommands } from '@/app/workspace/[workspaceId]/providers/global-commands-provider'
 import { createCommand } from '@/app/workspace/[workspaceId]/utils/commands-utils'
 import { useShowActionBar, useUpdateGeneralSetting } from '@/hooks/queries/general-settings'
+import { useSignerOptions } from '@/hooks/use-signer-options'
 import { useCanvasViewport } from '@/hooks/use-canvas-viewport'
 import { useCollaborativeWorkflow } from '@/hooks/use-collaborative-workflow'
 import { useCanvasModeStore } from '@/stores/canvas-mode'
 import { useTerminalStore } from '@/stores/terminal'
 import { useUndoRedoStore } from '@/stores/undo-redo'
 import { useWorkflowRegistry } from '@/stores/workflows/registry/store'
+import { useWorkflowStore } from '@/stores/workflows/workflow/store'
 
 const logger = createLogger('WorkflowControls')
 
@@ -66,7 +68,18 @@ export const WorkflowControls = memo(function WorkflowControls() {
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const [isCanvasModeOpen, setIsCanvasModeOpen] = useState(false)
+  const [isSignerOpen, setIsSignerOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const { options: signerOptions, hasWallets } = useSignerOptions()
+  const defaultSigner = useWorkflowStore((s) => s.metadata?.defaultSigner)
+  const setDefaultSigner = useWorkflowStore((s) => s.setDefaultSigner)
+
+  const selectedSignerLabel = useMemo(() => {
+    if (!defaultSigner) return 'No Signer'
+    const opt = signerOptions.find((o) => o.id === defaultSigner)
+    return opt?.label || 'No Signer'
+  }, [defaultSigner, signerOptions])
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -200,6 +213,71 @@ export const WorkflowControls = memo(function WorkflowControls() {
             <Tooltip.Shortcut keys='⌘⇧F'>Fit to View</Tooltip.Shortcut>
           </Tooltip.Content>
         </Tooltip.Root>
+
+        {hasWallets && (
+          <>
+            <div className='mx-[4px] h-[20px] w-[1px] bg-[var(--border)]' />
+
+            <Popover
+              open={isSignerOpen}
+              onOpenChange={setIsSignerOpen}
+              variant='secondary'
+              size='sm'
+            >
+              <Tooltip.Root>
+                <PopoverTrigger asChild>
+                  <div className='flex cursor-pointer items-center gap-[4px]'>
+                    <Tooltip.Trigger asChild>
+                      <Button
+                        className='h-[28px] gap-[4px] rounded-[6px] px-[6px] text-[11px]'
+                        variant={defaultSigner ? 'active' : 'ghost'}
+                      >
+                        <Wallet className='h-[14px] w-[14px]' />
+                        <span className='max-w-[80px] truncate'>{selectedSignerLabel}</span>
+                      </Button>
+                    </Tooltip.Trigger>
+                    <Button className='-m-[4px] !p-[6px] group' variant='ghost'>
+                      <ChevronDown
+                        className={`h-[8px] w-[10px] text-[var(--text-muted)] transition-transform duration-100 group-hover:text-[var(--text-secondary)] ${isSignerOpen ? 'rotate-180' : ''}`}
+                      />
+                    </Button>
+                  </div>
+                </PopoverTrigger>
+                <Tooltip.Content side='top'>Default Signer</Tooltip.Content>
+              </Tooltip.Root>
+              <PopoverContent side='top' sideOffset={8} maxWidth={220} minWidth={160}>
+                <PopoverItem
+                  onClick={() => {
+                    setDefaultSigner(undefined)
+                    setIsSignerOpen(false)
+                  }}
+                >
+                  <span className={!defaultSigner ? 'font-medium' : ''}>No Default</span>
+                </PopoverItem>
+                {signerOptions
+                  .filter((opt) => opt.id !== 'default')
+                  .map((opt) => (
+                    <PopoverItem
+                      key={opt.id}
+                      onClick={() => {
+                        setDefaultSigner(opt.id)
+                        setIsSignerOpen(false)
+                      }}
+                    >
+                      <span
+                        className={clsx(
+                          'truncate',
+                          defaultSigner === opt.id && 'font-medium'
+                        )}
+                      >
+                        {opt.label}
+                      </span>
+                    </PopoverItem>
+                  ))}
+              </PopoverContent>
+            </Popover>
+          </>
+        )}
       </div>
 
       <Popover

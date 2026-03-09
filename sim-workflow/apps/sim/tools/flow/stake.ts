@@ -27,14 +27,19 @@ export const flowStakeTool: ToolConfig<FlowStakeParams, FlowStakeResponse> = {
       required: false,
       description: 'Node ID for delegator staking',
     },
+    signer: {
+      type: 'string',
+      required: false,
+      description: 'Signer configuration JSON (overrides signerAddress/signerPrivateKey when present)',
+    },
     signerAddress: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Flow address of the signer',
     },
     signerPrivateKey: {
       type: 'string',
-      required: true,
+      required: false,
       description: 'Hex-encoded private key of the signer',
     },
     network: {
@@ -51,6 +56,7 @@ export const flowStakeTool: ToolConfig<FlowStakeParams, FlowStakeResponse> = {
     body: (params) => ({
       amount: params.amount,
       nodeId: params.nodeId,
+      ...(params.signer ? { signer: params.signer } : {}),
       signerAddress: params.signerAddress,
       signerPrivateKey: params.signerPrivateKey,
       network: params.network ?? 'mainnet',

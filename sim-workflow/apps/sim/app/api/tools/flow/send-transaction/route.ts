@@ -2,60 +2,21 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createLogger } from '@sim/logger'
 import { checkInternalAuth } from '@/lib/auth/hybrid'
-import { SHA3 } from 'sha3'
-import { ec as EC } from 'elliptic'
+import { resolveSignerFromParams, extractFiAuthFromRequest } from '@/lib/flow/signer-resolver'
+import type { SignerParams } from '@/lib/flow/signer-resolver'
+import { ACCESS_NODES, createAuthz } from '@/app/api/tools/flow/tx-helpers'
+import type { FclAuthz } from '@/app/api/tools/flow/tx-helpers'
 
 const logger = createLogger('FlowSendTransaction')
-
-const ACCESS_NODES: Record<string, string> = {
-  mainnet: 'https://rest-mainnet.onflow.org',
-  testnet: 'https://rest-testnet.onflow.org',
-}
 
 const Schema = z.object({
   script: z.string().min(1, 'Transaction script is required'),
   arguments: z.string().optional().default('[]'),
-  signerAddress: z.string().min(1, 'Signer address is required'),
-  signerPrivateKey: z.string().min(1, 'Signer private key is required'),
+  signer: z.string().optional(),
+  signerAddress: z.string().optional().default(''),
+  signerPrivateKey: z.string().optional().default(''),
   network: z.string().optional().default('mainnet'),
 })
-
-function signWithKey(privateKey: string, message: string): string {
-  const ec = new EC('p256')
-  const key = ec.keyFromPrivate(Buffer.from(privateKey, 'hex'))
-  const sha3 = new SHA3(256)
-  sha3.update(Buffer.from(message, 'hex'))
-  const digest = sha3.digest()
-  const sig = key.sign(digest)
-  const r = sig.r.toArrayLike(Buffer, 'be', 32)
-  const s = sig.s.toArrayLike(Buffer, 'be', 32)
-  return Buffer.concat([r, s]).toString('hex')
-}
-
-/**
- * Creates an FCL-compatible authorization function for signing transactions.
- * Uses `unknown` cast because FCL's authorization types are complex and
- * not fully compatible with standard function signatures.
- */
-function createAuthz(
-  fcl: typeof import('@onflow/fcl'),
-  address: string,
-  privateKey: string,
-  keyIndex: number = 0
-) {
-  const authzFn = async (account: Record<string, unknown>) => ({
-    ...account,
-    tempId: `${address}-${keyIndex}`,
-    addr: fcl.sansPrefix(address),
-    keyId: keyIndex,
-    signingFunction: async (signable: { message: string }) => ({
-      addr: fcl.sansPrefix(address),
-      keyId: keyIndex,
-      signature: signWithKey(privateKey, signable.message),
-    }),
-  })
-  return authzFn
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { script, arguments: argsJson, signerAddress, signerPrivateKey, network } =
+    const { script, arguments: argsJson, signer: signerJson, signerAddress, signerPrivateKey, network } =
       Schema.parse(body)
 
     const accessNode = ACCESS_NODES[network]
@@ -96,14 +57,31 @@ export async function POST(request: NextRequest) {
 
     fcl.config().put('accessNode.api', accessNode)
 
-    logger.info(`Sending transaction on ${network} from ${signerAddress}`)
+    logger.info(`Sending transaction on ${network}`)
 
-    const authz = createAuthz(fcl, signerAddress, signerPrivateKey)
-
-    // FCL's TypeScript types don't fully support async authorization functions,
-    // but the runtime handles them correctly. Cast through unknown to satisfy the compiler.
-    type FclAuthz = Parameters<typeof fcl.mutate>[0] extends { proposer?: infer P } ? P : never
-    const typedAuthz = authz as unknown as FclAuthz
+    let typedAuthz: FclAuthz
+    if (signerJson) {
+      let signerParams: SignerParams
+      try {
+        signerParams = JSON.parse(signerJson) as SignerParams
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'Invalid signer JSON configuration' },
+          { status: 400 }
+        )
+      }
+      const fiAuth = extractFiAuthFromRequest(request)
+      const { authz } = await resolveSignerFromParams(signerParams, fiAuth ?? undefined)
+      typedAuthz = authz as unknown as FclAuthz
+    } else if (signerAddress && signerPrivateKey) {
+      const authz = createAuthz(fcl, signerAddress, signerPrivateKey)
+      typedAuthz = authz as unknown as FclAuthz
+    } else {
+      return NextResponse.json(
+        { success: false, error: 'Either signer config or signerAddress+signerPrivateKey required' },
+        { status: 400 }
+      )
+    }
 
     const txId: string = await fcl.mutate({
       cadence: script,

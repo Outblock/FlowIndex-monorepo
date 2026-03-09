@@ -225,6 +225,65 @@ func (s *Server) handleStakingAccountTransactions(w http.ResponseWriter, r *http
 	s.handleFlowAccountTransactions(w, r)
 }
 
+// handleAccountStakingActivity handles GET /flow/account/{address}/staking/activity
+func (s *Server) handleAccountStakingActivity(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	address := normalizeAddr(vars["address"])
+	if address == "" {
+		writeAPIError(w, http.StatusBadRequest, "address is required")
+		return
+	}
+
+	limit, offset := parseLimitOffset(r)
+	if limit > 100 {
+		limit = 100
+	}
+
+	events, err := s.repo.ListStakingEventsByAddress(r.Context(), address, limit, offset)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Build sorted epoch list (descending by start_height) for block→epoch lookup.
+	// end_height is often 0, so we match by finding the epoch with the highest
+	// start_height that is still <= the event's block_height.
+	var epochs []models.EpochStats
+	if len(events) > 0 {
+		epochs, _ = s.repo.ListEpochStats(r.Context(), 200, 0)
+		// ListEpochStats already returns ORDER BY epoch DESC (= start_height DESC)
+	}
+
+	out := make([]interface{}, 0, len(events))
+	for _, e := range events {
+		item := map[string]interface{}{
+			"block_height":   e.BlockHeight,
+			"transaction_id": e.TransactionID,
+			"event_index":    e.EventIndex,
+			"event_type":     e.EventType,
+			"node_id":        e.NodeID,
+			"delegator_id":   e.DelegatorID,
+			"amount":         e.Amount,
+			"timestamp":      formatTime(e.Timestamp),
+		}
+		// Find epoch: first epoch (highest start_height) where start_height <= block_height
+		for _, es := range epochs {
+			if uint64(es.StartHeight) <= e.BlockHeight {
+				item["epoch"] = es.Epoch
+				item["epoch_start"] = formatTime(es.StartTime)
+				item["epoch_end"] = formatTime(es.EndTime)
+				break
+			}
+		}
+		out = append(out, item)
+	}
+
+	writeAPIResponse(w, out, map[string]interface{}{
+		"limit":  limit,
+		"offset": offset,
+	}, nil)
+}
+
 // handleStakingRewardsPaid handles GET /staking/rewards/paid
 func (s *Server) handleStakingRewardsPaid(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parseLimitOffset(r)

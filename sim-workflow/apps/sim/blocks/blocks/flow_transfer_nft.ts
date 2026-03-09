@@ -38,18 +38,31 @@ export const FlowTransferNftBlock: BlockConfig = {
       required: true,
     },
     {
+      id: 'signer',
+      title: 'Signer',
+      type: 'dropdown',
+      options: [
+        { label: 'Use Default', id: 'default' },
+        { label: 'Manual Key', id: 'manual' },
+      ],
+      placeholder: 'Select a signer...',
+      defaultValue: 'default',
+    },
+    {
       id: 'signerAddress',
       title: 'Signer Address',
       type: 'short-input',
       placeholder: '0x...',
-      required: true,
+      condition: { field: 'signer', value: 'manual' },
+      required: { field: 'signer', value: 'manual' },
     },
     {
       id: 'signerPrivateKey',
       title: 'Signer Private Key',
       type: 'short-input',
       placeholder: 'Hex-encoded private key',
-      required: true,
+      condition: { field: 'signer', value: 'manual' },
+      required: { field: 'signer', value: 'manual' },
     },
     {
       id: 'network',
@@ -65,15 +78,44 @@ export const FlowTransferNftBlock: BlockConfig = {
     access: ['flow_transfer_nft'],
     config: {
       tool: () => 'flow_transfer_nft',
-      params: (params) => ({
-        recipient: params.recipient,
-        nftId: params.nftId,
-        collectionStoragePath: params.collectionStoragePath,
-        collectionPublicPath: params.collectionPublicPath,
-        signerAddress: params.signerAddress,
-        signerPrivateKey: params.signerPrivateKey,
-        network: params.network ?? 'mainnet',
-      }),
+      params: (params) => {
+        let signerJson: string | undefined
+        const signerValue = params.signer as string
+        if (signerValue === 'manual') {
+          signerJson = JSON.stringify({
+            signerMode: 'legacy',
+            signerAddress: params.signerAddress,
+            signerPrivateKey: params.signerPrivateKey,
+          })
+        } else if (typeof signerValue === 'string' && signerValue.startsWith('cloud:')) {
+          signerJson = JSON.stringify({
+            signerMode: 'cloud',
+            signerKeyId: signerValue.replace('cloud:', ''),
+          })
+        } else if (typeof signerValue === 'string' && signerValue.startsWith('passkey:')) {
+          signerJson = JSON.stringify({
+            signerMode: 'passkey',
+            signerCredentialId: signerValue.replace('passkey:', ''),
+          })
+        } else {
+          signerJson = JSON.stringify({
+            signerMode: 'legacy',
+            signerAddress: params.signerAddress,
+            signerPrivateKey: params.signerPrivateKey,
+          })
+        }
+
+        return {
+          recipient: params.recipient as string,
+          nftId: params.nftId as string,
+          collectionStoragePath: params.collectionStoragePath as string,
+          collectionPublicPath: params.collectionPublicPath as string,
+          signer: signerJson,
+          signerAddress: params.signerAddress as string,
+          signerPrivateKey: params.signerPrivateKey as string,
+          network: (params.network as string) || 'mainnet',
+        }
+      },
     },
   },
   inputs: {
