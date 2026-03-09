@@ -467,6 +467,49 @@ func (r *Repository) ListStakingEventsByTypeLike(ctx context.Context, pattern st
 	return events, rows.Err()
 }
 
+// ListStakingEventsByAddress returns staking events for an account address.
+// It joins through staking_delegators (for delegators) and staking_nodes (for operators).
+func (r *Repository) ListStakingEventsByAddress(ctx context.Context, address string, limit, offset int) ([]models.StakingEvent, error) {
+	addrBytes := hexToBytes(address)
+	query := `
+		WITH account_roles AS (
+			SELECT DISTINCT node_id, delegator_id
+			FROM (
+				SELECT node_id, delegator_id FROM app.staking_delegators WHERE address = $1
+				UNION ALL
+				SELECT node_id, 0 AS delegator_id FROM app.staking_nodes WHERE address = $1
+			) sub
+		)
+		SELECT se.block_height, encode(se.transaction_id, 'hex') AS transaction_id,
+			se.event_index, se.event_type, COALESCE(se.node_id, ''),
+			COALESCE(se.delegator_id, 0), COALESCE(se.amount, 0)::TEXT, se.timestamp
+		FROM app.staking_events se
+		JOIN account_roles ar ON se.node_id = ar.node_id
+			AND (ar.delegator_id = 0 OR se.delegator_id = ar.delegator_id)
+		ORDER BY se.block_height DESC, se.event_index DESC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.db.Query(ctx, query, addrBytes, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("list staking events by address: %w", err)
+	}
+	defer rows.Close()
+
+	var events []models.StakingEvent
+	for rows.Next() {
+		var e models.StakingEvent
+		if err := rows.Scan(
+			&e.BlockHeight, &e.TransactionID,
+			&e.EventIndex, &e.EventType, &e.NodeID,
+			&e.DelegatorID, &e.Amount, &e.Timestamp,
+		); err != nil {
+			return nil, err
+		}
+		events = append(events, e)
+	}
+	return events, rows.Err()
+}
+
 // GetLatestTokenomicsSnapshot returns the most recent tokenomics snapshot.
 func (r *Repository) GetLatestTokenomicsSnapshot(ctx context.Context) (map[string]interface{}, error) {
 	var totalSupply, circulatingSupply, totalStaked, stakingAPY *float64
