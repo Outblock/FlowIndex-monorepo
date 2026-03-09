@@ -14,7 +14,6 @@ import ReactFlow, {
     type EdgeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import Avatar from 'boring-avatars';
 import { normalizeAddress, formatShort } from '../account/accountUtils';
 import { colorsFromAddress, addressType } from '../AddressLink';
 import { extractLogoUrl } from '../TransactionRow';
@@ -158,9 +157,9 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         : addr.startsWith('BRIDGE:') ? (isDark ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(2,132,199,0.3)')
         : nodeStyle.border;
 
-    const avatarVariant = (addr: string): 'beam' | 'bauhaus' | 'pixel' => {
-        const t = addressType(addr);
-        return t === 'flow' ? 'beam' : t === 'coa' ? 'bauhaus' : 'pixel';
+    const TAG_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+        coa: { bg: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.1)', text: isDark ? '#a78bfa' : '#7c3aed', label: 'COA' },
+        eoa: { bg: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.1)', text: isDark ? '#fbbf24' : '#d97706', label: 'EOA' },
     };
 
     const placeColumn = (addrs: string[], col: number): Node[] =>
@@ -168,6 +167,9 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
             const synthetic = isSynthetic(addr);
             const info = seen.get(addr)!;
             const normalized = normalizeAddress(addr);
+            const addrType = addressType(normalized);
+            const colors = colorsFromAddress(normalized);
+            const tag = TAG_STYLES[addrType];
             return {
                 id: addr,
                 data: {
@@ -177,45 +179,34 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
                                 {info.label}
                             </div>
                         </div>
-                    ) : (() => {
-                        const addrType = addressType(normalized);
-                        const tagColors: Record<string, { bg: string; text: string }> = {
-                            coa: { bg: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.1)', text: isDark ? '#a78bfa' : '#7c3aed' },
-                            eoa: { bg: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.1)', text: isDark ? '#fbbf24' : '#d97706' },
-                        };
-                        const tag = tagColors[addrType];
-                        return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <div style={{ width: 24, height: 24, flexShrink: 0, borderRadius: '50%', overflow: 'hidden' }}>
-                                    <Avatar
-                                        size={24}
-                                        name={normalized}
-                                        variant={avatarVariant(normalized)}
-                                        colors={colorsFromAddress(normalized)}
-                                    />
-                                </div>
-                                <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <span style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
-                                            {info.label}
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                                width: 24, height: 24, minWidth: 24, minHeight: 24,
+                                borderRadius: '50%',
+                                background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]}, ${colors[2]})`,
+                            }} />
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
+                                        {info.label}
+                                    </span>
+                                    {tag && (
+                                        <span style={{
+                                            fontSize: '8px', fontWeight: 700, textTransform: 'uppercase' as const,
+                                            padding: '1px 4px', borderRadius: '2px', lineHeight: '14px',
+                                            background: tag.bg, color: tag.text,
+                                        }}>
+                                            {tag.label}
                                         </span>
-                                        {tag && (
-                                            <span style={{
-                                                fontSize: '8px', fontWeight: 700, textTransform: 'uppercase',
-                                                padding: '1px 4px', borderRadius: '2px', lineHeight: '14px',
-                                                background: tag.bg, color: tag.text,
-                                            }}>
-                                                {addrType}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div style={{ fontSize: '9px', color: isDark ? '#71717a' : '#a1a1aa', fontFamily: 'ui-monospace, monospace', marginTop: '2px' }}>
-                                        {formatShort(addr, 8, 4)}
-                                    </div>
+                                    )}
+                                </div>
+                                <div style={{ fontSize: '9px', color: isDark ? '#71717a' : '#a1a1aa', fontFamily: 'ui-monospace, monospace', marginTop: '2px' }}>
+                                    {formatShort(addr, 8, 4)}
                                 </div>
                             </div>
-                        );
-                    })(),
+                        </div>
+                    ),
                 },
                 position: { x: col * colWidth, y: row * rowHeight },
                 sourcePosition: Position.Right,
