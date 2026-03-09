@@ -876,6 +876,7 @@ CREATE TABLE IF NOT EXISTS app.staking_events (
 
 CREATE INDEX IF NOT EXISTS idx_staking_events_node ON app.staking_events(node_id);
 CREATE INDEX IF NOT EXISTS idx_staking_events_type ON app.staking_events(event_type, block_height DESC);
+CREATE INDEX IF NOT EXISTS idx_staking_events_delegator ON app.staking_events(node_id, delegator_id);
 
 CREATE TABLE IF NOT EXISTS app.epoch_stats (
     epoch              BIGINT PRIMARY KEY,
