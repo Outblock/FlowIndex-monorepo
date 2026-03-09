@@ -429,7 +429,7 @@ function TransactionSummaryCard({ transaction, formatAddress: _formatAddress, on
 
             {/* Transfer flow diagram (auto-synthesized) */}
             <div className="mb-4">
-                <TransferFlowDiagram detail={fullTx} />
+                <TransferFlowDiagram detail={transaction} />
             </div>
 
             {/* FT transfer flow rows — aggregated by (from, to, token) */}
