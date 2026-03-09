@@ -12,14 +12,20 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	flowgrpc "github.com/onflow/flow-go-sdk/access/grpc"
 )
 
 // testContext holds bootstrap data for parameterized tests.
 type testContext struct {
-	baseURL     string
-	blockHeight string
-	txID        string
-	address     string // a known account address
+	baseURL       string
+	blockHeight   string
+	txID          string
+	address       string // a known account address
+	ftToken       string // e.g. "A.1654653399040a61.FlowToken"
+	nftCollection string // e.g. "A.0b2a3299cc857e29.TopShot"
+	evmTxHash     string // an EVM transaction hash
+	contractID    string // a known contract identifier
 }
 
 // envelope is the standard API response shape.
@@ -103,7 +109,45 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	fmt.Printf("Bootstrap: blockHeight=%s txID=%s address=%s\n", ctx.blockHeight, ctx.txID, ctx.address)
+	// Initialize Flow SDK client for cross-referencing
+	var flowErr error
+	flowClient, flowErr = flowgrpc.NewBaseClient(mainnetAccessNode)
+	if flowErr != nil {
+		fmt.Fprintf(os.Stderr, "WARN: Flow client init failed: %v (cross-ref tests will skip)\n", flowErr)
+	}
+
+	// Bootstrap: FT token
+	ctx.ftToken = "A.1654653399040a61.FlowToken"
+	if _, body, err := fetchJSON(base + "/flow/v1/ft?limit=1"); err == nil {
+		if id := extractFieldFromList(body, "id"); id != "" {
+			ctx.ftToken = id
+		}
+	}
+
+	// Bootstrap: NFT collection
+	ctx.nftCollection = "A.0b2a3299cc857e29.TopShot"
+	if _, body, err := fetchJSON(base + "/flow/v1/nft?limit=1"); err == nil {
+		if id := extractFieldFromList(body, "id"); id != "" {
+			ctx.nftCollection = id
+		}
+	}
+
+	// Bootstrap: EVM tx hash
+	ctx.evmTxHash = ""
+	if _, body, err := fetchJSON(base + "/flow/v1/evm/transaction?limit=1"); err == nil {
+		ctx.evmTxHash = extractFieldFromList(body, "hash")
+	}
+
+	// Bootstrap: contract identifier
+	ctx.contractID = "A.1654653399040a61.FlowToken"
+	if _, body, err := fetchJSON(base + "/flow/v1/contract?limit=1"); err == nil {
+		if id := extractFieldFromList(body, "id"); id != "" {
+			ctx.contractID = id
+		}
+	}
+
+	fmt.Printf("Bootstrap: blockHeight=%s txID=%s address=%s ftToken=%s nftCollection=%s evmTxHash=%s contractID=%s\n",
+		ctx.blockHeight, ctx.txID, ctx.address, ctx.ftToken, ctx.nftCollection, ctx.evmTxHash, ctx.contractID)
 	os.Exit(m.Run())
 }
 
@@ -291,6 +335,10 @@ func sub(path string) string {
 		"{height}", ctx.blockHeight,
 		"{id}", ctx.txID,
 		"{address}", ctx.address,
+		"{token}", ctx.ftToken,
+		"{nft_type}", ctx.nftCollection,
+		"{evm_hash}", ctx.evmTxHash,
+		"{contract_id}", ctx.contractID,
 	)
 	return r.Replace(path)
 }
