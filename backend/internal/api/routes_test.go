@@ -95,7 +95,7 @@ var specExcludedRoutes = map[string]bool{
 	// NFT/COA backfill (admin-like)
 	"/flow/nft/backfill": true,
 	"/flow/coa/backfill": true,
-	// Base routes
+	// Base/subrouter prefixes (not actual endpoints)
 	"/status": true,
 	"/admin":  true,
 	// Alias: /contract/{id}/version/{id} same as /contract/{id}/{id}
@@ -134,8 +134,8 @@ func TestAllRoutesInSpec(t *testing.T) {
 		if err != nil {
 			return nil
 		}
-		// Skip admin, wallet, webhook routes
-		if strings.HasPrefix(tpl, "/admin/") || strings.HasPrefix(tpl, "/api/v1/wallet") || strings.HasPrefix(tpl, "/webhook") {
+		// Skip wallet, webhook routes (admin routes are now documented)
+		if strings.HasPrefix(tpl, "/api/v1/wallet") || strings.HasPrefix(tpl, "/webhook") {
 			return nil
 		}
 		if specExcludedRoutes[tpl] {

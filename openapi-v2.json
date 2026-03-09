@@ -5733,6 +5733,2023 @@
           }
         }
       }
+    },
+    "/admin/refetch-token-metadata": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Refetch token metadata",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Fetches metadata from chain for all FT tokens and NFT collections missing metadata.",
+        "responses": {
+          "200": {
+            "description": "Metadata refresh results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ft_missing": {
+                      "type": "integer"
+                    },
+                    "ft_updated": {
+                      "type": "integer"
+                    },
+                    "ft_failed": {
+                      "type": "integer"
+                    },
+                    "nft_missing": {
+                      "type": "integer"
+                    },
+                    "nft_updated": {
+                      "type": "integer"
+                    },
+                    "nft_failed": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/batch-fetch-metadata": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Batch fetch token metadata",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Fetches metadata for all FT tokens and NFT collections missing metadata using concurrent goroutines.",
+        "responses": {
+          "200": {
+            "description": "Batch metadata fetch results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ft_total": {
+                      "type": "integer"
+                    },
+                    "ft_updated": {
+                      "type": "integer"
+                    },
+                    "ft_failed": {
+                      "type": "integer"
+                    },
+                    "nft_total": {
+                      "type": "integer"
+                    },
+                    "nft_updated": {
+                      "type": "integer"
+                    },
+                    "nft_failed": {
+                      "type": "integer"
+                    },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "identifier": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/refetch-bridge": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Refetch EVM bridge addresses",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Re-checks EVM bridge addresses for all tokens/collections that have metadata but no evm_address.",
+        "responses": {
+          "200": {
+            "description": "Bridge refetch results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nft_checked": {
+                      "type": "integer"
+                    },
+                    "nft_updated": {
+                      "type": "integer"
+                    },
+                    "nft_failed": {
+                      "type": "integer"
+                    },
+                    "ft_checked": {
+                      "type": "integer"
+                    },
+                    "ft_updated": {
+                      "type": "integer"
+                    },
+                    "ft_failed": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/ft": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List FT tokens (admin)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Lists all fungible tokens with admin-level details.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search by name, symbol, or contract",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "verified",
+            "in": "query",
+            "description": "Filter by verified status (true/false)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of records to return (default 25, max 100)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination (default 0)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of FT tokens",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "": "#/components/schemas/admin.FTToken"
+                      }
+                    },
+                    "_meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/ft/{identifier}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update FT token",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Update metadata fields for a fungible token.",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "description": "Contract identifier (A.address.ContractName)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "symbol": {
+                    "type": "string"
+                  },
+                  "logo": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "external_url": {
+                    "type": "string"
+                  },
+                  "decimals": {
+                    "type": "integer"
+                  },
+                  "is_verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "updated": {
+                          "type": "boolean"
+                        },
+                        "identifier": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/nft": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List NFT collections (admin)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Lists all NFT collections with admin-level details.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search by name, symbol, or contract",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "verified",
+            "in": "query",
+            "description": "Filter by verified status (true/false)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of records to return (default 25, max 100)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination (default 0)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of NFT collections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "": "#/components/schemas/admin.NFTCollection"
+                      }
+                    },
+                    "_meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/nft/{identifier}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update NFT collection",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Update metadata fields for an NFT collection.",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "description": "Contract identifier (A.address.ContractName)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "symbol": {
+                    "type": "string"
+                  },
+                  "square_image": {
+                    "type": "string"
+                  },
+                  "banner_image": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "external_url": {
+                    "type": "string"
+                  },
+                  "is_verified": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "updated": {
+                          "type": "boolean"
+                        },
+                        "identifier": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/import-token/preview": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Preview token import",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Fetches token metadata from chain for preview before importing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Contract address (hex, with or without 0x)"
+                  },
+                  "contract_name": {
+                    "type": "string",
+                    "description": "Contract name"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "ft",
+                      "nft"
+                    ],
+                    "description": "Token type"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token metadata preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "FTToken or NFTCollection metadata from chain"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/import-token/save": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Save imported token",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Saves a token (FT or NFT) to the database after preview.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "ft",
+                      "nft"
+                    ]
+                  },
+                  "contract_address": {
+                    "type": "string"
+                  },
+                  "contract_name": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "symbol": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "external_url": {
+                    "type": "string"
+                  },
+                  "logo": {
+                    "type": "string"
+                  },
+                  "decimals": {
+                    "type": "integer"
+                  },
+                  "vault_path": {
+                    "type": "string"
+                  },
+                  "receiver_path": {
+                    "type": "string"
+                  },
+                  "balance_path": {
+                    "type": "string"
+                  },
+                  "square_image": {
+                    "type": "string"
+                  },
+                  "banner_image": {
+                    "type": "string"
+                  },
+                  "evm_address": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Save result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List script templates",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Lists script templates with optional search, category, and labeled filters.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search by hash, label, or description",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "labeled",
+            "in": "query",
+            "description": "Filter by labeled status (true/false)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of records to return (default 25, max 100)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination (default 0)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of script templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "": "#/components/schemas/admin.ScriptTemplate"
+                      }
+                    },
+                    "_meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates/stats": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get script template stats",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Returns aggregate statistics about script template classification coverage.",
+        "responses": {
+          "200": {
+            "description": "Script template statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "labeled": {
+                          "type": "integer"
+                        },
+                        "unlabeled": {
+                          "type": "integer"
+                        },
+                        "coverage_pct": {
+                          "type": "number"
+                        },
+                        "labeled_tx": {
+                          "type": "integer"
+                        },
+                        "total_tx": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates/refresh-counts": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Refresh script template counts",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Refreshes tx_count and variant_count for all script templates.",
+        "responses": {
+          "200": {
+            "description": "Refresh result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "refreshed": {
+                          "type": "boolean"
+                        },
+                        "updated_rows": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates/ai-classify": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "AI-classify a script template",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Uses Claude AI to classify a single script template by its hash. Requires ANTHROPIC_API_KEY.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "script_hash": {
+                    "type": "string",
+                    "description": "Script hash to classify"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Classification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "script_hash": {
+                          "type": "string"
+                        },
+                        "categories": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates/ai-classify-batch": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "AI-classify script templates in batch",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Uses Claude AI to classify multiple unlabeled script templates. Requires ANTHROPIC_API_KEY.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "min_tx_count": {
+                    "type": "integer",
+                    "description": "Minimum tx count threshold (default 1000)"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Max templates to classify (default 20, max 50)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch classification results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "script_hash": {
+                            "type": "string"
+                          },
+                          "categories": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates/{hash}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update script template",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Update category, label, and description for a script template.",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "description": "Script hash",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "updated": {
+                          "type": "boolean"
+                        },
+                        "script_hash": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/script-templates/{hash}/script": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get script template text",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Returns the full script text for a given script hash.",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "description": "Script hash",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Script text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "script_hash": {
+                          "type": "string"
+                        },
+                        "script_text": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/refresh-daily-stats": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Refresh daily stats",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Triggers a full re-aggregation of daily_stats in the background.",
+        "responses": {
+          "200": {
+            "description": "Refresh started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/backfill-analytics": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Backfill analytics",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Triggers analytics deriver backfill for a block range in the background.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from_height": {
+                    "type": "integer",
+                    "description": "Start block height"
+                  },
+                  "to_height": {
+                    "type": "integer",
+                    "description": "End block height (exclusive)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string"
+                        },
+                        "from_height": {
+                          "type": "integer"
+                        },
+                        "to_height": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reset-token-worker": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reset token worker",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Deletes bogus EVM FT transfers and resets token_worker to re-process from the earliest affected height.",
+        "responses": {
+          "200": {
+            "description": "Reset result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reset_from_height": {
+                          "type": "integer"
+                        },
+                        "evm_transfers_deleted": {
+                          "type": "integer"
+                        },
+                        "leases_deleted": {
+                          "type": "integer"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reprocess-worker": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reprocess worker",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Re-runs a specific worker for a height range in the background with configurable concurrency. Supports checkpoint-based resume.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "worker": {
+                    "type": "string",
+                    "description": "Worker name (token_worker, evm_worker, proposer_key_backfill)"
+                  },
+                  "from_height": {
+                    "type": "integer",
+                    "description": "Start block height"
+                  },
+                  "to_height": {
+                    "type": "integer",
+                    "description": "End block height (exclusive)"
+                  },
+                  "chunk_size": {
+                    "type": "integer",
+                    "description": "Chunk size (default 1000)"
+                  },
+                  "concurrency": {
+                    "type": "integer",
+                    "description": "Max concurrent chunks (default 1, max 16)"
+                  },
+                  "delete_staking_transfers": {
+                    "type": "boolean",
+                    "description": "Delete staking FT transfers before reprocessing (token_worker only)"
+                  },
+                  "resume": {
+                    "type": "boolean",
+                    "description": "Resume from last saved checkpoint"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reprocess job started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "worker": {
+                          "type": "string"
+                        },
+                        "from_height": {
+                          "type": "integer"
+                        },
+                        "to_height": {
+                          "type": "integer"
+                        },
+                        "chunk_size": {
+                          "type": "integer"
+                        },
+                        "concurrency": {
+                          "type": "integer"
+                        },
+                        "total_chunks": {
+                          "type": "integer"
+                        },
+                        "resume": {
+                          "type": "boolean"
+                        },
+                        "checkpoint": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reset-history-deriver": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reset history deriver",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Resets history_deriver UP and DOWN checkpoints to a given height for re-processing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "height": {
+                    "type": "integer",
+                    "description": "Target block height"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reset_to_height": {
+                          "type": "integer"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/redirect-history-ingester": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Redirect history ingester",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Resets history_ingester checkpoint to a specific height so it starts backfilling downward from there.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "height": {
+                    "type": "integer",
+                    "description": "Target block height"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Redirect result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "previous_height": {
+                          "type": "integer"
+                        },
+                        "new_height": {
+                          "type": "integer"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/resolve-errors": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Resolve indexing errors",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Marks all unresolved indexing errors as resolved for a given worker.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "worker": {
+                    "type": "string",
+                    "description": "Worker name (e.g. accounts_worker)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolution result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "worker": {
+                          "type": "string"
+                        },
+                        "resolved": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/skipped-ranges": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List skipped ranges",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Returns unresolved LIVE_DERIVER_SKIPPED errors, optionally filtered by worker.",
+        "parameters": [
+          {
+            "name": "worker",
+            "in": "query",
+            "description": "Filter by worker name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Skipped ranges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "skipped_ranges": {
+                          "type": "array",
+                          "items": {
+                            "type": "object"
+                          }
+                        },
+                        "count": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/backfill-staking": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Backfill staking blocks",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Runs staking_worker on specific block heights.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "heights": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "description": "Block heights to process (max 500)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "processed": {
+                          "type": "integer"
+                        },
+                        "errored": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "errors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/account-labels": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List account labels",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Lists account labels with optional search filter.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search by address or label",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of records to return (default 25, max 100)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination (default 0)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of account labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "": "#/components/schemas/admin.AccountLabel"
+                      }
+                    },
+                    "_meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Create or update account label",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Upserts an account label. Address and tag are required.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string",
+                    "description": "Account address"
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Tag identifier"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Display label"
+                  },
+                  "category": {
+                    "type": "string",
+                    "description": "Category (default: custom)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upsert result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "upserted": {
+                          "type": "boolean"
+                        },
+                        "address": {
+                          "type": "string"
+                        },
+                        "tag": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/account-labels/{address}/{tag}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Delete account label",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Deletes a specific account label by address and tag.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "description": "Account address",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "path",
+            "required": true,
+            "description": "Tag identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": {
+                          "type": "boolean"
+                        },
+                        "address": {
+                          "type": "string"
+                        },
+                        "tag": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/backfill-contracts": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Backfill contracts",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Fetches ALL contracts from one or more Flow addresses via RPC and upserts them into the database.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "addresses": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Flow addresses (hex, no 0x prefix). Defaults to EVM bridge address if empty."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Backfill results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "address": {
+                            "type": "string"
+                          },
+                          "found": {
+                            "type": "integer"
+                          },
+                          "upserted": {
+                            "type": "integer"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/contracts": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List contracts (admin)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Lists smart contracts with admin details including verified status and dependent count.",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search by name or address",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "verified",
+            "in": "query",
+            "description": "Filter by verified status (true/false)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of records to return (default 25, max 100)",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of records to skip for pagination (default 0)",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contracts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "": "#/components/schemas/admin.Contract"
+                      }
+                    },
+                    "_meta": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/contracts/refresh-dependent-counts": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Refresh contract dependent counts",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Recalculates dependent_count for all contracts.",
+        "responses": {
+          "200": {
+            "description": "Refresh result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "updated": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/contracts/{identifier}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Update contract",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "description": "Update verified status and/or kind for a contract.",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "description": "Contract identifier (A.address.ContractName)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "is_verified": {
+                    "type": "boolean",
+                    "description": "Set verified status"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "description": "Set contract kind"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean"
+                        },
+                        "identifier": {
+                          "type": "string"
+                        },
+                        "is_verified": {
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
@@ -5767,6 +7784,10 @@
     {
       "description": "AI-powered endpoints for transaction analysis and workflow generation.",
       "name": "AI"
+    },
+    {
+      "description": "Admin endpoints for managing tokens, collections, contracts, account labels, script templates, and operational tasks. All endpoints require admin authentication via Bearer token (static ADMIN_TOKEN or JWT with admin role).",
+      "name": "Admin"
     }
   ],
   "servers": [
@@ -5781,6 +7802,11 @@
         "in": "header",
         "name": "X-API-Key",
         "description": "Your FlowIndex API key (e.g. fi_live_abc123...). Include this header for higher rate limits. All endpoints work without authentication at reduced rate limits."
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Admin authentication via static ADMIN_TOKEN or JWT with admin role claim. Pass as Authorization: Bearer <token>."
       }
     },
     "schemas": {
@@ -10481,6 +12507,180 @@
           },
           "error": {
             "description": "Error contains details about any error that occurred"
+          }
+        }
+      },
+      "admin.FTToken": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Token identifier (A.address.ContractName)"
+          },
+          "contract_address": {
+            "type": "string",
+            "description": "Contract address with 0x prefix"
+          },
+          "contract_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "decimals": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "external_url": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "total_supply": {
+            "type": "string"
+          },
+          "evm_address": {
+            "type": "string"
+          },
+          "holder_count": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        }
+      },
+      "admin.NFTCollection": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Collection identifier (A.address.ContractName)"
+          },
+          "contract_address": {
+            "type": "string",
+            "description": "Contract address with 0x prefix"
+          },
+          "contract_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "external_url": {
+            "type": "string"
+          },
+          "square_image": {
+            "type": "string"
+          },
+          "banner_image": {
+            "type": "string"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        }
+      },
+      "admin.ScriptTemplate": {
+        "type": "object",
+        "properties": {
+          "script_hash": {
+            "type": "string"
+          },
+          "normalized_hash": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tx_count": {
+            "type": "integer"
+          },
+          "variant_count": {
+            "type": "integer"
+          },
+          "script_preview": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
+          }
+        }
+      },
+      "admin.AccountLabel": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      },
+      "admin.Contract": {
+        "type": "object",
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Contract identifier (A.address.ContractName)"
+          },
+          "address": {
+            "type": "string",
+            "description": "Contract address with 0x prefix"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "is_verified": {
+            "type": "boolean"
+          },
+          "dependent_count": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "description": "ISO 8601 timestamp"
           }
         }
       }
