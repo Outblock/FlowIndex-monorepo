@@ -294,17 +294,18 @@ services:
       - "8000:80"
 
   simulator:
-    image: ghcr.io/onflow/flow-emulator:latest
+    image: gcr.io/flow-container-registry/emulator:latest
     command: >
-      emulator
-      --fork-host access.mainnet.nodes.onflow.org:9000
+      emulator start
+      --rpc-host access.mainnet.nodes.onflow.org:9000
       --skip-tx-validation
+      --snapshot
       --persist
       --dbpath /data
-      --chain-id flow-mainnet
+      --chain-id mainnet
       --rest-port 8888
-      --grpc-port 3569
-      --log-level info
+      --port 3569
+      -v
     volumes:
       - simulator_data:/data
     ports:
