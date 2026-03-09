@@ -16,6 +16,8 @@ import { detectCodeType, executeScript, executeTransaction, executeCustodialTran
 import type { ExecutionResult } from './flow/execute';
 import { parseExecutionError, setErrorDecorations, type ParsedArgError } from './editor/errorDecorations';
 import type { FlowNetwork } from './flow/networks';
+import { useEmulatorStatus } from './flow/useEmulatorStatus';
+import { EMULATOR_SERVICE_ADDRESS, EMULATOR_SERVICE_KEY } from './flow/emulatorSigner';
 import { useAuth } from './auth/AuthContext';
 import { useKeys } from './auth/useKeys';
 import { useLocalKeys } from './auth/useLocalKeys';
@@ -39,7 +41,7 @@ import GitHubPanel from './components/GitHubPanel';
 import SettingsPanel from './components/SettingsPanel';
 import { githubApi } from './github/api';
 import { useDeployEvents } from './github/useDeployEvents';
-import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn, Share2, X, MessageSquare, ChevronDown, Globe } from 'lucide-react';
+import { Play, Loader2, PanelLeftOpen, PanelLeftClose, Bot, ChevronLeft, Key as KeyIcon, LogIn, Share2, X, MessageSquare, ChevronDown, Globe, Terminal } from 'lucide-react';
 import type { LspMode } from './editor/useLsp';
 
 const AIPanel = lazy(() => import('./components/AIPanel'));
@@ -283,6 +285,8 @@ export default function App() {
     if (n === 'mainnet' || n === 'testnet') return n;
     return (localStorage.getItem('runner:network') as FlowNetwork) || 'mainnet';
   });
+
+  const { status: emulatorStatus, recheck: recheckEmulator } = useEmulatorStatus(network);
 
   const [results, setResults] = useState<ExecutionResult[]>([]);
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
@@ -757,15 +761,15 @@ export default function App() {
   const handleRun = useCallback(async () => {
     if (loading) return;
 
-    // If no signer and this requires signing, open connect modal
-    if (selectedSigner.type === 'none' && codeType !== 'script') {
+    // If no signer and this requires signing, open connect modal (skip for emulator)
+    if (selectedSigner.type === 'none' && codeType !== 'script' && network !== 'emulator') {
       pendingRunRef.current = true;
       setConnectModalOpen(true);
       return;
     }
 
-    // If auto-sign is off and this is a transaction/contract, confirm first
-    if (!autoSign && codeType !== 'script') {
+    // If auto-sign is off and this is a transaction/contract, confirm first (skip for emulator)
+    if (!autoSign && codeType !== 'script' && network !== 'emulator') {
       const action = codeType === 'contract' ? 'deploy this contract' : 'send this transaction';
       const confirmed = window.confirm(`Are you sure you want to ${action}?\n\nThis will sign and submit on-chain.`);
       if (!confirmed) return;
@@ -797,6 +801,19 @@ export default function App() {
     if (codeType === 'script') {
       const result = await executeScript(activeCode, paramValues);
       setResults([result]);
+    } else if (network === 'emulator' && codeType !== 'script') {
+      // Emulator: always use service account
+      const emulatorSignFn = async (message: string) => {
+        const { signMessage } = await import('./auth/localKeyManager');
+        return signMessage(EMULATOR_SERVICE_KEY, message, 'ECDSA_P256', 'SHA3_256');
+      };
+      if (codeType === 'contract') {
+        await deployContract(activeCode, EMULATOR_SERVICE_ADDRESS, 0, emulatorSignFn, onResult, 'ECDSA_P256', 'SHA3_256');
+      } else {
+        await executeCustodialTransaction(activeCode, paramValues, EMULATOR_SERVICE_ADDRESS, 0, emulatorSignFn, onResult, 'ECDSA_P256', 'SHA3_256');
+      }
+      setLoading(false);
+      return;
     } else if (codeType === 'contract') {
       // Deploy contract — requires a signer
       if (selectedSigner.type === 'local') {
@@ -825,7 +842,7 @@ export default function App() {
     }
 
     setLoading(false);
-  }, [activeCode, codeType, paramValues, loading, selectedSigner, signWithLocalKey, promptForPassword, autoSign, passkeySign]);
+  }, [activeCode, codeType, paramValues, loading, selectedSigner, signWithLocalKey, promptForPassword, autoSign, passkeySign, network]);
 
   // Auto-retry run after connecting wallet from the modal
   useEffect(() => {
@@ -1399,22 +1416,26 @@ export default function App() {
               className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs px-2 py-1 rounded border border-zinc-700 transition-colors"
             >
               <Globe className="w-3 h-3 text-zinc-400" />
-              <span>{network === 'testnet' ? 'Testnet' : 'Mainnet'}</span>
+              {network === 'emulator' && (
+                <span className={`w-1.5 h-1.5 rounded-full ${emulatorStatus === 'connected' ? 'bg-emerald-400' : emulatorStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400'}`} />
+              )}
+              <span>{network === 'emulator' ? 'Emulator' : network === 'testnet' ? 'Testnet' : 'Mainnet'}</span>
               <ChevronDown className="w-3 h-3 text-zinc-400" />
             </button>
             {showNetworkMenu && (
               <div className="absolute top-full right-0 mt-1 w-32 bg-zinc-800 border border-zinc-700 rounded shadow-xl z-50 py-1">
-                {(['mainnet', 'testnet'] as const).map((n) => (
+                {(['mainnet', 'testnet', 'emulator'] as const).map((n) => (
                   <button
                     key={n}
                     onClick={() => { setNetwork(n); setShowNetworkMenu(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors flex items-center gap-1.5 ${
                       network === n
                         ? 'text-emerald-400 bg-emerald-600/10'
                         : 'text-zinc-300 hover:bg-zinc-700'
                     }`}
                   >
-                    {n === 'testnet' ? 'Testnet' : 'Mainnet'}
+                    {n === 'emulator' && <Terminal className="w-3 h-3" />}
+                    {n === 'emulator' ? 'Emulator' : n === 'testnet' ? 'Testnet' : 'Mainnet'}
                   </button>
                 ))}
               </div>
@@ -1650,6 +1671,16 @@ export default function App() {
               onCloseFile={handleCloseTab}
               pendingDiffPaths={Object.keys(pendingDiffs)}
             />
+            {network === 'emulator' && emulatorStatus === 'disconnected' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-900/30 border-b border-amber-700/50 text-amber-300 text-xs">
+                <Terminal className="w-3.5 h-3.5 shrink-0" />
+                <span>Emulator not running.</span>
+                <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-amber-200 font-mono">flow emulator</code>
+                <button onClick={recheckEmulator} className="ml-auto text-amber-400 hover:text-amber-200 underline">
+                  Retry
+                </button>
+              </div>
+            )}
             {loadingDeps && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/20 text-amber-400 shrink-0">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

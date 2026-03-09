@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Wallet, ChevronDown, LogOut, Key, Zap, Droplets } from 'lucide-react';
+import { Wallet, ChevronDown, LogOut, Key, Zap, Droplets, Terminal } from 'lucide-react';
 import Avatar from 'boring-avatars';
 import { fcl } from '../flow/fclConfig';
+import type { FlowNetwork } from '../flow/networks';
 import type { LocalKey, KeyAccount } from '../auth/localKeyManager';
 
 export type SignerOption =
@@ -21,7 +22,7 @@ interface SignerSelectorProps {
   onOpenConnectModal?: () => void;
   autoSign: boolean;
   onToggleAutoSign: (value: boolean) => void;
-  network: 'mainnet' | 'testnet';
+  network: FlowNetwork;
 }
 
 /** Derive 5 colors from an address (matches frontend AddressLink). */
@@ -85,6 +86,15 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
     for (const account of accounts) {
       localEntries.push({ key, account });
     }
+  }
+
+  if (network === 'emulator') {
+    return (
+      <div className="flex items-center gap-1.5 bg-zinc-800 text-xs px-2 py-1 rounded border border-zinc-700 text-emerald-400">
+        <Terminal className="w-3.5 h-3.5" />
+        <span>Service Account</span>
+      </div>
+    );
   }
 
   const isConnected = selected.type !== 'none';
