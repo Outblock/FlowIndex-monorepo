@@ -94,6 +94,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           metadata: {
             name: workflowData.name,
             description: workflowData.description,
+            ...((workflowData as any).metadata || {}),
           },
         },
         variables: workflowData.variables || {},
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         metadata: {
           name: workflowData.name,
           description: workflowData.description,
+          ...((workflowData as any).metadata || {}),
         },
       },
       variables: workflowData.variables || {},

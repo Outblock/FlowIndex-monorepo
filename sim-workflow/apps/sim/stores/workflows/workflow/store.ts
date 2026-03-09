@@ -511,6 +511,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
           lastSaved: state.lastSaved,
           deploymentStatuses: state.deploymentStatuses,
           needsRedeployment: state.needsRedeployment,
+          metadata: state.metadata,
         }
       },
       replaceWorkflowState: (
@@ -540,6 +541,7 @@ export const useWorkflowStore = create<WorkflowStore>()(
               workflowState.needsRedeployment !== undefined
                 ? workflowState.needsRedeployment
                 : state.needsRedeployment,
+            metadata: workflowState.metadata || state.metadata,
             lastSaved:
               options?.updateLastSaved === true
                 ? Date.now()

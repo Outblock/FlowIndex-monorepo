@@ -158,6 +158,7 @@ export const workflow = pgTable(
     runCount: integer('run_count').notNull().default(0),
     lastRunAt: timestamp('last_run_at'),
     variables: json('variables').default('{}'),
+    metadata: json('metadata').default('{}'),
   },
   (table) => ({
     userIdIdx: index('workflow_user_id_idx').on(table.userId),

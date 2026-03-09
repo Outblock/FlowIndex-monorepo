@@ -106,6 +106,7 @@ const WorkflowStateSchema = z.object({
   isDeployed: z.boolean().optional(),
   deployedAt: z.coerce.date().optional(),
   variables: z.any().optional(), // Workflow variables
+  metadata: z.record(z.any()).optional(), // Workflow metadata (e.g. defaultSigner)
 })
 
 /**
@@ -246,6 +247,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // If variables are provided in the state, update them in the workflow record
     if (state.variables !== undefined) {
       updateData.variables = state.variables
+    }
+
+    // If metadata is provided in the state, update it in the workflow record
+    if (state.metadata !== undefined) {
+      updateData.metadata = state.metadata
     }
 
     await db.update(workflow).set(updateData).where(eq(workflow.id, workflowId))

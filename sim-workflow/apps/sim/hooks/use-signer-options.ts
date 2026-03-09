@@ -37,6 +37,6 @@ export function useSignerOptions() {
     options: signerOptions,
     isLoading,
     error,
-    hasWallets: signerOptions.length > 1, // More than just "Manual Key"
+    hasWallets: signerOptions.length > 2, // More than just "Use Default" + "Manual Key"
   }
 }
