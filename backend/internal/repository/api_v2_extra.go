@@ -202,6 +202,8 @@ type EVMTransactionRecord struct {
 	Value       string
 	TxType      int
 	ChainID     string
+	Data        string
+	Logs        string
 	Position    int
 	EventIndex  int
 	StatusCode  int
@@ -604,6 +606,8 @@ func (r *Repository) ListEVMTransactions(ctx context.Context, limit, offset int)
 			COALESCE(value::text, ''),
 			COALESCE(tx_type, 0),
 			COALESCE(chain_id::text, ''),
+			COALESCE(data, ''),
+			COALESCE(logs::text, ''),
 			COALESCE(transaction_index, 0),
 			COALESCE(event_index, 0),
 			COALESCE(status_code, 0),
@@ -633,6 +637,8 @@ func (r *Repository) ListEVMTransactions(ctx context.Context, limit, offset int)
 			&row.Value,
 			&row.TxType,
 			&row.ChainID,
+			&row.Data,
+			&row.Logs,
 			&row.Position,
 			&row.EventIndex,
 			&row.StatusCode,
@@ -663,6 +669,8 @@ func (r *Repository) GetEVMTransactionByHash(ctx context.Context, hash string) (
 			COALESCE(value::text, ''),
 			COALESCE(tx_type, 0),
 			COALESCE(chain_id::text, ''),
+			COALESCE(data, ''),
+			COALESCE(logs::text, ''),
 			COALESCE(transaction_index, 0),
 			COALESCE(event_index, 0),
 			COALESCE(status_code, 0),
@@ -685,6 +693,8 @@ func (r *Repository) GetEVMTransactionByHash(ctx context.Context, hash string) (
 		&row.Value,
 		&row.TxType,
 		&row.ChainID,
+		&row.Data,
+		&row.Logs,
 		&row.Position,
 		&row.EventIndex,
 		&row.StatusCode,
@@ -716,6 +726,8 @@ func (r *Repository) GetEVMTransactionsByCadenceTx(ctx context.Context, txID str
 			COALESCE(value::text, ''),
 			COALESCE(tx_type, 0),
 			COALESCE(chain_id::text, ''),
+			COALESCE(data, ''),
+			COALESCE(logs::text, ''),
 			COALESCE(transaction_index, 0),
 			COALESCE(event_index, 0),
 			COALESCE(status_code, 0),
@@ -745,6 +757,8 @@ func (r *Repository) GetEVMTransactionsByCadenceTx(ctx context.Context, txID str
 			&row.Value,
 			&row.TxType,
 			&row.ChainID,
+			&row.Data,
+			&row.Logs,
 			&row.Position,
 			&row.EventIndex,
 			&row.StatusCode,

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import ReactFlow, {
     Node,
     Edge,
@@ -264,8 +264,12 @@ export function FlowDiagram({ initialNodes, initialEdges, isDark }: {
     initialEdges: Edge[];
     isDark: boolean;
 }) {
-    const [nodes, , onNodesChange] = useNodesState(initialNodes);
-    const [edges, , onEdgesChange] = useEdgesState(initialEdges);
+    const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+    // Re-sync when enrichment data arrives (initial state doesn't update on prop change)
+    useEffect(() => { setNodes(initialNodes); }, [initialNodes, setNodes]);
+    useEffect(() => { setEdges(initialEdges); }, [initialEdges, setEdges]);
 
     return (
         <ReactFlow

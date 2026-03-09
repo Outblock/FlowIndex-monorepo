@@ -616,7 +616,7 @@ func toEVMTransactionOutput(rec repository.EVMTransactionRecord) map[string]inte
 	if status == "" {
 		status = "SEALED"
 	}
-	return map[string]interface{}{
+	out := map[string]interface{}{
 		"block_number": rec.BlockHeight,
 		"hash":         rec.EVMHash,
 		"from":         rec.FromAddress,
@@ -632,6 +632,13 @@ func toEVMTransactionOutput(rec repository.EVMTransactionRecord) map[string]inte
 		"event_index":  rec.EventIndex,
 		"nonce":        rec.Nonce,
 	}
+	if rec.Data != "" {
+		out["data"] = rec.Data
+	}
+	if rec.Logs != "" {
+		out["logs"] = json.RawMessage(rec.Logs)
+	}
+	return out
 }
 
 func toEVMTokenOutput(rec repository.EVMTokenSummary) map[string]interface{} {

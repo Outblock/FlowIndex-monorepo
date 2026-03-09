@@ -742,6 +742,7 @@ function TransactionDetail() {
                     from: e.from || d.from,
                     to: e.to || d.to,
                     value: (e.value && e.value !== '0') ? e.value : d.value,
+                    data: e.data || d.data,
                 };
             });
         }
@@ -2131,8 +2132,22 @@ function TransactionDetail() {
                                                 </div>
 
                                                 {/* Decoded ERC call data */}
-                                                {exec.data && (() => {
-                                                    const decoded = decodeEVMCallData(exec.data);
+                                                {(() => {
+                                                    // Try exec.data first, then extract from raw event payload
+                                                    let callData = exec.data;
+                                                    if (!callData) {
+                                                        const matchedEvt = transaction.events?.find((e: any) => e.event_index === exec.event_index);
+                                                        const evtPayload = matchedEvt?.values || matchedEvt?.payload || matchedEvt?.data;
+                                                        if (evtPayload) {
+                                                            const fmt = formatEventPayload(evtPayload);
+                                                            if (fmt.payload) {
+                                                                const decoded = decodeFlowDirectCallPayload(fmt.payload);
+                                                                if (decoded?.data) callData = decoded.data;
+                                                            }
+                                                        }
+                                                    }
+                                                    if (!callData) return null;
+                                                    const decoded = decodeEVMCallData(callData);
                                                     if (decoded.callType === 'unknown') return null;
                                                     const CALL_LABELS: Record<string, { label: string; tag: string; color: string }> = {
                                                         erc20_transfer: { label: 'ERC-20 Transfer', tag: 'ERC-20', color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30' },
