@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Wallet, ChevronDown, LogOut, Key, Zap, Droplets, Terminal } from 'lucide-react';
+import { Wallet, ChevronDown, LogOut, Key, Zap, Droplets, Terminal, Shield } from 'lucide-react';
 import Avatar from 'boring-avatars';
 import { fcl } from '../flow/fclConfig';
 import type { FlowNetwork } from '../flow/networks';
@@ -22,6 +22,8 @@ interface SignerSelectorProps {
   onOpenConnectModal?: () => void;
   autoSign: boolean;
   onToggleAutoSign: (value: boolean) => void;
+  simulateBeforeSend: boolean;
+  onToggleSimulate: (value: boolean) => void;
   network: FlowNetwork;
 }
 
@@ -57,7 +59,7 @@ function useFlowBalance(address: string | null) {
   return balance;
 }
 
-export default function SignerSelector({ selected, onSelect, localKeys, accountsMap, passkeyAccounts = [], onViewAccount, onOpenKeyManager, onOpenConnectModal, autoSign, onToggleAutoSign, network }: SignerSelectorProps) {
+export default function SignerSelector({ selected, onSelect, localKeys, accountsMap, passkeyAccounts = [], onViewAccount, onOpenKeyManager, onOpenConnectModal, autoSign, onToggleAutoSign, simulateBeforeSend, onToggleSimulate, network }: SignerSelectorProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -297,6 +299,28 @@ export default function SignerSelector({ selected, onSelect, localKeys, accounts
               <span
                 className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
                   autoSign ? 'translate-x-3' : ''
+                }`}
+              />
+            </div>
+          </button>
+
+          {/* Simulate before send toggle */}
+          <button
+            onClick={() => onToggleSimulate(!simulateBeforeSend)}
+            className="w-full flex items-center justify-between px-3 py-2 text-xs text-zinc-400 hover:bg-zinc-700 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Shield className={`w-3.5 h-3.5 ${simulateBeforeSend ? 'text-blue-400' : ''}`} />
+              <span>Simulate First</span>
+            </div>
+            <div
+              className={`relative w-7 h-4 rounded-full transition-colors ${
+                simulateBeforeSend ? 'bg-blue-500' : 'bg-zinc-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                  simulateBeforeSend ? 'translate-x-3' : ''
                 }`}
               />
             </div>

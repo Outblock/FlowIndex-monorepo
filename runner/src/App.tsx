@@ -14,6 +14,9 @@ import { configureFcl } from './flow/fclConfig';
 import { parseMainParams } from './flow/cadenceParams';
 import { detectCodeType, executeScript, executeTransaction, executeCustodialTransaction, deployContract } from './flow/execute';
 import type { ExecutionResult } from './flow/execute';
+import { simulateTransaction } from './flow/simulate';
+import type { SimulateResponse } from './flow/simulate';
+import TransactionPreview from './components/TransactionPreview';
 import { parseExecutionError, setErrorDecorations, type ParsedArgError } from './editor/errorDecorations';
 import type { FlowNetwork } from './flow/networks';
 import { useEmulatorStatus } from './flow/useEmulatorStatus';
@@ -382,6 +385,17 @@ export default function App() {
     setAutoSign(value);
     try { localStorage.setItem('runner-auto-sign', String(value)); } catch { /* ignore */ }
   }, []);
+
+  const [simulateBeforeSend, setSimulateBeforeSend] = useState<boolean>(() => {
+    try { return localStorage.getItem('runner:simulate-before-send') !== 'false'; } catch { return true; }
+  });
+  const handleToggleSimulate = useCallback((value: boolean) => {
+    setSimulateBeforeSend(value);
+    try { localStorage.setItem('runner:simulate-before-send', String(value)); } catch { /* ignore */ }
+  }, []);
+  const [simResult, setSimResult] = useState<SimulateResponse | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
+  const [pendingExecution, setPendingExecution] = useState<(() => void) | null>(null);
 
   const [accountPanelAddress, setAccountPanelAddress] = useState<string | null>(null);
   const handleViewAccount = useCallback((address: string) => setAccountPanelAddress(address), []);
@@ -780,23 +794,8 @@ export default function App() {
     notifyChange(project.activeFile, value);
   }, [project.activeFile, notifyChange]);
 
-  const handleRun = useCallback(async () => {
-    if (loading) return;
-
-    // If no signer and this requires signing, open connect modal (skip for emulator)
-    if (selectedSigner.type === 'none' && codeType !== 'script' && network !== 'emulator') {
-      pendingRunRef.current = true;
-      setConnectModalOpen(true);
-      return;
-    }
-
-    // If auto-sign is off and this is a transaction/contract, confirm first (skip for emulator)
-    if (!autoSign && codeType !== 'script' && network !== 'emulator') {
-      const action = codeType === 'contract' ? 'deploy this contract' : 'send this transaction';
-      const confirmed = window.confirm(`Are you sure you want to ${action}?\n\nThis will sign and submit on-chain.`);
-      if (!confirmed) return;
-    }
-
+  /** Execute the transaction/script directly (no simulation gate). */
+  const handleRunDirect = useCallback(async () => {
     // Clear previous error decorations
     errorDecoCleanupRef.current?.();
     errorDecoCleanupRef.current = null;
@@ -864,7 +863,62 @@ export default function App() {
     }
 
     setLoading(false);
-  }, [activeCode, codeType, paramValues, loading, selectedSigner, signWithLocalKey, promptForPassword, autoSign, passkeySign, network]);
+  }, [activeCode, codeType, paramValues, selectedSigner, signWithLocalKey, promptForPassword, passkeySign, network]);
+
+  const handleRun = useCallback(async () => {
+    if (loading) return;
+
+    // If no signer and this requires signing, open connect modal (skip for emulator)
+    if (selectedSigner.type === 'none' && codeType !== 'script' && network !== 'emulator') {
+      pendingRunRef.current = true;
+      setConnectModalOpen(true);
+      return;
+    }
+
+    // If auto-sign is off and this is a transaction/contract, confirm first (skip for emulator)
+    if (!autoSign && codeType !== 'script' && network !== 'emulator') {
+      const action = codeType === 'contract' ? 'deploy this contract' : 'send this transaction';
+      const confirmed = window.confirm(`Are you sure you want to ${action}?\n\nThis will sign and submit on-chain.`);
+      if (!confirmed) return;
+    }
+
+    // Simulate before sending (mainnet transactions only)
+    if (codeType === 'transaction' && simulateBeforeSend && network === 'mainnet') {
+      // Determine signer address for the simulation request
+      let signerAddr = '';
+      if (selectedSigner.type === 'local') signerAddr = selectedSigner.account.flowAddress;
+      else if (selectedSigner.type === 'passkey') signerAddr = selectedSigner.flowAddress;
+
+      if (signerAddr) {
+        setSimLoading(true);
+        setSimResult(null);
+        try {
+          const simResp = await simulateTransaction({
+            cadence: activeCode,
+            arguments: Object.entries(paramValues).map(([, v]) => ({ type: 'String', value: v })),
+            authorizers: [signerAddr],
+            payer: signerAddr,
+          });
+          setSimLoading(false);
+          setSimResult(simResp);
+          // Store the actual execution as a pending callback
+          setPendingExecution(() => () => {
+            setSimResult(null);
+            setPendingExecution(null);
+            handleRunDirect();
+          });
+          return; // Wait for user to confirm or cancel via TransactionPreview
+        } catch (err) {
+          // Simulation service unreachable — fall through to execute directly
+          console.warn('Simulation service unavailable, proceeding without preview:', err);
+          setSimLoading(false);
+          setSimResult(null);
+        }
+      }
+    }
+
+    handleRunDirect();
+  }, [activeCode, codeType, paramValues, loading, selectedSigner, autoSign, network, simulateBeforeSend, handleRunDirect]);
 
   // Auto-retry run after connecting wallet from the modal
   useEffect(() => {
@@ -1352,7 +1406,22 @@ export default function App() {
   const hasBottomPanel = scriptParams.length > 0 || results.length > 0 || loading;
 
   return (
-    <div className="flex flex-col h-full bg-zinc-900 text-zinc-100">
+    <div className="flex flex-col h-full bg-zinc-900 text-zinc-100 relative">
+      {/* Transaction simulation preview overlay */}
+      {(simLoading || simResult) && (
+        <TransactionPreview
+          loading={simLoading}
+          result={simResult}
+          onConfirm={() => {
+            if (pendingExecution) pendingExecution();
+          }}
+          onCancel={() => {
+            setSimResult(null);
+            setSimLoading(false);
+            setPendingExecution(null);
+          }}
+        />
+      )}
       {/* Header */}
       <header className="flex items-center justify-between px-3 md:px-4 py-2 border-b border-zinc-700 bg-zinc-900/80 backdrop-blur shrink-0 overflow-visible relative z-20">
         <div className="flex items-center gap-2">
@@ -1477,6 +1546,8 @@ export default function App() {
             onOpenConnectModal={() => setConnectModalOpen(true)}
             autoSign={autoSign}
             onToggleAutoSign={handleToggleAutoSign}
+            simulateBeforeSend={simulateBeforeSend}
+            onToggleSimulate={handleToggleSimulate}
             network={network}
           />
 
