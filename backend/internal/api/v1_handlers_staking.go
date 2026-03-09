@@ -225,6 +225,65 @@ func (s *Server) handleStakingAccountTransactions(w http.ResponseWriter, r *http
 	s.handleFlowAccountTransactions(w, r)
 }
 
+// handleAccountStakingActivity handles GET /flow/account/{address}/staking/activity
+func (s *Server) handleAccountStakingActivity(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	address := normalizeAddr(vars["address"])
+	if address == "" {
+		writeAPIError(w, http.StatusBadRequest, "address is required")
+		return
+	}
+
+	limit, offset := parseLimitOffset(r)
+	if limit > 100 {
+		limit = 100
+	}
+
+	events, err := s.repo.ListStakingEventsByAddress(r.Context(), address, limit, offset)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Build epoch lookup from epoch_stats for the block height range in results
+	epochMap := make(map[uint64]models.EpochStats)
+	if len(events) > 0 {
+		epochStats, _ := s.repo.ListEpochStats(r.Context(), 200, 0)
+		for _, es := range epochStats {
+			epochMap[uint64(es.Epoch)] = es
+		}
+	}
+
+	out := make([]interface{}, 0, len(events))
+	for _, e := range events {
+		item := map[string]interface{}{
+			"block_height":   e.BlockHeight,
+			"transaction_id": e.TransactionID,
+			"event_index":    e.EventIndex,
+			"event_type":     e.EventType,
+			"node_id":        e.NodeID,
+			"delegator_id":   e.DelegatorID,
+			"amount":         e.Amount,
+			"timestamp":      formatTime(e.Timestamp),
+		}
+		// Find epoch for this block height
+		for _, es := range epochMap {
+			if uint64(es.StartHeight) <= e.BlockHeight && (es.EndHeight == 0 || e.BlockHeight <= uint64(es.EndHeight)) {
+				item["epoch"] = es.Epoch
+				item["epoch_start"] = formatTime(es.StartTime)
+				item["epoch_end"] = formatTime(es.EndTime)
+				break
+			}
+		}
+		out = append(out, item)
+	}
+
+	writeAPIResponse(w, out, map[string]interface{}{
+		"limit":  limit,
+		"offset": offset,
+	}, nil)
+}
+
 // handleStakingRewardsPaid handles GET /staking/rewards/paid
 func (s *Server) handleStakingRewardsPaid(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parseLimitOffset(r)
