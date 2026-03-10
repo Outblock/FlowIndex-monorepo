@@ -2,9 +2,8 @@ name: Publish Packages
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'packages/**'
+    tags:
+      - 'packages/*'    # e.g. packages/flow-signer@0.1.1, packages/agent-wallet@0.1.7
   workflow_dispatch:
 
 concurrency:
