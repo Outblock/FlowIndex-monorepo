@@ -68,13 +68,14 @@ function signMessage(
 ): string {
   const msgBytes = hexToBytes(messageHex);
 
-  // Hash the message
+  // Hash the message with the configured algorithm
   const digest = hashAlgo === 'SHA2_256' ? sha256(msgBytes) : sha3_256(msgBytes);
 
-  // ECDSA sign — v2 returns raw bytes, parse via Signature class
+  // ECDSA sign — noble v2 auto-hashes by default, so we must use prehash:false
+  // since we've already hashed with the Flow-configured hash algorithm above.
   const privBytes = hexToBytes(privateKeyHex);
   const curve = sigAlgo === 'ECDSA_P256' ? p256 : secp256k1;
-  const sigBytes = curve.sign(digest, privBytes, { lowS: true }) as Uint8Array;
+  const sigBytes = curve.sign(digest, privBytes, { lowS: true, prehash: false }) as Uint8Array;
   const sig = curve.Signature.fromBytes(sigBytes);
 
   // Return r||s  (each 32 bytes, total 64 bytes = 128 hex chars)

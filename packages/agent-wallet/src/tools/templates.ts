@@ -1,5 +1,6 @@
 /**
  * MCP tools for Cadence template listing, inspection, and execution.
+ * Uses cadence-codegen generated CadenceService for type-safe FCL calls.
  */
 
 import { z } from 'zod';
@@ -8,153 +9,56 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerContext } from '../server/server.js';
 import { getTemplate, listTemplates } from '../templates/registry.js';
 import { addPendingTx } from '../approval/manager.js';
+import type { CadenceService } from '../templates/cadence.gen.js';
+import * as fcl from '@onflow/fcl';
 
 // ---------------------------------------------------------------------------
-// FCL network configuration
+// Helpers
 // ---------------------------------------------------------------------------
 
-const ACCESS_NODES: Record<string, string> = {
-  mainnet: 'https://rest-mainnet.onflow.org',
-  testnet: 'https://rest-testnet.onflow.org',
-};
-
-async function configureFcl(network: 'mainnet' | 'testnet'): Promise<typeof import('@onflow/fcl')> {
-  const fcl = await import('@onflow/fcl');
-  fcl.config()
-    .put('accessNode.api', ACCESS_NODES[network] ?? ACCESS_NODES.mainnet)
-    .put('flow.network', network);
-  return fcl;
-}
-
-// ---------------------------------------------------------------------------
-// Signing / transaction execution helper
-// ---------------------------------------------------------------------------
-
-/**
- * Map Flow algo names to FCL numeric constants.
- *   SignatureAlgorithm:  ECDSA_P256 = 2, ECDSA_secp256k1 = 3
- *   HashAlgorithm:       SHA2_256 = 1, SHA3_256 = 3
- */
-function sigAlgoCode(algo: string): number {
-  switch (algo) {
-    case 'ECDSA_P256': return 2;
-    case 'ECDSA_secp256k1': return 3;
-    default: return 3;
-  }
-}
-
-function hashAlgoCode(algo: string): number {
-  switch (algo) {
-    case 'SHA2_256': return 1;
-    case 'SHA3_256': return 3;
-    default: return 1;
-  }
+function jsonContent(data: unknown, isError = false) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    ...(isError ? { isError: true } : {}),
+  };
 }
 
 /**
- * Convert a raw value + Cadence type string into an fcl.arg() call.
- * Uses fcl.t which re-exports all @onflow/types.
+ * Convert snake_case template name to camelCase method name on CadenceService.
+ * e.g. "create_coa" -> "createCoa", "transfer_tokens_v3" -> "transferTokensV3"
  */
-async function cadenceArg(value: unknown, cadenceType: string) {
-  const fcl = await import('@onflow/fcl');
+function toCamelCase(name: string): string {
+  return name.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+}
+
+/**
+ * Execute a generated CadenceService method by template name.
+ * For transactions, the service's request interceptor injects the signer.
+ * Returns the tx ID (for transactions) or result (for scripts).
+ */
+export async function executeViaCodegen(
+  service: CadenceService,
+  templateName: string,
+  orderedArgs: unknown[],
+): Promise<unknown> {
+  const methodName = toCamelCase(templateName);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const t = fcl.t as Record<string, any>;
-  const ty = cadenceType.trim();
-
-  // Array types like [UInt64], [UInt8], [String]
-  const arrayMatch = ty.match(/^\[(.+)\]$/);
-  if (arrayMatch) {
-    const innerType = arrayMatch[1].trim();
-    const fclInner = t[innerType];
-    if (!fclInner) throw new Error(`Unsupported array element type: ${innerType}`);
-    const arr = Array.isArray(value) ? value.map(String) : [];
-    return fcl.arg(arr, t.Array(fclInner));
+  const method = (service as any)[methodName];
+  if (typeof method !== 'function') {
+    throw new Error(`No generated method found for template "${templateName}" (tried "${methodName}")`);
   }
-
-  // Optional types like String?
-  if (ty.endsWith('?')) {
-    const baseType = ty.slice(0, -1);
-    const fclBase = t[baseType];
-    if (!fclBase) throw new Error(`Unsupported optional base type: ${baseType}`);
-    return fcl.arg(value == null ? null : String(value), t.Optional(fclBase));
-  }
-
-  // Simple types: String, Address, UFix64, UInt64, etc.
-  const fclType = t[ty];
-  if (fclType) {
-    return fcl.arg(String(value), fclType);
-  }
-
-  throw new Error(`Unsupported Cadence type: ${ty}`);
+  return method.call(service, ...orderedArgs);
 }
 
 /**
- * Convert an array of raw values + TemplateArg definitions into FCL typed args.
+ * Execute a generated CadenceService transaction, wait for seal, return result.
  */
-export async function buildFclArgs(
-  rawValues: unknown[],
-  argDefs: Array<{ name: string; type: string }>,
-): Promise<unknown[]> {
-  return Promise.all(
-    argDefs.map((def, i) => cadenceArg(rawValues[i], def.type)),
-  );
-}
-
-export interface TxResult {
-  status: 'sealed';
-  tx_id: string;
-  block_height: number;
-  events: Array<{ type: string; data: unknown }>;
-}
-
-/**
- * Sign and submit a Cadence transaction via FCL, using the provided signer.
- * Reusable by the approval tools once a pending tx is approved.
- */
-export async function executeFlowTransaction(
-  ctx: ServerContext,
-  cadenceCode: string,
-  args: unknown[],
-  _signerInfo?: { address?: string; keyIndex?: number },
+export async function executeTransaction(
+  service: CadenceService,
+  templateName: string,
+  orderedArgs: unknown[],
 ): Promise<TxResult> {
-  const fcl = await configureFcl(ctx.config.network);
-
-  const info = ctx.signer.info();
-  const address = info.flowAddress;
-  if (!address) {
-    throw new Error('Signer has no Flow address configured');
-  }
-
-  const keyIndex = _signerInfo?.keyIndex ?? info.keyIndex;
-  const sigAlgo = sigAlgoCode(info.sigAlgo);
-  const hashAlgo = hashAlgoCode(info.hashAlgo);
-
-  // FCL authorization function
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const authz = (account: any) => ({
-    ...account,
-    addr: fcl.sansPrefix(address),
-    keyId: keyIndex,
-    signingFunction: async (signable: { message: string }) => {
-      const result = await ctx.signer.signFlowTransaction(signable.message);
-      return {
-        addr: fcl.sansPrefix(address),
-        keyId: keyIndex,
-        signature: result.signature,
-      };
-    },
-    sigAlgo,
-    hashAlgo,
-  });
-
-  const txId: string = await fcl.mutate({
-    cadence: cadenceCode,
-    args: () => args,
-    proposer: authz,
-    payer: authz,
-    authorizations: [authz],
-    limit: 9999,
-  });
+  const txId = await executeViaCodegen(service, templateName, orderedArgs) as string;
 
   // Wait for seal
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,15 +75,11 @@ export async function executeFlowTransaction(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Tool helpers
-// ---------------------------------------------------------------------------
-
-function jsonContent(data: unknown, isError = false) {
-  return {
-    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
-    ...(isError ? { isError: true } : {}),
-  };
+export interface TxResult {
+  status: 'sealed';
+  tx_id: string;
+  block_height: number;
+  events: Array<{ type: string; data: unknown }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -263,11 +163,10 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
     {
       title: 'Execute Cadence Script',
       description:
-        'Execute a read-only Cadence script on the Flow network. Provide either a template_name or raw Cadence code.',
+        'Execute a read-only Cadence script on the Flow network. Provide a template_name to use a generated script.',
       inputSchema: {
-        template_name: z.string().optional().describe('Name of a script template to use'),
-        code: z.string().optional().describe('Raw Cadence script code (used if template_name is not provided)'),
-        args: z.array(z.any()).optional().describe('Script arguments in FCL arg format'),
+        template_name: z.string().describe('Name of a script template to use'),
+        args: z.record(z.any()).optional().describe('Named arguments matching the template arg schema'),
       },
       annotations: {
         readOnlyHint: true,
@@ -276,26 +175,19 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
         openWorldHint: true,
       },
     },
-    async ({ template_name, code, args }: { template_name?: string; code?: string; args?: unknown[] }) => {
+    async ({ template_name, args }: { template_name: string; args?: Record<string, unknown> }) => {
       try {
-        let cadence: string;
-        if (template_name) {
-          const tmpl = getTemplate(template_name);
-          if (!tmpl) return jsonContent({ error: `Template "${template_name}" not found` }, true);
-          if (tmpl.type !== 'script') return jsonContent({ error: `Template "${template_name}" is a transaction, not a script` }, true);
-          cadence = tmpl.cadence;
-        } else if (code) {
-          cadence = code;
-        } else {
-          return jsonContent({ error: 'Either template_name or code must be provided' }, true);
-        }
+        const template = getTemplate(template_name);
+        if (!template) return jsonContent({ error: `Template "${template_name}" not found` }, true);
+        if (template.type !== 'script') return jsonContent({ error: `Template "${template_name}" is a transaction, not a script` }, true);
 
-        const fcl = await configureFcl(ctx.config.network);
-        const result = await fcl.query({
-          cadence,
-          args: () => args ?? [],
+        const orderedArgs = template.args.map((a) => {
+          const val = args?.[a.name];
+          if (val === undefined) throw new Error(`Missing required argument: ${a.name}`);
+          return val;
         });
 
+        const result = await executeViaCodegen(ctx.cadenceService, template_name, orderedArgs);
         return jsonContent({ result });
       } catch (error) {
         return jsonContent({ error: String(error) }, true);
@@ -334,7 +226,7 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
         }
 
         // Extract raw values in template-defined order
-        const rawValues: unknown[] = template.args.map((argDef) => {
+        const orderedArgs = template.args.map((argDef) => {
           const val = args[argDef.name];
           if (val === undefined) {
             throw new Error(`Missing required argument: ${argDef.name}`);
@@ -361,9 +253,8 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
           });
         }
 
-        // Convert raw values to FCL typed args and execute
-        const fclArgs = await buildFclArgs(rawValues, template.args);
-        const result = await executeFlowTransaction(ctx, template.cadence, fclArgs);
+        // Execute immediately via codegen service
+        const result = await executeTransaction(ctx.cadenceService, template_name, orderedArgs);
         return jsonContent(result);
       } catch (error) {
         return jsonContent({ error: String(error) }, true);

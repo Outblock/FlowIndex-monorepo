@@ -8,7 +8,7 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   onSuccess: async () => {
-    // Copy cadence templates to dist so they're available at runtime
+    // Copy cadence templates for runtime metadata (list_templates / get_template)
     cpSync('src/templates/cadence', 'dist/cadence', { recursive: true });
   },
 });
