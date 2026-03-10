@@ -1361,7 +1361,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 3000 \
-            --set-env-vars "SIMULATOR_BACKEND_URL=${{ secrets.SIMULATOR_BACKEND_URL }}" \
+            --set-env-vars "SIMULATOR_BACKEND_URL=https://flowindex.io/api" \
             --memory 512Mi \
             --cpu 1 \
             --min-instances 0 \
