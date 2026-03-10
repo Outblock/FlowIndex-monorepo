@@ -304,6 +304,19 @@ services:
       - "18080:8080"
     restart: unless-stopped
 
+  simulate:
+    build:
+      context: ./simulate
+      dockerfile: Dockerfile
+    ports:
+      - "5175:3000"
+    environment:
+      - SIMULATOR_BACKEND_URL=http://backend:8080
+    depends_on:
+      - backend
+      - simulator
+    restart: unless-stopped
+
   docs:
     build:
       context: .
