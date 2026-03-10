@@ -38,5 +38,13 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
     };
   }
 
-  return resp.json();
+  // Backend returns snake_case keys and omits empty arrays; normalize here
+  const raw = await resp.json();
+  return {
+    success: raw.success,
+    error: raw.error,
+    events: raw.events ?? [],
+    balanceChanges: raw.balance_changes ?? raw.balanceChanges ?? [],
+    computationUsed: raw.computation_used ?? raw.computationUsed ?? 0,
+  };
 }
