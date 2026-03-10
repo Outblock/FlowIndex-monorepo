@@ -1780,6 +1780,10 @@ export default function App() {
                   activeMode={activeMode}
                   onOpenKeyManager={() => setShowKeyManager(true)}
                   showKeyManager={showKeyManager}
+                  autoSign={autoSign}
+                  onToggleAutoSign={handleToggleAutoSign}
+                  simulateBeforeSend={simulateBeforeSend}
+                  onToggleSimulate={handleToggleSimulate}
                 />
               )}
             </div>

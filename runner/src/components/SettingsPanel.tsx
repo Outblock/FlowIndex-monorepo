@@ -1,4 +1,4 @@
-import { Sparkles, Cpu, Server, Key as KeyIcon, Loader2 } from 'lucide-react';
+import { Sparkles, Cpu, Server, Key as KeyIcon, Loader2, Zap, Shield } from 'lucide-react';
 import type { LspMode } from '../editor/useLsp';
 
 interface SettingsPanelProps {
@@ -7,9 +7,13 @@ interface SettingsPanelProps {
   activeMode: string | null;
   onOpenKeyManager: () => void;
   showKeyManager: boolean;
+  autoSign: boolean;
+  onToggleAutoSign: (value: boolean) => void;
+  simulateBeforeSend: boolean;
+  onToggleSimulate: (value: boolean) => void;
 }
 
-export default function SettingsPanel({ lspMode, onLspModeChange, activeMode, onOpenKeyManager, showKeyManager }: SettingsPanelProps) {
+export default function SettingsPanel({ lspMode, onLspModeChange, activeMode, onOpenKeyManager, showKeyManager, autoSign, onToggleAutoSign, simulateBeforeSend, onToggleSimulate }: SettingsPanelProps) {
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* LSP Mode */}
@@ -47,6 +51,55 @@ export default function SettingsPanel({ lspMode, onLspModeChange, activeMode, on
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Transaction */}
+      <div className="border-b border-zinc-800">
+        <div className="px-3 py-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Transaction</span>
+        </div>
+        <div className="px-3 pb-3 space-y-1">
+          <button
+            onClick={() => onToggleAutoSign(!autoSign)}
+            className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] text-zinc-400 hover:bg-zinc-800 rounded transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Zap className={`w-3.5 h-3.5 ${autoSign ? 'text-amber-400' : ''}`} />
+              <span>Auto Sign</span>
+            </div>
+            <div
+              className={`relative w-7 h-4 rounded-full transition-colors ${
+                autoSign ? 'bg-amber-500' : 'bg-zinc-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                  autoSign ? 'translate-x-3' : ''
+                }`}
+              />
+            </div>
+          </button>
+          <button
+            onClick={() => onToggleSimulate(!simulateBeforeSend)}
+            className="w-full flex items-center justify-between px-2 py-1.5 text-[11px] text-zinc-400 hover:bg-zinc-800 rounded transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Shield className={`w-3.5 h-3.5 ${simulateBeforeSend ? 'text-blue-400' : ''}`} />
+              <span>Simulate First</span>
+            </div>
+            <div
+              className={`relative w-7 h-4 rounded-full transition-colors ${
+                simulateBeforeSend ? 'bg-blue-500' : 'bg-zinc-600'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
+                  simulateBeforeSend ? 'translate-x-3' : ''
+                }`}
+              />
+            </div>
+          </button>
         </div>
       </div>
 
