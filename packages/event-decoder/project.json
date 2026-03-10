@@ -1,0 +1,19 @@
+{
+  "name": "event-decoder",
+  "sourceRoot": "packages/event-decoder/src",
+  "tags": ["package"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsup", "cwd": "packages/event-decoder" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsc --noEmit", "cwd": "packages/event-decoder" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "vitest run", "cwd": "packages/event-decoder" }
+    }
+  }
+}
