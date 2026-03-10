@@ -159,22 +159,23 @@ export function Hero() {
             style={{
               background: `linear-gradient(
                 180deg,
-                #e8e0d0 0%,
-                #ddd5c4 4%,
-                #d5ccba 10%,
-                #ccc3b0 20%,
-                #c4baa6 50%,
-                #bbb09c 80%,
-                #b0a592 95%,
-                #a69a86 100%
+                #3a3a3e 0%,
+                #353538 4%,
+                #313134 10%,
+                #2e2e32 20%,
+                #2a2a2e 50%,
+                #26262a 80%,
+                #232326 95%,
+                #202024 100%
               )`,
               padding: '36px 36px 0 36px',
               boxShadow: `
-                inset 0 2px 0 rgba(255,255,255,0.5),
-                inset 0 -2px 0 rgba(0,0,0,0.15),
-                inset 2px 0 0 rgba(255,255,255,0.2),
-                inset -2px 0 0 rgba(0,0,0,0.08),
-                0 0 80px rgba(0,0,0,0.3)
+                inset 0 1px 0 rgba(255,255,255,0.08),
+                inset 0 -1px 0 rgba(0,0,0,0.4),
+                inset 1px 0 0 rgba(255,255,255,0.04),
+                inset -1px 0 0 rgba(0,0,0,0.2),
+                0 0 80px rgba(0,0,0,0.5),
+                0 20px 60px rgba(0,0,0,0.4)
               `,
             }}
           >
@@ -182,8 +183,8 @@ export function Hero() {
             <div
               className="absolute top-[12px] left-1/2 -translate-x-1/2 text-[10px] tracking-[6px] uppercase font-bold select-none"
               style={{
-                color: 'rgba(0,0,0,0.15)',
-                textShadow: '0 1px 0 rgba(255,255,255,0.25)',
+                color: 'rgba(255,255,255,0.06)',
+                textShadow: '0 -1px 0 rgba(0,0,0,0.3)',
               }}
             >
               FlowIndex
@@ -195,14 +196,14 @@ export function Hero() {
               style={{
                 boxShadow: `
                   inset 0 6px 20px rgba(0,0,0,0.7),
-                  inset 0 0 60px rgba(0,0,0,0.4),
-                  inset 6px 0 20px rgba(0,0,0,0.3),
-                  inset -6px 0 20px rgba(0,0,0,0.3),
-                  inset 0 -4px 12px rgba(0,0,0,0.5),
-                  0 0 0 2px rgba(60,50,35,0.6),
-                  0 0 0 4px rgba(80,70,50,0.3)
+                  inset 0 0 60px rgba(0,0,0,0.5),
+                  inset 6px 0 20px rgba(0,0,0,0.4),
+                  inset -6px 0 20px rgba(0,0,0,0.4),
+                  inset 0 -4px 12px rgba(0,0,0,0.6),
+                  0 0 0 2px rgba(10,10,14,0.8),
+                  0 0 0 4px rgba(50,50,55,0.3)
                 `,
-                border: '3px solid #5a5040',
+                border: '3px solid #1a1a1e',
               }}
             >
               {/* ── CRT phosphor tube ── */}
@@ -323,10 +324,10 @@ export function Hero() {
                   </div>
 
                   {/* Result panel */}
-                  <div className="w-72 border-l border-emerald-900/15 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-emerald-900/20">
-                      <span className="text-[11px] text-emerald-700/40 tracking-wider flex items-center gap-1.5">
-                        <span className="text-emerald-500/50">&gt;</span> RESULT
+                  <div className="w-72 border-l border-zinc-700/30 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-zinc-700/20">
+                      <span className="text-[11px] text-zinc-400 tracking-wider flex items-center gap-1.5">
+                        <span className="text-flow-green/70">&gt;</span> RESULT
                       </span>
                     </div>
                     <div
@@ -340,17 +341,17 @@ export function Hero() {
                           style={{ boxShadow: '0 0 10px rgba(0,239,139,0.9), 0 0 20px rgba(0,239,139,0.4)' }}
                         />
                         <span className="text-flow-green text-sm font-semibold" style={{ textShadow: '0 0 12px rgba(0,239,139,0.6)' }}>Passed</span>
-                        <span className="ml-auto text-[10px] text-emerald-700/40 bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-900/15">1,204 comp</span>
+                        <span className="ml-auto text-[11px] text-zinc-400 bg-zinc-800/40 px-2 py-0.5 rounded border border-zinc-700/30">1,204 comp</span>
                       </div>
-                      <div className="text-[10px] text-emerald-700/40 tracking-wider mb-3">BALANCE CHANGES</div>
-                      <div className="rounded-lg p-3 text-[12px] space-y-2 border border-emerald-900/15 bg-emerald-950/10">
+                      <div className="text-[10px] text-zinc-400 tracking-wider mb-3">BALANCE CHANGES</div>
+                      <div className="rounded-lg p-3 text-[12px] space-y-2.5 border border-zinc-700/20 bg-zinc-900/30">
                         <div className="flex justify-between">
-                          <span className="text-emerald-700/50">0x1654...0a61</span>
-                          <span className="text-red-400" style={{ textShadow: '0 0 8px rgba(248,113,113,0.4)' }}>-10.0 FLOW</span>
+                          <span className="text-zinc-400">0x1654...0a61</span>
+                          <span className="text-red-400 font-medium" style={{ textShadow: '0 0 8px rgba(248,113,113,0.4)' }}>-10.0 FLOW</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-emerald-700/50">0xf8d6...20c7</span>
-                          <span className="text-flow-green" style={{ textShadow: '0 0 10px rgba(0,239,139,0.6)' }}>+10.0 FLOW</span>
+                          <span className="text-zinc-400">0xf8d6...20c7</span>
+                          <span className="text-flow-green font-medium" style={{ textShadow: '0 0 10px rgba(0,239,139,0.6)' }}>+10.0 FLOW</span>
                         </div>
                       </div>
                     </div>
@@ -363,8 +364,8 @@ export function Hero() {
             <div
               className="flex items-center justify-between px-5 py-4 mt-0"
               style={{
-                borderTop: '1px solid rgba(0,0,0,0.1)',
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.05) 0%, rgba(0,0,0,0.12) 100%)',
+                borderTop: '1px solid rgba(255,255,255,0.03)',
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.2) 100%)',
                 borderRadius: '0 0 20px 20px',
               }}
             >
@@ -375,11 +376,11 @@ export function Hero() {
                     <div
                       className="w-[18px] h-[10px] rounded-[2px]"
                       style={{
-                        background: 'linear-gradient(180deg, #8a8070 0%, #7a7060 40%, #6a6050 100%)',
-                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 3px rgba(0,0,0,0.25), 0 1px 1px rgba(0,0,0,0.15)',
+                        background: 'linear-gradient(180deg, #404044 0%, #353538 40%, #2a2a2e 100%)',
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3)',
                       }}
                     />
-                    <span className="text-[5px] uppercase tracking-wider" style={{ color: 'rgba(0,0,0,0.25)' }}>{label}</span>
+                    <span className="text-[5px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>{label}</span>
                   </div>
                 ))}
               </div>
@@ -389,10 +390,10 @@ export function Hero() {
                 <div
                   className="px-3 py-[2px] rounded-sm text-[8px] tracking-[3px] uppercase font-bold"
                   style={{
-                    background: 'linear-gradient(180deg, #b0a590 0%, #a09580 100%)',
-                    color: 'rgba(0,0,0,0.3)',
-                    textShadow: '0 1px 0 rgba(255,255,255,0.2)',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.12)',
+                    background: 'linear-gradient(180deg, #35353a 0%, #2a2a2e 100%)',
+                    color: 'rgba(255,255,255,0.2)',
+                    textShadow: '0 -1px 0 rgba(0,0,0,0.3)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.3)',
                   }}
                 >
                   Simulate VM-2000
@@ -414,17 +415,17 @@ export function Hero() {
                     <div
                       className="w-[20px] h-[20px] rounded-full"
                       style={{
-                        background: `radial-gradient(circle at 35% 35%, #908070 0%, #6a6050 50%, #5a5040 100%)`,
-                        boxShadow: 'inset 0 2px 3px rgba(255,255,255,0.15), inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.15)',
-                        border: '1px solid rgba(100,90,70,0.5)',
+                        background: `radial-gradient(circle at 35% 35%, #48484e 0%, #35353a 50%, #2a2a2e 100%)`,
+                        boxShadow: 'inset 0 2px 3px rgba(255,255,255,0.06), inset 0 -2px 3px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(60,60,65,0.5)',
                       }}
                     >
                       {/* Knob indicator line */}
                       <div className="w-full h-full flex items-start justify-center pt-[3px]">
-                        <div className="w-[1px] h-[5px] bg-white/20 rounded-full" />
+                        <div className="w-[1px] h-[5px] bg-white/10 rounded-full" />
                       </div>
                     </div>
-                    <span className="text-[5px] uppercase tracking-wider" style={{ color: 'rgba(0,0,0,0.25)' }}>{label}</span>
+                    <span className="text-[5px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>{label}</span>
                   </div>
                 ))}
               </div>
@@ -438,7 +439,7 @@ export function Hero() {
           <div
             className="w-[70px] h-[35px]"
             style={{
-              background: `linear-gradient(180deg, #c0b5a0 0%, #b0a590 50%, #a09580 100%)`,
+              background: `linear-gradient(180deg, #38383e 0%, #30303a 50%, #2a2a30 100%)`,
               clipPath: 'polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)',
               boxShadow: '4px 0 6px rgba(0,0,0,0.2), -4px 0 6px rgba(0,0,0,0.2)',
             }}
@@ -447,7 +448,7 @@ export function Hero() {
           <div
             className="w-[220px] h-[14px] rounded-[7px]"
             style={{
-              background: `linear-gradient(180deg, #bbb09c 0%, #b0a590 40%, #a59a86 100%)`,
+              background: `linear-gradient(180deg, #35353b 0%, #30303a 40%, #2a2a30 100%)`,
               boxShadow: '0 4px 12px rgba(0,0,0,0.4), 0 8px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.2)',
             }}
           />
