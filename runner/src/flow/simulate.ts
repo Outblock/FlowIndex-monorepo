@@ -20,7 +20,7 @@ export interface SimulateResponse {
   computationUsed: number;
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'https://api.flowindex.io';
 
 export async function simulateTransaction(req: SimulateRequest): Promise<SimulateResponse> {
   const resp = await fetch(`${API_BASE}/flow/v1/simulate`, {
