@@ -210,6 +210,8 @@ jobs:
               --network=host \
               --env-file /mnt/stateful_partition/pgdata/backend.env \
               -e SKIP_MIGRATION=true \
+              -e SIMULATOR_URL=${{ secrets.SIMULATOR_URL }} \
+              -e SIMULATOR_ADMIN_URL=${{ secrets.SIMULATOR_ADMIN_URL }} \
               $IMAGE
           '
 
