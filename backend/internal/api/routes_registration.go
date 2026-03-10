@@ -12,7 +12,6 @@ func registerBaseRoutes(r *mux.Router, s *Server) {
 	r.HandleFunc("/openapi.json", s.handleOpenAPIJSON).Methods("GET", "OPTIONS")
 	r.HandleFunc("/status", s.handleStatus).Methods("GET", "OPTIONS")
 	r.HandleFunc("/ws", s.handleWebSocket).Methods("GET", "OPTIONS")
-	r.HandleFunc("/ws/status", s.handleStatusWebSocket).Methods("GET", "OPTIONS")
 }
 
 func registerAdminRoutes(r *mux.Router, s *Server) {

@@ -137,22 +137,20 @@ function Blocks() {
         }
     }, [lastMessage, blockPage]);
 
-    // Initial Load - handled by loader, but we keep status refresh
+    // Fallback status polling — only when WS is disconnected
     useEffect(() => {
+        if (isConnected) return;
         const refreshStatus = async () => {
             try {
                 await ensureHeyApiConfigured();
                 const status = await fetchStatus();
                 if (status) setStatusRaw(status);
-            } catch (error) {
-                console.error('Failed to fetch status:', error);
-            }
+            } catch { /* ignore */ }
         };
-
-        const statusTimer = setInterval(refreshStatus, 20000);
+        const statusTimer = setInterval(refreshStatus, 60000);
         return () => clearInterval(statusTimer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+         
+    }, [isConnected]);
 
     return (
         <div className="container mx-auto px-4 py-8 space-y-8">

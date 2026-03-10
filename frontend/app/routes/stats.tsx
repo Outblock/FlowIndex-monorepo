@@ -268,29 +268,11 @@ function Stats() {
         const interval = setInterval(() => loadStatus(false), 10000);
         const gcpInterval = setInterval(loadGcpStatus, 15000);
 
-        let ws: WebSocket | undefined;
-        try {
-            const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            const wsUrl = `${proto}://${window.location.host}/ws/status`;
-            ws = new WebSocket(wsUrl);
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    processStatus(data);
-                } catch (err) {
-                    console.error('Failed to parse status WS payload:', err);
-                }
-            };
-        } catch (err) {
-            console.error('Failed to open status WS:', err);
-        }
-
         return () => {
             clearInterval(interval);
             clearInterval(gcpInterval);
-            if (ws) ws.close();
         };
-         
+
     }, [processStatus, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Derived values for System Stats

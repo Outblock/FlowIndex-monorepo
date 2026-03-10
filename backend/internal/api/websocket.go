@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"flowscan-clone/internal/models"
@@ -14,6 +15,23 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+// liveStats holds approximate counters that are periodically refreshed from
+// the status cache and included in every new_block WS message so the frontend
+// can render stats without polling /status.
+var liveStats struct {
+	totalTransactions atomic.Int64
+	totalAddresses    atomic.Int64
+	totalContracts    atomic.Int64
+}
+
+// UpdateLiveStats is called by buildStatusPayload to keep the atomic counters
+// in sync with the latest DB estimates.
+func UpdateLiveStats(totalTxs, totalAddrs, totalContracts int64) {
+	liveStats.totalTransactions.Store(totalTxs)
+	liveStats.totalAddresses.Store(totalAddrs)
+	liveStats.totalContracts.Store(totalContracts)
+}
 
 // --- WebSocket Hub ---
 
@@ -118,40 +136,20 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleStatusWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println("Status WebSocket upgrade error:", err)
-		return
-	}
-	defer conn.Close()
-
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		payload, err := s.buildStatusPayload(r.Context(), false)
-		if err != nil {
-			payload = []byte(`{"status":"error"}`)
-		}
-		if err := conn.WriteMessage(websocket.TextMessage, payload); err != nil {
-			return
-		}
-		<-ticker.C
-	}
-}
-
 type BroadcastMessage struct {
 	Type    string      `json:"type"`
 	Payload interface{} `json:"payload"`
 }
 
 type WSBlock struct {
-	Height     uint64    `json:"height"`
-	ID         string    `json:"id"`
-	Timestamp  time.Time `json:"timestamp"`
-	TxCount    int       `json:"tx_count"`
-	EventCount int       `json:"event_count"`
+	Height            uint64    `json:"height"`
+	ID                string    `json:"id"`
+	Timestamp         time.Time `json:"timestamp"`
+	TxCount           int       `json:"tx_count"`
+	EventCount        int       `json:"event_count"`
+	TotalTransactions int64     `json:"total_transactions,omitempty"`
+	TotalAddresses    int64     `json:"total_addresses,omitempty"`
+	TotalContracts    int64     `json:"total_contracts,omitempty"`
 }
 
 type WSTransaction struct {
@@ -176,11 +174,14 @@ func BroadcastNewBlock(block models.Block) {
 		ts = block.CreatedAt
 	}
 	payload := WSBlock{
-		Height:     block.Height,
-		ID:         block.ID,
-		Timestamp:  ts,
-		TxCount:    block.TxCount,
-		EventCount: block.EventCount,
+		Height:            block.Height,
+		ID:                block.ID,
+		Timestamp:         ts,
+		TxCount:           block.TxCount,
+		EventCount:        block.EventCount,
+		TotalTransactions: liveStats.totalTransactions.Load(),
+		TotalAddresses:    liveStats.totalAddresses.Load(),
+		TotalContracts:    liveStats.totalContracts.Load(),
 	}
 	msg := BroadcastMessage{Type: "new_block", Payload: payload}
 	data, _ := json.Marshal(msg)

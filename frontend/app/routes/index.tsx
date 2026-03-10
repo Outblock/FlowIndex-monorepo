@@ -417,11 +417,20 @@ function Home() {
                 newBlockExpiryRef.current.set(newBlock.height, Date.now() + 3000);
                 setHighlightNow(Date.now());
             }
-            setStatusRaw((prev: any) => prev ? {
-                ...prev,
-                latest_height: Math.max(prev.latest_height || 0, newBlock.height),
-                max_height: Math.max(prev.max_height || 0, newBlock.height)
-            } : prev);
+            // WS new_block now carries stats — use them to populate/update statusRaw
+            // even if SSR timed out (prev === null).
+            setStatusRaw((prev: any) => {
+                const height = newBlock.height ?? 0;
+                const base = prev ?? {};
+                return {
+                    ...base,
+                    latest_height: Math.max(base.latest_height || 0, height),
+                    max_height: Math.max(base.max_height || 0, height),
+                    ...(newBlock.total_transactions ? { total_transactions: newBlock.total_transactions } : {}),
+                    ...(newBlock.total_addresses ? { total_addresses: newBlock.total_addresses } : {}),
+                    ...(newBlock.total_contracts ? { total_contracts: newBlock.total_contracts } : {}),
+                };
+            });
         }
 
         if (lastMessage.type === 'new_transaction') {
@@ -457,54 +466,67 @@ function Home() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lastMessage]);
 
-    // Initial data load + periodic refresh
+    // Initial data load on mount
     useEffect(() => {
-        const active = true;
-
-        const refreshStatus = async () => {
-            try {
-                await ensureHeyApiConfigured();
-                const statusRes = await fetchStatus();
-                if (!active || !statusRes) return;
-                setStatusRaw(statusRes);
-            } catch (error) {
-                console.error('Failed to fetch status:', error);
-            }
-        };
-
-        const refreshNetworkStats = async () => {
-            try {
-                const stats = await fetchNetworkStats();
-                if (!active || !stats) return;
-                setNetworkStats(stats);
-            } catch (error) {
-                console.error('Failed to fetch network stats:', error);
-            }
-        };
-
-        // Immediate fetch on mount (SSR may have failed or timed out)
-        if (!statusRaw) refreshStatus();
-        if (!networkStats) refreshNetworkStats();
+        // Immediate fetch if SSR timed out
+        if (!statusRaw) {
+            (async () => {
+                try {
+                    await ensureHeyApiConfigured();
+                    const res = await fetchStatus();
+                    if (res) setStatusRaw(res);
+                } catch { /* ignore */ }
+            })();
+        }
+        if (!networkStats) {
+            (async () => {
+                try {
+                    const stats = await fetchNetworkStats();
+                    if (stats) setNetworkStats(stats);
+                } catch { /* ignore */ }
+            })();
+        }
         if (!initialBlocks?.length) loadBlocks();
         loadTransactions();
         if (!initialTokens?.length) loadTokens();
         if (!initialNfts?.length) loadNftCollections();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-        const statusTimer = setInterval(refreshStatus, 20000);
-        const networkStatsTimer = setInterval(refreshNetworkStats, 60000);
-        // Fallback polling when websocket is unavailable.
-        const txRefreshTimer = setInterval(() => {
-            if (!isConnectedRef.current) {
-                loadTransactions();
-            }
-        }, 5000);
+    // Fallback polling — only active when WS is disconnected.
+    // When WS is connected, new_block messages carry live stats.
+    useEffect(() => {
+        if (isConnected) return; // WS is live, no need to poll
+
+        const refreshStatus = async () => {
+            try {
+                await ensureHeyApiConfigured();
+                const res = await fetchStatus();
+                if (res) setStatusRaw(res);
+            } catch { /* ignore */ }
+        };
+        const refreshTxs = () => loadTransactions();
+
+        const statusTimer = setInterval(refreshStatus, 60000);
+        const txRefreshTimer = setInterval(refreshTxs, 5000);
 
         return () => {
             clearInterval(statusTimer);
-            clearInterval(networkStatsTimer);
             clearInterval(txRefreshTimer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isConnected]);
+
+    // Network stats refresh (price/epoch/tokenomics) — independent of WS
+    useEffect(() => {
+        const refresh = async () => {
+            try {
+                const stats = await fetchNetworkStats();
+                if (stats) setNetworkStats(stats);
+            } catch { /* ignore */ }
+        };
+        const timer = setInterval(refresh, 60000);
+        return () => clearInterval(timer);
     }, []);
 
     const latestHeight = statusRaw?.latest_height || 0;

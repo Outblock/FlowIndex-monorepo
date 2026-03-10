@@ -19,7 +19,7 @@ export function IndexingStatus() {
         };
 
         loadStatus();
-        const interval = setInterval(loadStatus, 5000);
+        const interval = setInterval(loadStatus, 30000);
         return () => clearInterval(interval);
     }, []);
 

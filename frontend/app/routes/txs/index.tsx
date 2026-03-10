@@ -63,7 +63,7 @@ function Transactions() {
 
     const tokenMeta = useMemo(() => mergeTokenMetaFromTransactions(transactions), [transactions]);
 
-    const { isConnected: _isConnected } = useWebSocketStatus();
+    const { isConnected } = useWebSocketStatus();
     const { lastMessage } = useWebSocketMessages();
 
     // ── Fetch transactions with filters ──
@@ -125,18 +125,26 @@ function Transactions() {
         setStatus((prev: any) => prev ? { ...prev, total_transactions: (prev.total_transactions || 0) + 1 } : prev);
     }, [lastMessage, liveFeed, page, filters]);
 
-    // ── Status refresh ──
+    // ── Status refresh (fallback when WS disconnected) ──
     useEffect(() => {
-        const refresh = async () => {
+        // Initial fetch for SSR miss
+        (async () => {
             try {
                 const s = await fetchStatus();
                 if (s) setStatus(s);
             } catch { /* ignore */ }
-        };
-        refresh();
-        const interval = setInterval(refresh, 15000);
-        return () => clearInterval(interval);
+        })();
     }, []);
+    useEffect(() => {
+        if (isConnected) return;
+        const interval = setInterval(async () => {
+            try {
+                const s = await fetchStatus();
+                if (s) setStatus(s);
+            } catch { /* ignore */ }
+        }, 60000);
+        return () => clearInterval(interval);
+    }, [isConnected]);
 
     // ── Client-side type filter ──
     const displayTxs = activeTypeFilter

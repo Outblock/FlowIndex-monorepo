@@ -88,7 +88,6 @@ var specExcludedRoutes = map[string]bool{
 	"/openapi.yaml":      true,
 	"/openapi.json":      true,
 	"/ws":                true,
-	"/ws/status":         true,
 	"/status/gcp-vms":    true,
 	"/auth/verify-key":   true,
 	"/api/cadence/check": true,

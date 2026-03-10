@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -114,42 +115,91 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 		return defaultVal
 	}
 
-	// Get indexed height from DB (Forward Tip)
-	lastIndexed, err := s.repo.GetLastIndexedHeight(ctx, "main_ingester")
-	if err != nil {
-		lastIndexed = 0
-	}
+	// --- Run all independent DB queries in parallel ---
+	var (
+		lastIndexed    uint64
+		historyIndexed uint64
+		minH, maxH     uint64
+		totalBlocks    int64
+		checkpoints    map[string]uint64
+		totalEvents    int64
+		totalAddresses int64
+		totalContracts int64
+		totalTxs       int64
+		flowHeight     uint64
+		flowHeightOk   bool
+		errorSummary   interface{}
+		wg             sync.WaitGroup
+	)
 
-	// Get history height from DB (Backward Tip)
-	historyIndexed, err := s.repo.GetLastIndexedHeight(ctx, "history_ingester")
-	if err != nil {
-		historyIndexed = 0
-	}
+	wg.Add(9)
 
-	// Get Real Block Range (Min/Max/Count in DB)
-	minH, maxH, totalBlocks, err := s.repo.GetBlockRange(ctx)
-	if err != nil {
-		minH = 0
-		maxH = 0
-		totalBlocks = 0
-	}
+	go func() {
+		defer wg.Done()
+		if h, err := s.repo.GetLastIndexedHeight(ctx, "main_ingester"); err == nil {
+			lastIndexed = h
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if h, err := s.repo.GetLastIndexedHeight(ctx, "history_ingester"); err == nil {
+			historyIndexed = h
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if mn, mx, cnt, err := s.repo.GetBlockRange(ctx); err == nil {
+			minH, maxH, totalBlocks = mn, mx, cnt
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if cp, err := s.repo.GetAllCheckpoints(ctx); err == nil {
+			checkpoints = cp
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if n, err := s.repo.GetTotalEvents(ctx); err == nil {
+			totalEvents = n
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if n, err := s.repo.GetTotalAddresses(ctx); err == nil {
+			totalAddresses = n
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if n, err := s.repo.GetTotalContracts(ctx); err == nil {
+			totalContracts = n
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		if n, err := s.repo.GetTotalTransactions(ctx); err == nil {
+			totalTxs = n
+		}
+	}()
+	// Flow access node call (can be slow)
+	go func() {
+		defer wg.Done()
+		flowCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		if h, err := s.client.GetLatestBlockHeight(flowCtx); err == nil {
+			flowHeight = h
+			flowHeightOk = true
+		}
+	}()
 
-	checkpoints, err := s.repo.GetAllCheckpoints(ctx)
-	if err != nil {
+	wg.Wait()
+
+	// Keep WS broadcast stats in sync with latest DB estimates.
+	UpdateLiveStats(totalTxs, totalAddresses, totalContracts)
+
+	if checkpoints == nil {
 		checkpoints = map[string]uint64{}
-	}
-
-	totalEvents, err := s.repo.GetTotalEvents(ctx)
-	if err != nil {
-		totalEvents = 0
-	}
-	totalAddresses, err := s.repo.GetTotalAddresses(ctx)
-	if err != nil {
-		totalAddresses = 0
-	}
-	totalContracts, err := s.repo.GetTotalContracts(ctx)
-	if err != nil {
-		totalContracts = 0
 	}
 
 	forwardEnabled := os.Getenv("ENABLE_FORWARD_INGESTER") != "false"
@@ -250,7 +300,7 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 		},
 	}
 
-	// Get latest block height from Flow (bounded latency)
+	// Resolve latest height: prefer Flow access node, fallback to cache, then DB
 	latestHeight := maxH
 	{
 		var cachedHeight uint64
@@ -258,12 +308,10 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 		cachedHeight = s.latestHeightCache.height
 		s.latestHeightCache.mu.Unlock()
 
-		ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
-		defer cancel()
-		if h, err := s.client.GetLatestBlockHeight(ctx); err == nil {
-			latestHeight = h
+		if flowHeightOk {
+			latestHeight = flowHeight
 			s.latestHeightCache.mu.Lock()
-			s.latestHeightCache.height = h
+			s.latestHeightCache.height = flowHeight
 			s.latestHeightCache.updatedAt = time.Now()
 			s.latestHeightCache.mu.Unlock()
 		} else if cachedHeight > 0 {
@@ -303,12 +351,6 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 		progress = 0
 	}
 
-	// Get total transactions
-	totalTxs, err := s.repo.GetTotalTransactions(ctx)
-	if err != nil {
-		totalTxs = 0
-	}
-
 	behind := uint64(0)
 	if latestHeight > lastIndexed {
 		behind = latestHeight - lastIndexed
@@ -319,54 +361,77 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 		historyHeight = minH
 	}
 
-	indexedRanges := make([]interface{}, 0)
-	if includeRanges {
-		// Only compute indexed_ranges for pages that need the mosaic.
-		// This query can be expensive under DB load.
-		ranges, err := s.repo.GetIndexedRanges(ctx)
-		if err == nil {
-			indexedRanges = make([]interface{}, 0, len(ranges))
-			for _, r := range ranges {
-				indexedRanges = append(indexedRanges, r)
-			}
-		}
-	}
+	// --- Phase 2: queries that depend on phase 1 results (run in parallel) ---
+	var (
+		indexedRanges        = make([]interface{}, 0)
+		oldestBlockTimestamp *string
+		checkpointTimestamps = map[string]string{}
+		wg2                  sync.WaitGroup
+	)
 
-	// Get oldest block timestamp
-	var oldestBlockTimestamp *string
-	if minH > 0 {
-		if ts, err := s.repo.GetBlockTimestamp(ctx, minH); err == nil {
-			formatted := ts.UTC().Format(time.RFC3339)
-			oldestBlockTimestamp = &formatted
-		}
-	}
-
-	// Get timestamps for all worker checkpoint heights
-	checkpointTimestamps := map[string]string{}
-	if len(checkpoints) > 0 {
-		heightSet := make(map[uint64]struct{})
-		for _, h := range checkpoints {
-			if h > 0 {
-				heightSet[h] = struct{}{}
-			}
-		}
-		heights := make([]uint64, 0, len(heightSet))
-		for h := range heightSet {
-			heights = append(heights, h)
-		}
-		if tsMap, err := s.repo.GetBlockTimestamps(ctx, heights); err == nil {
-			for name, h := range checkpoints {
-				if ts, ok := tsMap[h]; ok {
-					checkpointTimestamps[name] = ts.UTC().Format(time.RFC3339)
+	needsPhase2 := includeRanges || minH > 0 || len(checkpoints) > 0
+	if needsPhase2 {
+		if includeRanges {
+			wg2.Add(1)
+			go func() {
+				defer wg2.Done()
+				if ranges, err := s.repo.GetIndexedRanges(ctx); err == nil {
+					result := make([]interface{}, 0, len(ranges))
+					for _, r := range ranges {
+						result = append(result, r)
+					}
+					indexedRanges = result
 				}
-			}
+			}()
 		}
-	}
 
-	// Error summary (non-blocking — ok if it fails)
-	var errorSummary interface{}
-	if es, err := s.repo.GetErrorSummary(ctx); err == nil {
-		errorSummary = es
+		if minH > 0 {
+			wg2.Add(1)
+			go func() {
+				defer wg2.Done()
+				if ts, err := s.repo.GetBlockTimestamp(ctx, minH); err == nil {
+					formatted := ts.UTC().Format(time.RFC3339)
+					oldestBlockTimestamp = &formatted
+				}
+			}()
+		}
+
+		if len(checkpoints) > 0 {
+			wg2.Add(1)
+			go func() {
+				defer wg2.Done()
+				heightSet := make(map[uint64]struct{})
+				for _, h := range checkpoints {
+					if h > 0 {
+						heightSet[h] = struct{}{}
+					}
+				}
+				heights := make([]uint64, 0, len(heightSet))
+				for h := range heightSet {
+					heights = append(heights, h)
+				}
+				if tsMap, err := s.repo.GetBlockTimestamps(ctx, heights); err == nil {
+					cpTs := map[string]string{}
+					for name, h := range checkpoints {
+						if ts, ok := tsMap[h]; ok {
+							cpTs[name] = ts.UTC().Format(time.RFC3339)
+						}
+					}
+					checkpointTimestamps = cpTs
+				}
+			}()
+		}
+
+		// Error summary
+		wg2.Add(1)
+		go func() {
+			defer wg2.Done()
+			if es, err := s.repo.GetErrorSummary(ctx); err == nil {
+				errorSummary = es
+			}
+		}()
+
+		wg2.Wait()
 	}
 
 	resp := map[string]interface{}{
