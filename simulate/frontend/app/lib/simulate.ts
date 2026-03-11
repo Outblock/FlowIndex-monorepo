@@ -1,4 +1,4 @@
-import type { FTTransfer, NFTTransfer, EVMExecution, SystemEvent, DefiEvent, StakingEvent, DecodedSummaryItem } from '@flowindex/event-decoder'
+import type { FTTransfer, NFTTransfer, EVMExecution, EVMLogTransfer, SystemEvent, DefiEvent, StakingEvent, DecodedSummaryItem } from '@flowindex/event-decoder'
 
 export interface SimulateRequest {
   cadence: string
@@ -24,6 +24,7 @@ export interface SimulateResponse {
   transfers: FTTransfer[]
   nftTransfers: NFTTransfer[]
   evmExecutions: EVMExecution[]
+  evmLogTransfers: EVMLogTransfer[]
   systemEvents: SystemEvent[]
   defiEvents: DefiEvent[]
   stakingEvents: StakingEvent[]
@@ -53,6 +54,7 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
       transfers: [],
       nftTransfers: [],
       evmExecutions: [],
+      evmLogTransfers: [],
       systemEvents: [],
       defiEvents: [],
       stakingEvents: [],

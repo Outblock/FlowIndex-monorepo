@@ -1,7 +1,7 @@
 // ── EVM event decoding (ported from frontend/app/lib/deriveFromEvents.ts) ──
 
 import { parseCadenceEventFields, formatAddr } from './cadence.js';
-import type { RawEvent, EVMExecution, DecodedEVMCall } from './types.js';
+import type { RawEvent, EVMExecution, DecodedEVMCall, EVMLogTransfer } from './types.js';
 
 /**
  * Decode a Flow EVM "direct call" raw_tx_payload (0xff-prefixed RLP).
@@ -297,5 +297,326 @@ export function parseEVMEvents(events: RawEvent[]): EVMExecution[] {
     const execution = parseEVMExecution(event);
     if (execution) results.push(execution);
   }
+  return results;
+}
+
+// ── EVM event log decoding (ERC-20/721/1155 Transfer) ──
+
+// keccak256("Transfer(address,address,uint256)")
+const TOPIC_ERC20_TRANSFER = 'ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+// keccak256("TransferSingle(address,address,address,uint256,uint256)")
+const TOPIC_ERC1155_TRANSFER_SINGLE = 'c3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
+// keccak256("TransferBatch(address,address,address,uint256[],uint256[])")
+const TOPIC_ERC1155_TRANSFER_BATCH = '4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb';
+
+interface RawEVMLog {
+  address: string;  // hex, no 0x
+  topics: string[]; // hex strings, no 0x
+  data: string;     // hex, no 0x
+}
+
+/** Extract address from a 32-byte topic (last 20 bytes) */
+function topicToAddress(topic: string): string {
+  const t = topic.replace(/^0x/, '').toLowerCase();
+  if (t.length < 40) return '';
+  return '0x' + t.slice(t.length - 40);
+}
+
+/** Extract uint256 from 32-byte hex */
+function hexToDecimal(hex: string): string {
+  const h = hex.replace(/^0x/, '').replace(/^0+/, '') || '0';
+  return BigInt('0x' + h).toString();
+}
+
+/**
+ * RLP-decode EVM logs from a byte array.
+ * Logs are RLP-encoded as: list[ list[address(20B), list[topic...], data], ... ]
+ */
+export function rlpDecodeLogs(hexOrBytes: string | number[] | Uint8Array): RawEVMLog[] {
+  let bytes: Uint8Array;
+  if (typeof hexOrBytes === 'string') {
+    const hex = hexOrBytes.replace(/^0x/, '');
+    if (hex.length === 0 || hex.length % 2 !== 0) return [];
+    bytes = new Uint8Array(hex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+  } else if (hexOrBytes instanceof Uint8Array) {
+    bytes = hexOrBytes;
+  } else {
+    bytes = new Uint8Array(hexOrBytes.map(b => Number(b) & 0xff));
+  }
+
+  if (bytes.length === 0) return [];
+
+  // Minimal RLP decoder
+  let pos = 0;
+
+  function readLength(): { dataStart: number; dataLen: number; isList: boolean } | null {
+    if (pos >= bytes.length) return null;
+    const b = bytes[pos];
+    if (b <= 0x7f) {
+      return { dataStart: pos, dataLen: 1, isList: false };
+    }
+    if (b <= 0xb7) {
+      const len = b - 0x80;
+      pos++;
+      return { dataStart: pos, dataLen: len, isList: false };
+    }
+    if (b <= 0xbf) {
+      const ll = b - 0xb7;
+      pos++;
+      let len = 0;
+      for (let i = 0; i < ll; i++) len = (len * 256) + bytes[pos + i];
+      pos += ll;
+      return { dataStart: pos, dataLen: len, isList: false };
+    }
+    if (b <= 0xf7) {
+      const len = b - 0xc0;
+      pos++;
+      return { dataStart: pos, dataLen: len, isList: true };
+    }
+    // b >= 0xf8
+    const ll = b - 0xf7;
+    pos++;
+    let len = 0;
+    for (let i = 0; i < ll; i++) len = (len * 256) + bytes[pos + i];
+    pos += ll;
+    return { dataStart: pos, dataLen: len, isList: true };
+  }
+
+  function readBytes(): Uint8Array {
+    if (pos >= bytes.length) return new Uint8Array(0);
+    const b = bytes[pos];
+    if (b <= 0x7f) { pos++; return new Uint8Array([b]); }
+    const info = readLength();
+    if (!info || info.isList) return new Uint8Array(0);
+    const out = bytes.slice(info.dataStart, info.dataStart + info.dataLen);
+    pos = info.dataStart + info.dataLen;
+    return out;
+  }
+
+  const toHex = (b: Uint8Array) => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+
+  try {
+    // Outer list
+    const outer = readLength();
+    if (!outer || !outer.isList) return [];
+    const outerEnd = outer.dataStart + outer.dataLen;
+
+    const logs: RawEVMLog[] = [];
+
+    while (pos < outerEnd) {
+      // Each log is a list [address, topics, data]
+      const logInfo = readLength();
+      if (!logInfo || !logInfo.isList) break;
+      const logEnd = logInfo.dataStart + logInfo.dataLen;
+
+      // address (20 bytes string)
+      const addrBytes = readBytes();
+      const address = toHex(addrBytes);
+
+      // topics list
+      const topicsInfo = readLength();
+      if (!topicsInfo || !topicsInfo.isList) { pos = logEnd; continue; }
+      const topicsEnd = topicsInfo.dataStart + topicsInfo.dataLen;
+      const topics: string[] = [];
+      while (pos < topicsEnd) {
+        const topicBytes = readBytes();
+        if (topicBytes.length > 0) topics.push(toHex(topicBytes));
+      }
+      pos = topicsEnd;
+
+      // data
+      const dataBytes = readBytes();
+      const data = toHex(dataBytes);
+
+      logs.push({ address, topics, data });
+      pos = logEnd;
+    }
+
+    return logs;
+  } catch {
+    return [];
+  }
+}
+
+/** Try to extract logs from EVM.TransactionExecuted event fields */
+function extractLogs(fields: Record<string, any>): RawEVMLog[] {
+  // Try JSON array format first (from simulator or pre-parsed)
+  for (const key of ['logs', 'eventLogs']) {
+    const v = fields[key];
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && 'topics' in v[0]) {
+      // Already parsed as JSON objects
+      return v.map((log: any) => ({
+        address: normalizeHexValue(log.address || log.contractAddress || ''),
+        topics: (log.topics || []).map((t: any) => normalizeHexValue(t)),
+        data: normalizeHexValue(log.data || ''),
+      }));
+    }
+  }
+
+  // Try RLP-encoded byte array
+  for (const key of ['logs', 'eventLogs']) {
+    const v = fields[key];
+    if (v == null) continue;
+    if (typeof v === 'string') {
+      const logs = rlpDecodeLogs(v);
+      if (logs.length > 0) return logs;
+    }
+    if (Array.isArray(v) && v.length > 0 && (typeof v[0] === 'number' || (typeof v[0] === 'object' && 'value' in v[0]))) {
+      // Cadence UInt8 array or plain byte array
+      const numArr = v.map((b: any) => {
+        if (typeof b === 'number') return b;
+        if (typeof b === 'object' && b.value != null) return Number(b.value);
+        return Number(b);
+      });
+      const logs = rlpDecodeLogs(numArr);
+      if (logs.length > 0) return logs;
+    }
+  }
+
+  return [];
+}
+
+/** Decode a single EVM log into a token transfer, or null if not a recognized transfer */
+function decodeLogTransfer(
+  log: RawEVMLog,
+  logIndex: number,
+  eventIndex: number,
+): EVMLogTransfer | null {
+  if (log.topics.length === 0) return null;
+  const topic0 = log.topics[0].toLowerCase();
+
+  // ERC-20 Transfer(address indexed from, address indexed to, uint256 value)
+  // ERC-721 Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
+  // Same topic0, distinguished by number of topics: 3 = ERC-20, 4 = ERC-721
+  if (topic0 === TOPIC_ERC20_TRANSFER) {
+    if (log.topics.length === 4) {
+      // ERC-721
+      return {
+        contractAddress: '0x' + log.address,
+        standard: 'erc721',
+        from: topicToAddress(log.topics[1]),
+        to: topicToAddress(log.topics[2]),
+        amount: '1',
+        tokenId: hexToDecimal(log.topics[3]),
+        event_index: eventIndex,
+        log_index: logIndex,
+      };
+    }
+    if (log.topics.length === 3 && log.data.length >= 64) {
+      // ERC-20
+      return {
+        contractAddress: '0x' + log.address,
+        standard: 'erc20',
+        from: topicToAddress(log.topics[1]),
+        to: topicToAddress(log.topics[2]),
+        amount: hexToDecimal(log.data.slice(0, 64)),
+        tokenId: '',
+        event_index: eventIndex,
+        log_index: logIndex,
+      };
+    }
+  }
+
+  // ERC-1155 TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value)
+  if (topic0 === TOPIC_ERC1155_TRANSFER_SINGLE && log.topics.length === 4 && log.data.length >= 128) {
+    return {
+      contractAddress: '0x' + log.address,
+      standard: 'erc1155',
+      from: topicToAddress(log.topics[2]),
+      to: topicToAddress(log.topics[3]),
+      amount: hexToDecimal(log.data.slice(64, 128)),
+      tokenId: hexToDecimal(log.data.slice(0, 64)),
+      event_index: eventIndex,
+      log_index: logIndex,
+    };
+  }
+
+  // ERC-1155 TransferBatch — emit one EVMLogTransfer per id/value pair
+  // Not handled here (returns null); handled in parseEVMLogTransfers for multi-return
+  if (topic0 === TOPIC_ERC1155_TRANSFER_BATCH) {
+    return null; // handled separately
+  }
+
+  return null;
+}
+
+/** Decode ERC-1155 TransferBatch into multiple transfers */
+function decodeTransferBatch(
+  log: RawEVMLog,
+  logIndex: number,
+  eventIndex: number,
+): EVMLogTransfer[] {
+  if (log.topics.length < 4 || log.data.length < 128) return [];
+  const from = topicToAddress(log.topics[2]);
+  const to = topicToAddress(log.topics[3]);
+  const contractAddress = '0x' + log.address;
+
+  // data: offset_ids(32B) + offset_values(32B) + ids_length(32B) + ids... + values_length(32B) + values...
+  const data = log.data;
+  try {
+    const idsOffset = Number(BigInt('0x' + (data.slice(0, 64).replace(/^0+/, '') || '0'))) * 2;
+    const idsLenHex = data.slice(idsOffset, idsOffset + 64);
+    const idsLen = Number(BigInt('0x' + (idsLenHex.replace(/^0+/, '') || '0')));
+    if (idsLen === 0 || idsLen > 256) return []; // sanity
+
+    const valuesOffset = Number(BigInt('0x' + (data.slice(64, 128).replace(/^0+/, '') || '0'))) * 2;
+    const valuesLenHex = data.slice(valuesOffset, valuesOffset + 64);
+    const valuesLen = Number(BigInt('0x' + (valuesLenHex.replace(/^0+/, '') || '0')));
+    if (valuesLen !== idsLen) return [];
+
+    const transfers: EVMLogTransfer[] = [];
+    for (let i = 0; i < idsLen; i++) {
+      const idStart = idsOffset + 64 + i * 64;
+      const valStart = valuesOffset + 64 + i * 64;
+      if (idStart + 64 > data.length || valStart + 64 > data.length) break;
+      transfers.push({
+        contractAddress,
+        standard: 'erc1155',
+        from,
+        to,
+        tokenId: hexToDecimal(data.slice(idStart, idStart + 64)),
+        amount: hexToDecimal(data.slice(valStart, valStart + 64)),
+        event_index: eventIndex,
+        log_index: logIndex,
+      });
+    }
+    return transfers;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Parse EVM event logs from EVM.TransactionExecuted events and extract
+ * ERC-20/721/1155 token transfers.
+ */
+export function parseEVMLogTransfers(events: RawEvent[]): EVMLogTransfer[] {
+  const results: EVMLogTransfer[] = [];
+
+  for (const event of events) {
+    if (!event.type.includes('EVM.TransactionExecuted')) continue;
+
+    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+    const fields = parseCadenceEventFields(payload) || payload;
+    if (!fields) continue;
+
+    const logs = extractLogs(fields);
+    const eventIndex = event.event_index ?? 0;
+
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      const topic0 = log.topics[0]?.toLowerCase() ?? '';
+
+      // TransferBatch needs special handling (multi-return)
+      if (topic0 === TOPIC_ERC1155_TRANSFER_BATCH) {
+        results.push(...decodeTransferBatch(log, i, eventIndex));
+        continue;
+      }
+
+      const transfer = decodeLogTransfer(log, i, eventIndex);
+      if (transfer) results.push(transfer);
+    }
+  }
+
   return results;
 }

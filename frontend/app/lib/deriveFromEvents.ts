@@ -8,6 +8,7 @@ import type {
   FTTransfer as PackageFTTransfer,
   NFTTransfer,
   EVMExecution,
+  EVMLogTransfer,
   DecodedEvents,
   TransferType,
 } from '@flowindex/event-decoder';
@@ -17,7 +18,7 @@ export { decodeEVMCallData } from '@flowindex/event-decoder';
 export type { DecodedEVMCall } from '@flowindex/event-decoder';
 
 // Re-export types consumers need directly
-export type { NFTTransfer, EVMExecution, TransferType };
+export type { NFTTransfer, EVMExecution, EVMLogTransfer, TransferType };
 
 // FTTransfer with display fields that the frontend mutates onto the objects
 export interface FTTransfer extends PackageFTTransfer {
@@ -33,6 +34,7 @@ export interface DerivedEnrichments {
   ft_transfers: FTTransfer[];
   nft_transfers: NFTTransfer[];
   evm_executions: EVMExecution[];
+  evm_log_transfers: EVMLogTransfer[];
   fee: number;
   contract_imports: string[];
 }
@@ -48,6 +50,7 @@ export function deriveEnrichments(events: any[], script?: string | null): Derive
     ft_transfers: decoded.transfers as FTTransfer[],
     nft_transfers: decoded.nftTransfers,
     evm_executions: decoded.evmExecutions,
+    evm_log_transfers: decoded.evmLogTransfers,
     fee: decoded.fee,
     contract_imports: decoded.contractImports,
   };

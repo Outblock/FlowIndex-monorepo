@@ -1,4 +1,4 @@
-import type { RawEvent } from './types.js';
+import type { RawEvent, EVMLogTransfer } from './types.js';
 
 /**
  * Derive transaction tags from a list of raw events.
@@ -6,7 +6,7 @@ import type { RawEvent } from './types.js';
  * Tags are derived purely from event type strings — no payload parsing needed.
  * Ported from backend/internal/ingester/tx_contracts_worker.go lines 221-263.
  */
-export function deriveTags(events: RawEvent[]): string[] {
+export function deriveTags(events: RawEvent[], evmLogTransfers?: EVMLogTransfer[]): string[] {
   const tags = new Set<string>();
 
   for (const evt of events) {
@@ -77,6 +77,15 @@ export function deriveTags(events: RawEvent[]): string[] {
 
     if (t.includes('.TokensBurned') && !t.includes('FlowToken.TokensBurned')) {
       tags.add('TOKEN_BURN');
+    }
+  }
+
+  // EVM log-level token transfer tags
+  if (evmLogTransfers && evmLogTransfers.length > 0) {
+    for (const t of evmLogTransfers) {
+      if (t.standard === 'erc20') tags.add('EVM_ERC20_TRANSFER');
+      else if (t.standard === 'erc721') tags.add('EVM_ERC721_TRANSFER');
+      else if (t.standard === 'erc1155') tags.add('EVM_ERC1155_TRANSFER');
     }
   }
 

@@ -1,7 +1,7 @@
 // ── Main orchestrator: decodes all event types from a raw event list ──
 
 import { parseTokenEvents } from './tokens.js';
-import { parseEVMEvents } from './evm.js';
+import { parseEVMEvents, parseEVMLogTransfers } from './evm.js';
 import { parseSystemEvents } from './system.js';
 import { parseDefiEvents } from './defi.js';
 import { parseStakingEvents } from './staking.js';
@@ -12,14 +12,15 @@ import type { RawEvent, DecodedEvents } from './types.js';
 export function decodeEvents(events: RawEvent[], script?: string | null): DecodedEvents {
   const { transfers, nftTransfers } = parseTokenEvents(events);
   const evmExecutions = parseEVMEvents(events);
+  const evmLogTransfers = parseEVMLogTransfers(events);
   const systemEvents = parseSystemEvents(events);
   const defiEvents = parseDefiEvents(events);
   const stakingEvents = parseStakingEvents(events);
-  const tags = deriveTags(events);
+  const tags = deriveTags(events, evmLogTransfers);
   const fee = extractFee(events);
   const contractImports = extractContractImports(script);
 
-  return { transfers, nftTransfers, evmExecutions, defiEvents, stakingEvents, systemEvents, fee, tags, contractImports };
+  return { transfers, nftTransfers, evmExecutions, evmLogTransfers, defiEvents, stakingEvents, systemEvents, fee, tags, contractImports };
 }
 
 function extractFee(events: RawEvent[]): number {

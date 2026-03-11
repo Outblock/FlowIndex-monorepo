@@ -88,10 +88,29 @@ export interface DecodedEVMCall {
   callType: string;   // "erc20_transfer", "erc20_transferFrom", etc.
 }
 
+/** Decoded EVM log-level token transfer (ERC-20/721/1155 Transfer events) */
+export interface EVMLogTransfer {
+  /** Contract address that emitted the event (0x-prefixed) */
+  contractAddress: string;
+  /** 'erc20' | 'erc721' | 'erc1155' */
+  standard: 'erc20' | 'erc721' | 'erc1155';
+  from: string;    // 0x-prefixed
+  to: string;      // 0x-prefixed
+  /** Decimal string. For ERC-20: token amount in base units. For ERC-721: always "1". For ERC-1155: transfer amount. */
+  amount: string;
+  /** Token ID (decimal string). Empty for ERC-20. */
+  tokenId: string;
+  /** Index of the parent EVM.TransactionExecuted event */
+  event_index: number;
+  /** Index of this log within the EVM tx logs */
+  log_index: number;
+}
+
 export interface DecodedEvents {
   transfers: FTTransfer[];
   nftTransfers: NFTTransfer[];
   evmExecutions: EVMExecution[];
+  evmLogTransfers: EVMLogTransfer[];
   defiEvents: DefiEvent[];
   stakingEvents: StakingEvent[];
   systemEvents: SystemEvent[];

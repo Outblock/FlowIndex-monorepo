@@ -54,6 +54,7 @@ export default defineEventHandler(async (event) => {
     transfers: decoded?.transfers ?? [],
     nftTransfers: decoded?.nftTransfers ?? [],
     evmExecutions: decoded?.evmExecutions ?? [],
+    evmLogTransfers: decoded?.evmLogTransfers ?? [],
     systemEvents: decoded?.systemEvents ?? [],
     defiEvents: decoded?.defiEvents ?? [],
     stakingEvents: decoded?.stakingEvents ?? [],

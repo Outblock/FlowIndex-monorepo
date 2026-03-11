@@ -3,7 +3,7 @@ import { buildSummary, buildSummaryItems } from '../summary.js';
 import type { DecodedEvents } from '../types.js';
 
 const empty: DecodedEvents = {
-  transfers: [], nftTransfers: [], evmExecutions: [], defiEvents: [],
+  transfers: [], nftTransfers: [], evmExecutions: [], evmLogTransfers: [], defiEvents: [],
   stakingEvents: [], systemEvents: [], fee: 0, tags: [], contractImports: [],
 };
 

@@ -195,5 +195,17 @@ export function buildSummaryItems(decoded: DecodedEvents): DecodedSummaryItem[] 
     items.push({ icon: 'evm', text: `EVM call to ${evm.to}` });
   }
 
+  // EVM log transfers (ERC-20/721/1155)
+  for (const t of decoded.evmLogTransfers) {
+    const addr = t.contractAddress.slice(0, 10) + '…';
+    if (t.standard === 'erc20') {
+      items.push({ icon: 'transfer', text: `ERC-20 transfer ${t.amount} (${addr})` });
+    } else if (t.standard === 'erc721') {
+      items.push({ icon: 'nft', text: `ERC-721 transfer #${t.tokenId} (${addr})` });
+    } else if (t.standard === 'erc1155') {
+      items.push({ icon: 'nft', text: `ERC-1155 transfer #${t.tokenId} ×${t.amount} (${addr})` });
+    }
+  }
+
   return items;
 }
