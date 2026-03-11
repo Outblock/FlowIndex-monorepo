@@ -7750,6 +7750,101 @@
           }
         }
       }
+    },
+    "/simulate": {
+      "post": {
+        "description": "Simulate a Cadence transaction against forked mainnet state. Returns decoded event summaries, token transfers, NFT transfers, balance changes, and more using the event-decoder.\n\nThe simulation runs on a Flow Emulator in mainnet-fork mode with snapshot isolation — no permanent effects.",
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "Simulate transaction (decoded)",
+        "servers": [
+          {
+            "url": "https://simulate.flowindex.io/api"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/simulate.SimulateRequest"
+              },
+              "example": {
+                "cadence": "import FungibleToken from 0xf233dcee88fe0abe\nimport FlowToken from 0x1654653399040a61\n\ntransaction(amount: UFix64, to: Address) {\n  let sentVault: @{FungibleToken.Vault}\n  prepare(signer: auth(BorrowValue) &Account) {\n    let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)\n      ?? panic(\"Could not borrow\")\n    self.sentVault <- vaultRef.withdraw(amount: amount)\n  }\n  execute {\n    let receiverRef = getAccount(to).capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)\n      ?? panic(\"Could not borrow receiver\")\n    receiverRef.deposit(from: <- self.sentVault)\n  }\n}",
+                "arguments": [
+                  {
+                    "type": "UFix64",
+                    "value": "10.0"
+                  },
+                  {
+                    "type": "Address",
+                    "value": "0x1654653399040a61"
+                  }
+                ],
+                "authorizers": [
+                  "0xe467b9dd11fa00df"
+                ],
+                "payer": "0xe467b9dd11fa00df"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Simulation result with decoded events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/simulate.SimulateDecodedResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Simulation service unavailable"
+          }
+        }
+      }
+    },
+    "/simulate/raw": {
+      "post": {
+        "description": "Simulate a Cadence transaction against forked mainnet state. Returns raw events as-is from the emulator without decoding.",
+        "tags": [
+          "Simulate"
+        ],
+        "summary": "Simulate transaction (raw events)",
+        "servers": [
+          {
+            "url": "https://simulate.flowindex.io/api"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/simulate.SimulateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Simulation result with raw events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/simulate.SimulateRawResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Simulation service unavailable"
+          }
+        }
+      }
     }
   },
   "tags": [
@@ -7788,6 +7883,10 @@
     {
       "description": "Admin endpoints for managing tokens, collections, contracts, account labels, script templates, and operational tasks. All endpoints require admin authentication via Bearer token (static ADMIN_TOKEN or JWT with admin role).",
       "name": "Admin"
+    },
+    {
+      "name": "Simulate",
+      "description": "Transaction simulation against forked mainnet state"
     }
   ],
   "servers": [
@@ -12681,6 +12780,264 @@
           "created_at": {
             "type": "string",
             "description": "ISO 8601 timestamp"
+          }
+        }
+      },
+      "simulate.SimulateRequest": {
+        "type": "object",
+        "required": [
+          "cadence",
+          "authorizers",
+          "payer"
+        ],
+        "properties": {
+          "cadence": {
+            "type": "string",
+            "description": "Cadence transaction script"
+          },
+          "arguments": {
+            "type": "array",
+            "description": "Transaction arguments in JSON-CDC format",
+            "items": {
+              "type": "object"
+            }
+          },
+          "authorizers": {
+            "type": "array",
+            "description": "List of authorizer addresses (with 0x prefix)",
+            "items": {
+              "type": "string"
+            }
+          },
+          "payer": {
+            "type": "string",
+            "description": "Payer address (with 0x prefix). Use 0xe467b9dd11fa00df for the emulator service account."
+          }
+        }
+      },
+      "simulate.SimulateDecodedResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "computationUsed": {
+            "type": "integer"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Human-readable summary of what the transaction does"
+          },
+          "summaryItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/simulate.SummaryItem"
+            }
+          },
+          "transfers": {
+            "type": "array",
+            "description": "Decoded fungible token transfers",
+            "items": {
+              "$ref": "#/components/schemas/simulate.FTTransfer"
+            }
+          },
+          "nftTransfers": {
+            "type": "array",
+            "description": "Decoded NFT transfers",
+            "items": {
+              "$ref": "#/components/schemas/simulate.NFTTransfer"
+            }
+          },
+          "balanceChanges": {
+            "type": "array",
+            "description": "Net balance changes per address/token",
+            "items": {
+              "$ref": "#/components/schemas/simulate.BalanceChange"
+            }
+          },
+          "systemEvents": {
+            "type": "array",
+            "description": "System-level events (account changes, key additions, etc.)",
+            "items": {
+              "$ref": "#/components/schemas/simulate.SystemEvent"
+            }
+          },
+          "evmExecutions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "defiEvents": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "stakingEvents": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "fee": {
+            "type": "number",
+            "description": "Transaction fee in FLOW"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Classification tags (e.g. token-transfer, nft-mint)"
+          },
+          "events": {
+            "type": "array",
+            "description": "Raw events (also included for reference)",
+            "items": {
+              "$ref": "#/components/schemas/simulate.RawEvent"
+            }
+          }
+        }
+      },
+      "simulate.SimulateRawResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "computationUsed": {
+            "type": "integer"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/simulate.RawEvent"
+            }
+          },
+          "balanceChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/simulate.BalanceChange"
+            }
+          }
+        }
+      },
+      "simulate.SummaryItem": {
+        "type": "object",
+        "properties": {
+          "icon": {
+            "type": "string",
+            "description": "Icon hint (e.g. transfer, mint, burn)"
+          },
+          "text": {
+            "type": "string",
+            "description": "Human-readable description"
+          }
+        }
+      },
+      "simulate.FTTransfer": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Fully qualified token identifier (e.g. A.1654653399040a61.FlowToken)"
+          },
+          "from_address": {
+            "type": "string"
+          },
+          "to_address": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "event_index": {
+            "type": "integer"
+          },
+          "transfer_type": {
+            "type": "string",
+            "enum": [
+              "transfer",
+              "mint",
+              "burn"
+            ]
+          }
+        }
+      },
+      "simulate.NFTTransfer": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Fully qualified NFT collection identifier"
+          },
+          "from_address": {
+            "type": "string"
+          },
+          "to_address": {
+            "type": "string"
+          },
+          "token_id": {
+            "type": "string"
+          },
+          "event_index": {
+            "type": "integer"
+          },
+          "transfer_type": {
+            "type": "string",
+            "enum": [
+              "transfer",
+              "mint",
+              "burn"
+            ]
+          }
+        }
+      },
+      "simulate.BalanceChange": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "string",
+            "description": "Signed delta (e.g. -10 or 10)"
+          }
+        }
+      },
+      "simulate.SystemEvent": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "simulate.RawEvent": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Event type identifier (e.g. A.1654653399040a61.FlowToken.TokensWithdrawn)"
+          },
+          "payload": {
+            "type": "object",
+            "description": "JSON-CDC encoded event payload"
           }
         }
       }

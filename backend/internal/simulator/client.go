@@ -198,36 +198,54 @@ func (c *Client) SendTransaction(ctx context.Context, tx *TxRequest) (*TxResult,
 		return nil, fmt.Errorf("marshalling tx body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/transactions", bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, fmt.Errorf("building tx request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// Retry loop: the emulator returns 400 "pending block ... is currently being
+	// executed" when it hasn't finished committing the previous block. Wait and retry.
+	const maxRetries = 10
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/transactions", bytes.NewReader(bodyBytes))
+		if err != nil {
+			return nil, fmt.Errorf("building tx request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("sending transaction: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("sending transaction: %w", err)
+		}
 
-	respBody, _ := io.ReadAll(resp.Body)
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+			var txResp struct {
+				ID string `json:"id"`
+			}
+			if err := json.Unmarshal(respBody, &txResp); err != nil {
+				return nil, fmt.Errorf("parsing tx response: %w", err)
+			}
+			if txResp.ID == "" {
+				return nil, fmt.Errorf("emulator returned empty tx ID")
+			}
+			return c.waitForResult(ctx, txResp.ID)
+		}
+
+		// Retry on "pending block" errors
+		if resp.StatusCode == http.StatusBadRequest && strings.Contains(string(respBody), "pending block") {
+			lastErr = fmt.Errorf("emulator returned status %d: %s", resp.StatusCode, string(respBody))
+			log.Printf("[simulator] pending block, retrying in %dms (attempt %d/%d)", (attempt+1)*500, attempt+1, maxRetries)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt+1) * 500 * time.Millisecond):
+			}
+			continue
+		}
+
 		return nil, fmt.Errorf("emulator returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	var txResp struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(respBody, &txResp); err != nil {
-		return nil, fmt.Errorf("parsing tx response: %w", err)
-	}
-
-	if txResp.ID == "" {
-		return nil, fmt.Errorf("emulator returned empty tx ID")
-	}
-
-	return c.waitForResult(ctx, txResp.ID)
+	return nil, fmt.Errorf("emulator busy after %d retries: %w", maxRetries, lastErr)
 }
 
 // waitForResult polls the emulator for a sealed transaction result.
