@@ -1,6 +1,7 @@
 package simulator
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -44,9 +45,88 @@ type Handler struct {
 	mu     sync.Mutex
 }
 
-// NewHandler creates a new simulation handler.
+// NewHandler creates a new simulation handler and starts background warmup.
 func NewHandler(client *Client) *Handler {
-	return &Handler{client: client}
+	h := &Handler{client: client}
+	go h.warmup()
+	return h
+}
+
+// warmup pre-caches common mainnet contract state by running a simple transaction.
+// This makes the first real user request much faster.
+func (h *Handler) warmup() {
+	// Wait for emulator to be ready
+	time.Sleep(3 * time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	// Check emulator health first
+	if ok, err := h.client.HealthCheck(ctx); !ok || err != nil {
+		log.Printf("[simulator] warmup: emulator not ready, skipping: %v", err)
+		return
+	}
+
+	log.Println("[simulator] warmup: pre-caching common mainnet contract state...")
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// Create + revert snapshot around warmup
+	snapName := "warmup-init"
+	if _, err := h.client.CreateSnapshot(ctx, snapName); err != nil {
+		log.Printf("[simulator] warmup: snapshot create failed: %v", err)
+	}
+	defer func() {
+		if err := h.client.RevertSnapshot(ctx, snapName); err != nil {
+			log.Printf("[simulator] warmup: snapshot revert failed: %v", err)
+		}
+	}()
+
+	// Simple FlowToken transfer that touches FungibleToken + FlowToken contracts
+	warmupCadence := `import FungibleToken from 0xf233dcee88fe0abe
+import FlowToken from 0x1654653399040a61
+
+transaction(amount: UFix64, to: Address) {
+    let sentVault: @{FungibleToken.Vault}
+    prepare(signer: auth(BorrowValue) &Account) {
+        let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+            from: /storage/flowTokenVault
+        ) ?? panic("Could not borrow reference to the owner's Vault!")
+        self.sentVault <- vaultRef.withdraw(amount: amount)
+    }
+    execute {
+        let receiverRef = getAccount(to)
+            .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            ?? panic("Could not borrow receiver reference")
+        receiverRef.deposit(from: <- self.sentVault)
+    }
+}`
+
+	txReq := &TxRequest{
+		Cadence: warmupCadence,
+		Arguments: []json.RawMessage{
+			json.RawMessage(`{"type":"UFix64","value":"0.001"}`),
+			json.RawMessage(`{"type":"Address","value":"0x1654653399040a61"}`),
+		},
+		Authorizers: []string{"1654653399040a61"},
+		Payer:       "1654653399040a61",
+	}
+
+	start := time.Now()
+	result, err := h.client.SendTransaction(ctx, txReq)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		log.Printf("[simulator] warmup: transaction failed after %s: %v", elapsed, err)
+		return
+	}
+
+	if result.Success {
+		log.Printf("[simulator] warmup: completed successfully in %s (computation: %d)", elapsed, result.ComputationUsed)
+	} else {
+		log.Printf("[simulator] warmup: transaction error after %s: %s", elapsed, result.Error)
+	}
 }
 
 // HandleSimulate processes a simulate request.
