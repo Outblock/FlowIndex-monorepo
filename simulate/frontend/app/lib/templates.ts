@@ -72,7 +72,7 @@ transaction(amount: UFix64, to: Address) {
 }`,
     args: [
       { name: 'amount', type: 'UFix64', defaultValue: '10.0' },
-      { name: 'to', type: 'Address', defaultValue: '0xf8d6e0586b0a20c7' },
+      { name: 'to', type: 'Address', defaultValue: '0xf233dcee88fe0abe' },
     ],
   },
   {
@@ -102,22 +102,35 @@ transaction(amount: UFix64, to: Address) {
     ],
   },
   {
-    id: 'check-balance',
-    name: 'Check Balance',
-    filename: 'check-balance.cdc',
-    cadence: `import FungibleToken from 0xf233dcee88fe0abe
-import FlowToken from 0x1654653399040a61
+    id: 'transfer-nba-topshot',
+    name: 'Transfer NBA Moment',
+    filename: 'transfer-nba-moment.cdc',
+    cadence: `import NonFungibleToken from 0x1d7e57aa55817448
+import TopShot from 0x220cb8d928c0b076
 
-transaction {
+transaction(recipientAddr: Address, momentID: UInt64) {
+    let transferToken: @{NonFungibleToken.NFT}
+
     prepare(signer: auth(BorrowValue) &Account) {
-        let vaultRef = signer.storage.borrow<&FlowToken.Vault>(
-            from: /storage/flowTokenVault
-        ) ?? panic("Could not borrow FLOW vault reference")
+        let collectionRef = signer.storage.borrow<auth(NonFungibleToken.Withdraw) &TopShot.Collection>(
+            from: /storage/MomentCollection
+        ) ?? panic("Could not borrow reference to the owner's Moment collection")
 
-        log("Balance: ".concat(vaultRef.balance.toString()))
+        self.transferToken <- collectionRef.withdraw(withdrawID: momentID)
+    }
+
+    execute {
+        let recipientCollection = getAccount(recipientAddr)
+            .capabilities.borrow<&{TopShot.MomentCollectionPublic}>(/public/MomentCollection)
+            ?? panic("Could not borrow recipient's Moment collection")
+
+        recipientCollection.deposit(token: <- self.transferToken)
     }
 }`,
-    args: [],
+    args: [
+      { name: 'recipientAddr', type: 'Address', defaultValue: '0xc8b75d0745d3f284' },
+      { name: 'momentID', type: 'UInt64', defaultValue: '10000052' },
+    ],
   },
   {
     id: 'deploy-contract',
@@ -167,7 +180,7 @@ transaction(amount1: UFix64, to1: Address, amount2: UFix64, to2: Address) {
 }`,
     args: [
       { name: 'amount1', type: 'UFix64', defaultValue: '5.0' },
-      { name: 'to1', type: 'Address', defaultValue: '0x1654653399040a61' },
+      { name: 'to1', type: 'Address', defaultValue: '0xc1e160d6ed546c26' },
       { name: 'amount2', type: 'UFix64', defaultValue: '3.0' },
       { name: 'to2', type: 'Address', defaultValue: '0xf233dcee88fe0abe' },
     ],
