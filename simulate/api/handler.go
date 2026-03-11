@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -41,17 +43,102 @@ type SimulateResponse struct {
 // Requests are serialized via a mutex because the Flow Emulator
 // can only execute one block at a time.
 type Handler struct {
-	client *Client
-	mu     sync.Mutex
+	client             *Client
+	mu                 sync.Mutex
+	emulatorContainer  string
+	stuckTimeout       time.Duration
+	lastBlockChange    atomic.Int64 // unix timestamp of last observed block height change
+	lastBlockHeight    atomic.Int64
+	recovering         atomic.Bool
 }
 
 // NewHandler creates a new simulation handler and starts background warmup.
 // Warmup runs immediately on start, then repeats every hour to keep the
 // emulator's fork-mode cache fresh.
-func NewHandler(client *Client) *Handler {
-	h := &Handler{client: client}
+func NewHandler(client *Client, emulatorContainer string, stuckTimeoutSec int) *Handler {
+	h := &Handler{
+		client:            client,
+		emulatorContainer: emulatorContainer,
+		stuckTimeout:      time.Duration(stuckTimeoutSec) * time.Second,
+	}
+	h.lastBlockChange.Store(time.Now().Unix())
 	go h.warmupLoop()
+	go h.watchdog()
 	return h
+}
+
+// watchdog monitors the emulator for stuck blocks and auto-recovers by
+// restarting the emulator container when no progress is detected.
+func (h *Handler) watchdog() {
+	// Give emulator time to start up before monitoring
+	time.Sleep(30 * time.Second)
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if h.recovering.Load() {
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		height, err := h.client.getLatestBlockHeight(ctx)
+		cancel()
+
+		if err != nil {
+			// Can't reach emulator or got "pending block" error — check how long it's been stuck
+			stuckSince := time.Unix(h.lastBlockChange.Load(), 0)
+			if time.Since(stuckSince) > h.stuckTimeout {
+				log.Printf("[watchdog] emulator stuck for %s (timeout=%s), recovering...",
+					time.Since(stuckSince).Round(time.Second), h.stuckTimeout)
+				h.recoverEmulator()
+			}
+			continue
+		}
+
+		// Track block height changes
+		prev := h.lastBlockHeight.Load()
+		if height != prev {
+			h.lastBlockHeight.Store(height)
+			h.lastBlockChange.Store(time.Now().Unix())
+		}
+	}
+}
+
+// recoverEmulator restarts the emulator container and re-runs warmup.
+func (h *Handler) recoverEmulator() {
+	if !h.recovering.CompareAndSwap(false, true) {
+		return // already recovering
+	}
+	defer h.recovering.Store(false)
+
+	log.Printf("[recovery] restarting emulator container %q...", h.emulatorContainer)
+
+	// Restart via Docker CLI (requires Docker socket mounted)
+	cmd := exec.Command("docker", "restart", "-t", "5", h.emulatorContainer)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("[recovery] docker restart failed: %v, output: %s", err, string(out))
+		return
+	}
+	log.Printf("[recovery] emulator container restarted, waiting for ready...")
+
+	// Wait for emulator to be ready (up to 30s)
+	for i := 0; i < 30; i++ {
+		time.Sleep(1 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ok, err := h.client.HealthCheck(ctx)
+		cancel()
+		if ok && err == nil {
+			log.Println("[recovery] emulator ready, re-running warmup...")
+			h.lastBlockChange.Store(time.Now().Unix())
+			h.warmup()
+			return
+		}
+	}
+
+	log.Println("[recovery] emulator did not become ready after 30s")
+	h.lastBlockChange.Store(time.Now().Unix()) // reset timer to avoid immediate re-trigger
 }
 
 // warmupLoop runs warmup on start and then every hour.
@@ -243,9 +330,9 @@ func (h *Handler) runWarmupTx(_ context.Context, name string, cadence string, ar
 		Payer:       "e467b9dd11fa00df",
 	}
 
-	// Per-tx timeout: if a single warmup tx takes >120s it's stuck on
+	// Per-tx timeout: if a single warmup tx takes >45s it's stuck on
 	// a heavy mainnet state fetch — skip it rather than blocking everything.
-	txCtx, txCancel := context.WithTimeout(context.Background(), 120*time.Second)
+	txCtx, txCancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer txCancel()
 
 	h.mu.Lock()

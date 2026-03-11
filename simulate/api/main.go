@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 )
 
 func main() {
@@ -22,8 +23,20 @@ func main() {
 
 	allowedOrigins := os.Getenv("CORS_ORIGINS") // comma-separated, e.g. "https://simulator.flowindex.io,http://localhost:5174"
 
+	emulatorContainer := os.Getenv("EMULATOR_CONTAINER")
+	if emulatorContainer == "" {
+		emulatorContainer = "simulator"
+	}
+
+	stuckTimeout := 60 // seconds
+	if v := os.Getenv("STUCK_TIMEOUT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			stuckTimeout = n
+		}
+	}
+
 	client := NewClientWithAdmin(emulatorURL, adminURL)
-	handler := NewHandler(client)
+	handler := NewHandler(client, emulatorContainer, stuckTimeout)
 
 	mux := http.NewServeMux()
 

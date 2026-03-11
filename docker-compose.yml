@@ -310,10 +310,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "9090:9090"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - EMULATOR_URL=http://simulator:8888
       - EMULATOR_ADMIN_URL=http://simulator:8080
       - PORT=9090
+      - EMULATOR_CONTAINER=simulator
+      - STUCK_TIMEOUT=60
       - CORS_ORIGINS=*
     depends_on:
       - simulator

@@ -1332,9 +1332,12 @@ jobs:
             sleep 3
             docker run -d --restart=always --name simulator-api \
               --network=host \
+              -v /var/run/docker.sock:/var/run/docker.sock \
               -e EMULATOR_URL=http://localhost:8888 \
               -e EMULATOR_ADMIN_URL=http://localhost:8080 \
               -e PORT=9090 \
+              -e EMULATOR_CONTAINER=simulator \
+              -e STUCK_TIMEOUT=60 \
               -e CORS_ORIGINS=https://simulator.flowindex.io \
               ${{ env.REGISTRY }}/simulator-api:${{ github.sha }}
           '

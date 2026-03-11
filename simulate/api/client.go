@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -117,29 +118,62 @@ type emulatorSignature struct {
 	Signature string `json:"signature"`
 }
 
-// getLatestBlockID fetches the latest sealed block ID from the emulator.
-func (c *Client) getLatestBlockID(ctx context.Context) (string, error) {
+// blockInfo holds the parsed block header from the emulator.
+type blockInfo struct {
+	ID     string
+	Height int64
+}
+
+// getLatestBlock fetches the latest sealed block from the emulator.
+func (c *Client) getLatestBlock(ctx context.Context) (*blockInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/v1/blocks?height=sealed", nil)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("blocks endpoint returned %d: %s", resp.StatusCode, string(body))
+	}
+
 	var blocks []struct {
 		Header struct {
-			ID string `json:"id"`
+			ID     string `json:"id"`
+			Height string `json:"height"`
 		} `json:"header"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&blocks); err != nil {
-		return "", err
+	if err := json.Unmarshal(body, &blocks); err != nil {
+		return nil, err
 	}
 	if len(blocks) == 0 {
-		return "", fmt.Errorf("no sealed blocks")
+		return nil, fmt.Errorf("no sealed blocks")
 	}
-	return blocks[0].Header.ID, nil
+
+	height, _ := strconv.ParseInt(blocks[0].Header.Height, 10, 64)
+	return &blockInfo{ID: blocks[0].Header.ID, Height: height}, nil
+}
+
+// getLatestBlockID fetches the latest sealed block ID from the emulator.
+func (c *Client) getLatestBlockID(ctx context.Context) (string, error) {
+	b, err := c.getLatestBlock(ctx)
+	if err != nil {
+		return "", err
+	}
+	return b.ID, nil
+}
+
+// getLatestBlockHeight fetches the latest sealed block height from the emulator.
+func (c *Client) getLatestBlockHeight(ctx context.Context) (int64, error) {
+	b, err := c.getLatestBlock(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return b.Height, nil
 }
 
 // SendTransaction submits a transaction to the emulator and waits for the result.
