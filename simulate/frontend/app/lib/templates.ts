@@ -41,63 +41,52 @@ transaction(amount: UFix64, to: Address) {
 }`,
     args: [
       { name: 'amount', type: 'UFix64', defaultValue: '10.0' },
-      { name: 'to', type: 'Address', defaultValue: '0xf8d6e0586b0a20c7' },
+      { name: 'to', type: 'Address', defaultValue: '0x1654653399040a61' },
     ],
   },
   {
-    id: 'mint-nft',
-    name: 'Mint NFT',
-    filename: 'mint-nft.cdc',
-    cadence: `import NonFungibleToken from 0x1d7e57aa55817448
-import MetadataViews from 0x1d7e57aa55817448
-
-transaction(recipient: Address) {
+    id: 'create-account',
+    name: 'Create Account',
+    filename: 'create-account.cdc',
+    cadence: `transaction(publicKey: String) {
     prepare(signer: auth(BorrowValue) &Account) {
-        let minter = signer.storage.borrow<&{NonFungibleToken.Minter}>(
-            from: /storage/NFTMinter
-        ) ?? panic("Could not borrow minter reference")
+        let account = Account(payer: signer)
 
-        let nft <- minter.mint()
+        let key = PublicKey(
+            publicKey: publicKey.decodeHex(),
+            signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+        )
 
-        let receiverRef = getAccount(recipient)
-            .capabilities.borrow<&{NonFungibleToken.Receiver}>(
-                /public/NFTReceiver
-            ) ?? panic("Could not borrow receiver reference")
+        account.keys.add(
+            publicKey: key,
+            hashAlgorithm: HashAlgorithm.SHA3_256,
+            weight: 1000.0
+        )
 
-        receiverRef.deposit(token: <- nft)
+        log("Account created: ".concat(account.address.toString()))
     }
 }`,
     args: [
-      { name: 'recipient', type: 'Address', defaultValue: '0xf8d6e0586b0a20c7' },
+      { name: 'publicKey', type: 'String', defaultValue: 'f845b8406e4f43f79d3c1d8cacb3d5f3e7aeedb29feaeb4559fdb71a97e2fd0438565310e87670035d83bc10fe67fe314dba5363c81654595d64884b1ecad1512a64e65e020164' },
     ],
   },
   {
-    id: 'token-swap',
-    name: 'Token Swap',
-    filename: 'token-swap.cdc',
+    id: 'check-balance',
+    name: 'Check Balance',
+    filename: 'check-balance.cdc',
     cadence: `import FungibleToken from 0xf233dcee88fe0abe
 import FlowToken from 0x1654653399040a61
 
-transaction(amountIn: UFix64, minAmountOut: UFix64) {
-    let inVault: @{FungibleToken.Vault}
-
+transaction {
     prepare(signer: auth(BorrowValue) &Account) {
-        let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
+        let vaultRef = signer.storage.borrow<&FlowToken.Vault>(
             from: /storage/flowTokenVault
-        ) ?? panic("Could not borrow FLOW vault")
+        ) ?? panic("Could not borrow FLOW vault reference")
 
-        self.inVault <- vaultRef.withdraw(amount: amountIn)
-    }
-
-    execute {
-        destroy self.inVault
-        log("Swap executed")
+        log("Balance: ".concat(vaultRef.balance.toString()))
     }
 }`,
-    args: [
-      { name: 'amountIn', type: 'UFix64', defaultValue: '100.0' },
-      { name: 'minAmountOut', type: 'UFix64', defaultValue: '95.0' },
-    ],
+    args: [],
   },
   {
     id: 'deploy-contract',
@@ -114,30 +103,42 @@ transaction(amountIn: UFix64, minAmountOut: UFix64) {
     ],
   },
   {
-    id: 'stake-flow',
-    name: 'Stake FLOW',
-    filename: 'stake-flow.cdc',
-    cadence: `import FlowToken from 0x1654653399040a61
-import FungibleToken from 0xf233dcee88fe0abe
-import FlowIDTableStaking from 0x8624b52f9ddcd04a
+    id: 'transfer-flow-multi',
+    name: 'Multi Transfer',
+    filename: 'multi-transfer.cdc',
+    cadence: `import FungibleToken from 0xf233dcee88fe0abe
+import FlowToken from 0x1654653399040a61
 
-transaction(amount: UFix64, nodeID: String) {
+transaction(amount1: UFix64, to1: Address, amount2: UFix64, to2: Address) {
+    let vault1: @{FungibleToken.Vault}
+    let vault2: @{FungibleToken.Vault}
+
     prepare(signer: auth(BorrowValue) &Account) {
         let vaultRef = signer.storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(
             from: /storage/flowTokenVault
         ) ?? panic("Could not borrow FLOW vault")
 
-        let stakerRef = signer.storage.borrow<&FlowIDTableStaking.NodeStaker>(
-            from: /storage/flowStaker
-        ) ?? panic("Could not borrow staker reference")
+        self.vault1 <- vaultRef.withdraw(amount: amount1)
+        self.vault2 <- vaultRef.withdraw(amount: amount2)
+    }
 
-        let tokens <- vaultRef.withdraw(amount: amount)
-        stakerRef.stakeNewTokens(from: <- tokens)
+    execute {
+        let receiver1 = getAccount(to1)
+            .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            ?? panic("Could not borrow receiver 1")
+        receiver1.deposit(from: <- self.vault1)
+
+        let receiver2 = getAccount(to2)
+            .capabilities.borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            ?? panic("Could not borrow receiver 2")
+        receiver2.deposit(from: <- self.vault2)
     }
 }`,
     args: [
-      { name: 'amount', type: 'UFix64', defaultValue: '100.0' },
-      { name: 'nodeID', type: 'String', defaultValue: '0000000000000000000000000000000000000000000000000000000000000001' },
+      { name: 'amount1', type: 'UFix64', defaultValue: '5.0' },
+      { name: 'to1', type: 'Address', defaultValue: '0x1654653399040a61' },
+      { name: 'amount2', type: 'UFix64', defaultValue: '3.0' },
+      { name: 'to2', type: 'Address', defaultValue: '0xf233dcee88fe0abe' },
     ],
   },
 ]
