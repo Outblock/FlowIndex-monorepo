@@ -126,6 +126,7 @@ jobs:
               - '.github/workflows/deploy.yml'
             simulator:
               - 'simulate/emulator/**'
+              - 'simulate/api/**'
             simulate-landing:
               - 'simulate/frontend/**'
       - name: Resolve outputs
@@ -1288,7 +1289,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build & push simulator
+      - name: Build & push simulator (emulator)
         uses: docker/build-push-action@v6
         with:
           context: simulate/emulator
@@ -1301,17 +1302,40 @@ jobs:
           cache-from: type=gha,scope=simulator
           cache-to: type=gha,scope=simulator,mode=max
 
-      - name: Deploy simulator (pull & restart on GCE)
+      - name: Build & push simulator-api
+        uses: docker/build-push-action@v6
+        with:
+          context: simulate/api
+          file: simulate/api/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/simulator-api:latest
+            ${{ env.REGISTRY }}/simulator-api:${{ github.sha }}
+          cache-from: type=gha,scope=simulator-api
+          cache-to: type=gha,scope=simulator-api,mode=max
+
+      - name: Deploy simulator + API (pull & restart on GCE)
         run: |
           gcloud compute ssh flowindex-simulator --zone=us-central1-a --command='
             docker-credential-gcr configure-docker --registries=us-central1-docker.pkg.dev 2>/dev/null || true
             docker image prune -af --filter "until=1h" 2>/dev/null || true
             docker pull ${{ env.REGISTRY }}/simulator:${{ github.sha }}
+            docker pull ${{ env.REGISTRY }}/simulator-api:${{ github.sha }}
             docker stop simulator 2>/dev/null; docker rm simulator 2>/dev/null
+            docker stop simulator-api 2>/dev/null; docker rm simulator-api 2>/dev/null
             docker run -d --restart=always --name simulator \
               --network=host \
               -v simulator-data:/data \
               ${{ env.REGISTRY }}/simulator:${{ github.sha }}
+            sleep 3
+            docker run -d --restart=always --name simulator-api \
+              --network=host \
+              -e EMULATOR_URL=http://localhost:8888 \
+              -e EMULATOR_ADMIN_URL=http://localhost:8080 \
+              -e PORT=9090 \
+              -e CORS_ORIGINS=https://simulator.flowindex.io \
+              ${{ env.REGISTRY }}/simulator-api:${{ github.sha }}
           '
 
   build-simulate-landing:
@@ -1361,7 +1385,7 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --port 3000 \
-            --set-env-vars "SIMULATOR_BACKEND_URL=https://flowindex.io/api" \
+            --set-env-vars "SIMULATOR_BACKEND_URL=http://34.30.191.150:9090" \
             --memory 512Mi \
             --cpu 1 \
             --min-instances 0 \

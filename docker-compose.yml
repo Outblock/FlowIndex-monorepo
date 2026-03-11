@@ -25,8 +25,6 @@ services:
       - DB_URL=postgres://flowscan:flowscan-local@db:5432/flowscan?sslmode=disable
       - FLOW_ACCESS_NODE=access-001.mainnet28.nodes.onflow.org:9000
       - FLOW_ACCESS_NODES=access-001.mainnet28.nodes.onflow.org:9000,access.mainnet.nodes.onflow.org:9000
-      - SIMULATOR_URL=http://simulator:8888
-      - SIMULATOR_ADMIN_URL=http://simulator:8080
       - PORT=8080
       - START_BLOCK=140900000
       - LATEST_WORKER_COUNT=1
@@ -296,7 +294,7 @@ services:
 
   simulator:
     build:
-      context: ./simulator
+      context: ./simulate/emulator
       dockerfile: Dockerfile
     ports:
       - "8888:8888"
@@ -304,17 +302,31 @@ services:
       - "18080:8080"
     restart: unless-stopped
 
+  simulator-api:
+    build:
+      context: ./simulate/api
+      dockerfile: Dockerfile
+    ports:
+      - "9090:9090"
+    environment:
+      - EMULATOR_URL=http://simulator:8888
+      - EMULATOR_ADMIN_URL=http://simulator:8080
+      - PORT=9090
+      - CORS_ORIGINS=*
+    depends_on:
+      - simulator
+    restart: unless-stopped
+
   simulate:
     build:
-      context: ./simulate
+      context: ./simulate/frontend
       dockerfile: Dockerfile
     ports:
       - "5175:3000"
     environment:
-      - SIMULATOR_BACKEND_URL=http://backend:8080
+      - SIMULATOR_BACKEND_URL=http://simulator-api:9090
     depends_on:
-      - backend
-      - simulator
+      - simulator-api
     restart: unless-stopped
 
   docs:

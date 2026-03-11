@@ -12,7 +12,6 @@ import (
 	"flowscan-clone/internal/ingester"
 	"flowscan-clone/internal/market"
 	"flowscan-clone/internal/repository"
-	"flowscan-clone/internal/simulator"
 
 	"github.com/gorilla/mux"
 	"golang.org/x/sync/singleflight"
@@ -133,7 +132,6 @@ type Server struct {
 	webhookAdminHandlers WebhookAdminRegistrar
 	apiKeyResolver       APIKeyResolver
 	tierRPSResolver      TierRPSResolver
-	simulatorHandler     *simulator.Handler
 	statusCache      struct {
 		mu        sync.Mutex
 		payload   []byte
@@ -174,17 +172,8 @@ func NewServer(repo *repository.Repository, client FlowClient, port string, star
 		s.backfillProgress = NewBackfillProgress()
 	}
 
-	if simURL := os.Getenv("SIMULATOR_URL"); simURL != "" {
-		var simClient *simulator.Client
-		if adminURL := os.Getenv("SIMULATOR_ADMIN_URL"); adminURL != "" {
-			simClient = simulator.NewClientWithAdmin(simURL, adminURL)
-			log.Printf("[api] simulator enabled, URL=%s, admin=%s", simURL, adminURL)
-		} else {
-			simClient = simulator.NewClient(simURL)
-			log.Printf("[api] simulator enabled, URL=%s", simURL)
-		}
-		s.simulatorHandler = simulator.NewHandler(simClient)
-	}
+	// Simulator logic has been moved to simulate/api/ (runs on simulator VM).
+	// Backend no longer handles /flow/v1/simulate.
 
 	r.Use(commonMiddleware)
 	r.Use(s.rateLimitMiddleware)

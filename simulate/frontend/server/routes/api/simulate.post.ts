@@ -2,7 +2,7 @@ import { defineEventHandler, readBody, createError } from 'h3'
 import { decodeEvents, buildSummary, buildSummaryItems } from '@flowindex/event-decoder'
 import type { RawEvent } from '@flowindex/event-decoder'
 
-const BACKEND_URL = process.env.SIMULATOR_BACKEND_URL || 'http://localhost:8080'
+const BACKEND_URL = process.env.SIMULATOR_BACKEND_URL || 'http://localhost:9090'
 
 /**
  * POST /api/simulate
@@ -12,7 +12,7 @@ const BACKEND_URL = process.env.SIMULATOR_BACKEND_URL || 'http://localhost:8080'
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
-  const resp = await fetch(`${BACKEND_URL}/flow/v1/simulate`, {
+  const resp = await fetch(`${BACKEND_URL}/api/simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
