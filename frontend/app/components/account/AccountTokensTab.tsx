@@ -748,7 +748,7 @@ function EVMTokenRow({ token, getPrice }: { token: EVMToken; getPrice: (symbol: 
                     <div className="flex items-center gap-2">
                         <div className="font-bold text-zinc-900 dark:text-white leading-tight truncate">{token.name}</div>
                         <div className="text-[10px] font-mono text-zinc-500 bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full">{token.symbol}</div>
-                        <span className="text-[9px] font-mono text-purple-500 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded-full border border-purple-200 dark:border-purple-800">EVM</span>
+                        <span className="text-[9px] font-mono text-purple-500/70 dark:text-purple-400/60 bg-purple-500/8 dark:bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/15 dark:border-purple-400/15">EVM</span>
                     </div>
                     <div className="flex items-center gap-1 mt-0.5">
                         <span className="text-[10px] font-mono text-zinc-400 truncate max-w-[200px]">{token.address}</span>

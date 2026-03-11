@@ -14,8 +14,9 @@ import ReactFlow, {
     type EdgeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import Avatar from 'boring-avatars';
 import { normalizeAddress, formatShort } from '../account/accountUtils';
-import { colorsFromAddress, addressType } from '../AddressLink';
+import { colorsFromAddress, addressType, avatarVariant } from '../AddressLink';
 import { extractLogoUrl } from '../TransactionRow';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ExpandableFlowContainer } from '../ExpandableFlowContainer';
@@ -157,9 +158,10 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         : addr.startsWith('BRIDGE:') ? (isDark ? '1px solid rgba(56,189,248,0.3)' : '1px solid rgba(2,132,199,0.3)')
         : nodeStyle.border;
 
-    const TAG_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-        coa: { bg: isDark ? 'rgba(139,92,246,0.15)' : 'rgba(139,92,246,0.1)', text: isDark ? '#a78bfa' : '#7c3aed', label: 'COA' },
-        eoa: { bg: isDark ? 'rgba(245,158,11,0.15)' : 'rgba(245,158,11,0.1)', text: isDark ? '#fbbf24' : '#d97706', label: 'EOA' },
+    const TAG_STYLES: Record<string, { color: string; label: string }> = {
+        flow: { color: isDark ? '#71717a' : '#a1a1aa', label: 'Flow' },
+        coa: { color: isDark ? '#a78bfa' : '#7c3aed', label: 'COA' },
+        eoa: { color: isDark ? '#fbbf24' : '#d97706', label: 'EOA' },
     };
 
     const placeColumn = (addrs: string[], col: number): Node[] =>
@@ -167,9 +169,9 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
             const synthetic = isSynthetic(addr);
             const info = seen.get(addr)!;
             const normalized = normalizeAddress(addr);
-            const addrType = addressType(normalized);
+            const addrT = addressType(normalized);
             const colors = colorsFromAddress(normalized);
-            const tag = TAG_STYLES[addrType];
+            const tag = TAG_STYLES[addrT];
             return {
                 id: addr,
                 data: {
@@ -181,28 +183,18 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
                         </div>
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{
-                                width: 24, height: 24, minWidth: 24, minHeight: 24,
-                                borderRadius: '50%',
-                                background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]}, ${colors[2]})`,
-                            }} />
+                            <Avatar
+                                size={24}
+                                name={normalized}
+                                variant={avatarVariant(normalized)}
+                                colors={colors}
+                            />
                             <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
-                                        {info.label}
-                                    </span>
-                                    {tag && (
-                                        <span style={{
-                                            fontSize: '8px', fontWeight: 700, textTransform: 'uppercase' as const,
-                                            padding: '1px 4px', borderRadius: '2px', lineHeight: '14px',
-                                            background: tag.bg, color: tag.text,
-                                        }}>
-                                            {tag.label}
-                                        </span>
-                                    )}
+                                <div style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
+                                    {info.label}
                                 </div>
-                                <div style={{ fontSize: '9px', color: isDark ? '#71717a' : '#a1a1aa', fontFamily: 'ui-monospace, monospace', marginTop: '2px' }}>
-                                    {formatShort(addr, 8, 4)}
+                                <div style={{ fontSize: '9px', fontFamily: 'ui-monospace, monospace', marginTop: '2px', color: tag?.color || (isDark ? '#71717a' : '#a1a1aa') }}>
+                                    {tag?.label || 'Flow'}
                                 </div>
                             </div>
                         </div>

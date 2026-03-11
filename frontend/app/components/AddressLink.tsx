@@ -35,7 +35,7 @@ interface Props {
 }
 
 /** Determine avatar variant by address type. */
-function avatarVariant(addr: string): 'beam' | 'bauhaus' | 'pixel' {
+export function avatarVariant(addr: string): 'beam' | 'bauhaus' | 'pixel' {
     const hex = addr.replace(/^0x/, '');
     if (hex.length <= 16) return 'beam';        // Flow
     if (/^0{10,}/.test(hex)) return 'bauhaus';   // COA (EVM with 10+ leading zeros)
