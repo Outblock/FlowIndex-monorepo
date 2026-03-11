@@ -7760,7 +7760,7 @@
         "summary": "Simulate transaction (decoded)",
         "servers": [
           {
-            "url": "https://simulate.flowindex.io/api"
+            "url": "https://simulator.flowindex.io/api"
           }
         ],
         "requestBody": {
@@ -7816,7 +7816,7 @@
         "summary": "Simulate transaction (raw events)",
         "servers": [
           {
-            "url": "https://simulate.flowindex.io/api"
+            "url": "https://simulator.flowindex.io/api"
           }
         ],
         "requestBody": {

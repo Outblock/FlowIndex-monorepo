@@ -67,7 +67,7 @@ function Typewriter({ phase, onClickPlayground }: { phase: Phase; onClickPlaygro
           />
         )}
       </h1>
-      <p className="mt-4 text-sm text-zinc-600 h-5">
+      <p className="mt-4 text-sm text-zinc-400 h-5">
         {visibleSubtitle}
         {showCursor && charIdx >= totalChars && (
           <span
@@ -78,10 +78,11 @@ function Typewriter({ phase, onClickPlayground }: { phase: Phase; onClickPlaygro
       </p>
       <button
         onClick={onClickPlayground}
-        className={`mt-8 px-6 py-2.5 border border-zinc-700 rounded text-xs text-zinc-400 hover:border-flow-green hover:text-flow-green hover:shadow-[0_0_12px_rgba(0,239,139,0.15)] transition-all ${showButton ? 'opacity-100' : 'opacity-0'}`}
+        className={`mt-8 px-6 py-2.5 border border-zinc-600 rounded text-xs text-zinc-300 hover:border-flow-green hover:text-flow-green hover:shadow-[0_0_12px_rgba(0,239,139,0.15)] transition-all ${showButton ? 'opacity-100' : 'opacity-0'}`}
       >
         Try it below &darr;
       </button>
+
     </div>
   )
 }
@@ -91,26 +92,58 @@ const CODE_LINES = [
   { tokens: [{ text: 'import', cl: 'text-purple-400' }, { text: ' FungibleToken ', cl: 'text-yellow-300' }, { text: 'from ', cl: 'text-purple-400' }, { text: '0xf233dcee88fe0abe', cl: 'text-emerald-400' }] },
   { tokens: [{ text: 'import', cl: 'text-purple-400' }, { text: ' FlowToken ', cl: 'text-yellow-300' }, { text: 'from ', cl: 'text-purple-400' }, { text: '0x1654653399040a61', cl: 'text-emerald-400' }] },
   { tokens: [] },
-  { tokens: [{ text: 'transaction', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-500' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-500' }, { text: 'UFix64', cl: 'text-cyan-400' }, { text: ', ', cl: 'text-zinc-500' }, { text: 'to', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-500' }, { text: 'Address', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-500' }] },
-  { tokens: [{ text: '  prepare', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-500' }, { text: 'signer', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-500' }, { text: 'auth', cl: 'text-purple-400' }, { text: '(BorrowValue) ', cl: 'text-zinc-500' }, { text: '&Account', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-500' }] },
-  { tokens: [{ text: '    let', cl: 'text-purple-400' }, { text: ' vault ', cl: 'text-zinc-300' }, { text: '<- ', cl: 'text-red-400' }, { text: 'signer', cl: 'text-orange-300' }] },
-  { tokens: [{ text: '      .storage.borrow', cl: 'text-zinc-400' }, { text: '<...>', cl: 'text-zinc-600' }, { text: '()', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '      .withdraw', cl: 'text-zinc-400' }, { text: '(', cl: 'text-zinc-500' }, { text: 'amount', cl: 'text-orange-300' }, { text: ')', cl: 'text-zinc-500' }] },
-  { tokens: [{ text: '    recipient.deposit', cl: 'text-zinc-400' }, { text: '(from: ', cl: 'text-zinc-500' }, { text: '<- ', cl: 'text-red-400' }, { text: 'vault', cl: 'text-zinc-300' }, { text: ')', cl: 'text-zinc-500' }] },
-  { tokens: [{ text: '  }', cl: 'text-zinc-500' }] },
-  { tokens: [{ text: '}', cl: 'text-zinc-500' }] },
+  { tokens: [{ text: 'transaction', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'UFix64', cl: 'text-cyan-400' }, { text: ', ', cl: 'text-zinc-400' }, { text: 'to', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'Address', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    ', cl: 'text-zinc-400' }, { text: 'let', cl: 'text-purple-400' }, { text: ' sentVault', cl: 'text-zinc-200' }, { text: ': ', cl: 'text-zinc-400' }, { text: '@{FungibleToken.Vault}', cl: 'text-cyan-400' }] },
+  { tokens: [] },
+  { tokens: [{ text: '    ', cl: 'text-zinc-400' }, { text: 'prepare', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'auth', cl: 'text-purple-400' }, { text: '(BorrowValue) ', cl: 'text-zinc-400' }, { text: '&Account', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '        ', cl: 'text-zinc-400' }, { text: 'let', cl: 'text-purple-400' }, { text: ' vaultRef ', cl: 'text-zinc-200' }, { text: '= ', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: '.storage.borrow', cl: 'text-zinc-300' }, { text: '<...>', cl: 'text-zinc-500' }, { text: '(', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '            ', cl: 'text-zinc-400' }, { text: 'from', cl: 'text-orange-300' }, { text: ': /storage/flowTokenVault', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '        ) ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow"', cl: 'text-amber-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [] },
+  { tokens: [{ text: '        ', cl: 'text-zinc-400' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault ', cl: 'text-zinc-200' }, { text: '<- ', cl: 'text-red-400' }, { text: 'vaultRef', cl: 'text-zinc-200' }, { text: '.withdraw(', cl: 'text-zinc-300' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': amount)', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    }', cl: 'text-zinc-400' }] },
+  { tokens: [] },
+  { tokens: [{ text: '    ', cl: 'text-zinc-400' }, { text: 'execute', cl: 'text-purple-400' }, { text: ' {', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '        ', cl: 'text-zinc-400' }, { text: 'let', cl: 'text-purple-400' }, { text: ' receiverRef ', cl: 'text-zinc-200' }, { text: '= ', cl: 'text-zinc-400' }, { text: 'getAccount', cl: 'text-purple-400' }, { text: '(to)', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '            .capabilities.borrow', cl: 'text-zinc-300' }, { text: '<...>', cl: 'text-zinc-500' }, { text: '(/public/flowTokenReceiver)', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '            ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow receiver"', cl: 'text-amber-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [] },
+  { tokens: [{ text: '        receiverRef.deposit(', cl: 'text-zinc-300' }, { text: 'from', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: '<- ', cl: 'text-red-400' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault', cl: 'text-zinc-200' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    }', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '}', cl: 'text-zinc-400' }] },
 ]
 
 type Phase = 'idle' | 'typing' | 'ready' | 'running' | 'done'
 
+/* ── Build flat character stream for typewriter ── */
+const CHAR_STREAM: { char: string; cl: string; lineIdx: number; isNewline: boolean }[] = []
+CODE_LINES.forEach((line, lineIdx) => {
+  if (line.tokens.length === 0) {
+    CHAR_STREAM.push({ char: '\n', cl: '', lineIdx, isNewline: true })
+  } else {
+    for (const token of line.tokens) {
+      for (const ch of token.text) {
+        CHAR_STREAM.push({ char: ch, cl: token.cl, lineIdx, isNewline: false })
+      }
+    }
+    CHAR_STREAM.push({ char: '\n', cl: '', lineIdx, isNewline: true })
+  }
+})
+const TOTAL_CHARS = CHAR_STREAM.length
+
 export function Hero() {
   const [phase, setPhase] = useState<Phase>('idle')
-  const [visibleLines, setVisibleLines] = useState(0)
+  const [charIdx, setCharIdx] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const clearTimers = () => {
     timerRef.current.forEach(clearTimeout)
     timerRef.current = []
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
   }
 
   const schedule = (fn: () => void, ms: number) => {
@@ -121,15 +154,24 @@ export function Hero() {
     const run = () => {
       clearTimers()
       setPhase('typing')
-      setVisibleLines(0)
+      setCharIdx(0)
 
-      CODE_LINES.forEach((_, i) => {
-        schedule(() => setVisibleLines(i + 1), 150 * (i + 1))
-      })
+      let idx = 0
+      intervalRef.current = setInterval(() => {
+        idx += 1
+        if (idx >= TOTAL_CHARS) {
+          setCharIdx(TOTAL_CHARS)
+          if (intervalRef.current) clearInterval(intervalRef.current)
+          intervalRef.current = null
+          return
+        }
+        setCharIdx(idx)
+      }, 15)
 
-      schedule(() => setPhase('ready'), 150 * CODE_LINES.length + 400)
-      schedule(() => setPhase('running'), 150 * CODE_LINES.length + 1200)
-      schedule(() => setPhase('done'), 150 * CODE_LINES.length + 2200)
+      const typingDuration = TOTAL_CHARS * 15
+      schedule(() => setPhase('ready'), typingDuration + 400)
+      schedule(() => setPhase('running'), typingDuration + 1200)
+      schedule(() => setPhase('done'), typingDuration + 2200)
     }
 
     schedule(run, 500)
@@ -215,7 +257,7 @@ export function Hero() {
                   borderRadius: '4px',
                 }}
               >
-                {/* Scanlines — tighter, more visible */}
+                {/* Scanlines — subtle so text stays readable */}
                 <div
                   className="absolute inset-0 pointer-events-none z-[3]"
                   style={{
@@ -223,21 +265,21 @@ export function Hero() {
                       0deg,
                       transparent,
                       transparent 1px,
-                      rgba(0,0,0,0.3) 1px,
-                      rgba(0,0,0,0.3) 2px
+                      rgba(0,0,0,0.12) 1px,
+                      rgba(0,0,0,0.12) 2px
                     )`,
                   }}
                 />
 
-                {/* Barrel distortion vignette */}
+                {/* Barrel distortion vignette — lighter for readability */}
                 <div
                   className="absolute inset-0 pointer-events-none z-[4]"
                   style={{
                     background: `radial-gradient(
-                      ellipse 65% 65% at 50% 50%,
-                      transparent 35%,
-                      rgba(0,0,0,0.35) 65%,
-                      rgba(0,0,0,0.8) 100%
+                      ellipse 70% 70% at 50% 50%,
+                      transparent 40%,
+                      rgba(0,0,0,0.2) 70%,
+                      rgba(0,0,0,0.5) 100%
                     )`,
                   }}
                 />
@@ -269,8 +311,8 @@ export function Hero() {
                   {/* Code panel */}
                   <div className="flex-1 overflow-hidden">
                     <div className="px-5 py-3 border-b border-emerald-900/20 flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-700/50 flex items-center gap-2">
-                        <span className="text-emerald-500/50">$</span> transfer.cdc
+                      <span className="text-[11px] text-emerald-500/70 flex items-center gap-2">
+                        <span className="text-emerald-400/70">$</span> transfer.cdc
                       </span>
                       <button
                         className={`px-4 py-1.5 rounded text-[12px] font-bold transition-all duration-300 ${
@@ -280,34 +322,42 @@ export function Hero() {
                               ? 'bg-flow-green text-black animate-pulse shadow-[0_0_20px_rgba(0,239,139,0.4)]'
                               : phase === 'done'
                                 ? 'bg-flow-green text-black'
-                                : 'bg-emerald-950/30 text-emerald-800/40 border border-emerald-900/20'
+                                : 'bg-emerald-950/40 text-emerald-600/60 border border-emerald-800/30'
                         }`}
                       >
                         {phase === 'running' ? '◉ Running...' : phase === 'done' ? '✓ Passed' : '▶ Simulate'}
                       </button>
                     </div>
                     <div className="p-6 text-[13px] leading-[2]">
-                      {CODE_LINES.map((line, i) => (
-                        <div
-                          key={i}
-                          className={`transition-all duration-300 ${
-                            i < visibleLines ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-5'
-                          }`}
-                          style={{ textShadow: i < visibleLines ? '0 0 10px rgba(0, 239, 139, 0.12)' : 'none' }}
-                        >
-                          <span className="text-emerald-900/30 mr-4 select-none text-[10px] inline-block w-4 text-right">{String(i + 1).padStart(2)}</span>
-                          {line.tokens.map((t, j) => (
-                            <span key={j} className={t.cl}>{t.text}</span>
-                          ))}
-                          {line.tokens.length === 0 && <span>&nbsp;</span>}
-                        </div>
-                      ))}
-                      {phase === 'typing' && visibleLines < CODE_LINES.length && (
-                        <span
-                          className="inline-block w-[8px] h-[15px] bg-flow-green ml-8 animate-[cursor-blink_1s_step-end_infinite]"
-                          style={{ boxShadow: '0 0 10px rgba(0,239,139,0.7), 0 0 20px rgba(0,239,139,0.3)' }}
-                        />
-                      )}
+                      {(() => {
+                        const visible = CHAR_STREAM.slice(0, charIdx)
+                        const lines: { char: string; cl: string }[][] = [[]]
+                        for (const c of visible) {
+                          if (c.isNewline || c.char === '\n') {
+                            lines.push([])
+                          } else {
+                            lines[lines.length - 1].push(c)
+                          }
+                        }
+                        return lines.map((lineChars, i) => (
+                          <div
+                            key={i}
+                            style={{ textShadow: '0 0 10px rgba(0, 239, 139, 0.12)' }}
+                          >
+                            <span className="text-emerald-700/50 mr-4 select-none text-[10px] inline-block w-4 text-right">{String(i + 1).padStart(2)}</span>
+                            {lineChars.length === 0 && <span>&nbsp;</span>}
+                            {lineChars.map((c, j) => (
+                              <span key={j} className={c.cl}>{c.char}</span>
+                            ))}
+                            {phase === 'typing' && i === lines.length - 1 && charIdx < TOTAL_CHARS && (
+                              <span
+                                className="inline-block w-[8px] h-[15px] bg-flow-green animate-[cursor-blink_1s_step-end_infinite] align-middle"
+                                style={{ boxShadow: '0 0 10px rgba(0,239,139,0.7), 0 0 20px rgba(0,239,139,0.3)' }}
+                              />
+                            )}
+                          </div>
+                        ))
+                      })()}
                     </div>
                   </div>
 
@@ -396,7 +446,7 @@ export function Hero() {
                     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.3)',
                   }}
                 >
-                  Simulate VM-2000
+                  Simulator VM-2000
                 </div>
                 {/* Power LED */}
                 <div

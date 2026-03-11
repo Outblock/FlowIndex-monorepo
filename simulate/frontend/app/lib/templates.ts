@@ -67,7 +67,7 @@ transaction(amount: UFix64, to: Address) {
     }
 }`,
     args: [
-      { name: 'publicKey', type: 'String', defaultValue: 'f845b8406e4f43f79d3c1d8cacb3d5f3e7aeedb29feaeb4559fdb71a97e2fd0438565310e87670035d83bc10fe67fe314dba5363c81654595d64884b1ecad1512a64e65e020164' },
+      { name: 'publicKey', type: 'String', defaultValue: '930f06f2b2e26ff36e74473b0cad4e5a09192f80215986ec66398848add935e8d3c78aa6ad03362682da9fa1b6b704ce6a467959c30fade2064f0fd80e01bada' },
     ],
   },
   {

@@ -10,8 +10,8 @@ export function ResultPanel({ result }: ResultPanelProps) {
 
   if (!result) {
     return (
-      <div className="w-[300px] border-l border-zinc-800/40 flex items-center justify-center shrink-0">
-        <p className="text-[11px] text-zinc-700 flex items-center gap-2">
+      <div className="w-[340px] border-l border-zinc-800/40 flex items-center justify-center shrink-0">
+        <p className="text-[11px] text-zinc-500 flex items-center gap-2">
           <span className="text-flow-green/40">&gt;</span> Run a simulation to see results
         </p>
       </div>
@@ -19,9 +19,9 @@ export function ResultPanel({ result }: ResultPanelProps) {
   }
 
   return (
-    <div className="w-[300px] border-l border-zinc-800/40 shrink-0 overflow-y-auto">
+    <div className="w-[340px] border-l border-zinc-800/40 shrink-0 overflow-y-auto">
       <div className="px-3 py-2 border-b border-zinc-800/60 bg-black/40">
-        <span className="text-[10px] text-zinc-600 tracking-wider flex items-center gap-1.5">
+        <span className="text-[10px] text-zinc-500 tracking-wider flex items-center gap-1.5">
           <span className="text-flow-green/60">&gt;</span> RESULT
         </span>
       </div>
@@ -35,7 +35,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
             </span>
           </div>
           {result.computationUsed > 0 && (
-            <span className="text-[10px] text-zinc-600 bg-black/40 border border-zinc-800/40 px-2 py-0.5 rounded">
+            <span className="text-[10px] text-zinc-500 bg-black/40 border border-zinc-800/40 px-2 py-0.5 rounded">
               {result.computationUsed.toLocaleString()} comp
             </span>
           )}
@@ -58,11 +58,11 @@ export function ResultPanel({ result }: ResultPanelProps) {
         {/* Summary items */}
         {result.summaryItems.length > 0 && (
           <div>
-            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">SUMMARY</div>
+            <div className="text-[10px] text-zinc-500 tracking-wider mb-2">SUMMARY</div>
             <div className="space-y-1">
               {result.summaryItems.map((item, i) => (
                 <div key={i} className="flex items-center gap-2 bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5">
-                  <span className="text-[9px] text-zinc-600 uppercase w-14 shrink-0">{item.icon}</span>
+                  <span className="text-[9px] text-zinc-500 uppercase w-14 shrink-0">{item.icon}</span>
                   <span className="text-[11px] text-zinc-300">{item.text}</span>
                 </div>
               ))}
@@ -73,7 +73,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
         {/* Token transfers */}
         {result.transfers.length > 0 && (
           <div>
-            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">TOKEN TRANSFERS</div>
+            <div className="text-[10px] text-zinc-500 tracking-wider mb-2">TOKEN TRANSFERS</div>
             <div className="space-y-1">
               {result.transfers.map((ft, i) => {
                 const tokenName = ft.token.split('.').pop() || ft.token
@@ -88,9 +88,9 @@ export function ResultPanel({ result }: ResultPanelProps) {
                         <span className="text-[11px] text-zinc-200 font-mono">{amount} {tokenName}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 text-[9px] text-zinc-600 font-mono mt-0.5">
+                    <div className="flex items-center gap-1 text-[9px] text-zinc-500 font-mono mt-0.5">
                       {ft.from_address && <span>{ft.from_address.slice(0, 10)}...</span>}
-                      {ft.from_address && ft.to_address && <span className="text-zinc-700">&rarr;</span>}
+                      {ft.from_address && ft.to_address && <span className="text-zinc-500">&rarr;</span>}
                       {ft.to_address && <span>{ft.to_address.slice(0, 10)}...</span>}
                     </div>
                   </div>
@@ -103,7 +103,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
         {/* NFT transfers */}
         {result.nftTransfers.length > 0 && (
           <div>
-            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">NFT TRANSFERS</div>
+            <div className="text-[10px] text-zinc-500 tracking-wider mb-2">NFT TRANSFERS</div>
             <div className="space-y-1">
               {result.nftTransfers.map((nft, i) => {
                 const name = nft.token.split('.').pop() || nft.token
@@ -115,9 +115,9 @@ export function ResultPanel({ result }: ResultPanelProps) {
                       <span className={`text-[9px] font-medium ${typeColor}`}>{typeLabel}</span>
                       <span className="text-[11px] text-zinc-200 font-mono">{name} #{nft.token_id}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-[9px] text-zinc-600 font-mono mt-0.5">
+                    <div className="flex items-center gap-1 text-[9px] text-zinc-500 font-mono mt-0.5">
                       {nft.from_address && <span>{nft.from_address.slice(0, 10)}...</span>}
-                      {nft.from_address && nft.to_address && <span className="text-zinc-700">&rarr;</span>}
+                      {nft.from_address && nft.to_address && <span className="text-zinc-500">&rarr;</span>}
                       {nft.to_address && <span>{nft.to_address.slice(0, 10)}...</span>}
                     </div>
                   </div>
@@ -130,11 +130,11 @@ export function ResultPanel({ result }: ResultPanelProps) {
         {/* System events (account changes) */}
         {result.systemEvents.length > 0 && (
           <div>
-            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">ACCOUNT CHANGES</div>
+            <div className="text-[10px] text-zinc-500 tracking-wider mb-2">ACCOUNT CHANGES</div>
             <div className="space-y-1">
               {result.systemEvents.map((evt, i) => (
                 <div key={i} className="flex items-center gap-2 bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5">
-                  <span className="text-[9px] text-zinc-600 uppercase w-14 shrink-0">{evt.category}</span>
+                  <span className="text-[9px] text-zinc-500 uppercase w-14 shrink-0">{evt.category}</span>
                   <span className="text-[11px] text-zinc-300">{evt.detail}</span>
                 </div>
               ))}
@@ -145,13 +145,13 @@ export function ResultPanel({ result }: ResultPanelProps) {
         {/* Balance changes */}
         {result.balanceChanges.length > 0 && (
           <div>
-            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">BALANCE CHANGES</div>
+            <div className="text-[10px] text-zinc-500 tracking-wider mb-2">BALANCE CHANGES</div>
             <div className="space-y-1">
               {result.balanceChanges.map((c, i) => (
                 <div key={i} className="flex justify-between bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5 text-[11px]">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-zinc-500 font-mono truncate">{c.address}</span>
-                    <span className="text-[10px] text-zinc-700">{c.token}</span>
+                    <span className="text-zinc-400 font-mono truncate">{c.address}</span>
+                    <span className="text-[10px] text-zinc-500">{c.token}</span>
                   </div>
                   <span className={`font-mono font-medium shrink-0 ml-2 ${
                     c.delta.startsWith('-') ? 'text-red-400' : 'text-flow-green crt-glow'
@@ -177,7 +177,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
 
         {/* Fee */}
         {result.fee > 0 && (
-          <div className="text-[10px] text-zinc-600">
+          <div className="text-[10px] text-zinc-500">
             Fee: <span className="text-zinc-400 font-mono">{result.fee.toFixed(8)} FLOW</span>
           </div>
         )}
@@ -187,7 +187,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
           <div>
             <button
               onClick={() => setEventsExpanded(!eventsExpanded)}
-              className="text-[10px] text-zinc-600 tracking-wider hover:text-flow-green transition-colors"
+              className="text-[10px] text-zinc-500 tracking-wider hover:text-flow-green transition-colors"
             >
               {eventsExpanded ? '▾' : '▸'} RAW EVENTS ({result.events.length})
             </button>
@@ -197,7 +197,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
                   <div key={i} className="bg-black/40 border border-zinc-800/30 rounded p-2">
                     <div className="text-[10px] text-flow-green font-mono truncate">{evt.type}</div>
                     {evt.payload && (
-                      <pre className="text-[10px] text-zinc-600 mt-1 whitespace-pre-wrap break-all max-h-20 overflow-auto">
+                      <pre className="text-[10px] text-zinc-500 mt-1 whitespace-pre-wrap break-all max-h-20 overflow-auto">
                         {typeof evt.payload === 'string' ? evt.payload : JSON.stringify(evt.payload, null, 2)}
                       </pre>
                     )}

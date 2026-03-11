@@ -84,14 +84,16 @@ export function Playground() {
   }, [activeId, code, argValues])
 
   return (
-    <section id="playground" className="py-24 px-6 border-t border-zinc-800/50" ref={containerRef}>
-      <div className="mx-auto max-w-6xl">
-        <div className="text-[10px] text-flow-green/40 tracking-[3px] mb-4 crt-glow">// PLAYGROUND</div>
-        <h2 className="text-xl font-bold text-zinc-100 mb-8">Try it now</h2>
+    <section id="playground" className="border-t border-zinc-800/50 retro-grid flex flex-col" style={{ height: '100dvh' }} ref={containerRef}>
+      <div className="px-6 pt-6 pb-2 shrink-0">
+        <div className="text-[10px] text-flow-green/60 tracking-[3px] mb-2 crt-glow">// PLAYGROUND</div>
+        <h2 className="text-xl font-bold text-zinc-100">Try it now</h2>
+      </div>
 
-        <div className="crt-bezel">
-          <div className="crt-screen crt-scanlines crt-vignette bg-[#0a0a0a]">
-            <div className="flex h-[500px]">
+      <div className="flex-1 px-3 pb-3 flex flex-col min-h-0">
+        <div className="crt-bezel flex-1 flex flex-col min-h-0">
+          <div className="crt-screen crt-scanlines crt-vignette bg-[#0a0a0a] flex-1 flex flex-col min-h-0">
+            <div className="flex flex-1 min-h-0">
               {visible ? (
                 <>
                   <TemplatePanel
@@ -111,15 +113,15 @@ export function Playground() {
                   <ResultPanel result={result} />
                 </>
               ) : (
-                <div className="flex-1 flex items-center justify-center text-xs text-zinc-700">
+                <div className="flex-1 flex items-center justify-center text-xs text-zinc-500">
                   <span className="crt-cursor mr-2" /> Initializing playground...
                 </div>
               )}
             </div>
           </div>
-          <div className="flex items-center justify-center gap-2 pt-2 pb-0.5">
+          <div className="flex items-center justify-center gap-2 pt-2 pb-1">
             <div className="crt-led" />
-            <span className="text-[8px] text-zinc-700 tracking-widest uppercase">Simulator VM</span>
+            <span className="text-[8px] text-zinc-500 tracking-widest uppercase">Simulator</span>
           </div>
         </div>
       </div>

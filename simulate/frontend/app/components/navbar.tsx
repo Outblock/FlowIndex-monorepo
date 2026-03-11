@@ -5,13 +5,13 @@ export function Navbar() {
         <a href="/" className="flex items-center gap-2.5 text-sm font-semibold text-zinc-100">
           <span className="crt-led" />
           <span className="crt-glow text-flow-green">FlowIndex</span>
-          <span className="text-zinc-500">Simulate</span>
+          <span className="text-zinc-400">Simulator</span>
         </a>
-        <div className="flex items-center gap-6 text-xs text-zinc-500">
+        <div className="flex items-center gap-6 text-xs text-zinc-400">
           <a href="https://docs.flowindex.io" target="_blank" rel="noopener" className="hover:text-flow-green transition-colors">
             Docs
           </a>
-          <a href="https://github.com/FlowIndex" target="_blank" rel="noopener" className="hover:text-flow-green transition-colors">
+          <a href="https://github.com/Outblock/FlowIndex-monorepo/tree/main/simulate" target="_blank" rel="noopener" className="hover:text-flow-green transition-colors">
             GitHub
           </a>
           <a

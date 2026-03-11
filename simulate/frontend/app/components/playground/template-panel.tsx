@@ -12,9 +12,9 @@ export function TemplatePanel({ templates, activeId, argValues, onSelectTemplate
   const active = templates.find((t) => t.id === activeId)
 
   return (
-    <div className="w-[200px] border-r border-zinc-800/40 flex flex-col shrink-0">
+    <div className="w-[220px] border-r border-zinc-800/40 flex flex-col shrink-0">
       <div className="px-3 py-2 border-b border-zinc-800/60 bg-black/40">
-        <span className="text-[10px] text-zinc-600 tracking-wider flex items-center gap-1.5">
+        <span className="text-[10px] text-zinc-500 tracking-wider flex items-center gap-1.5">
           <span className="text-flow-green/60">~</span> TEMPLATES
         </span>
       </div>
@@ -26,7 +26,7 @@ export function TemplatePanel({ templates, activeId, argValues, onSelectTemplate
             className={`w-full text-left px-3 py-2 text-[11px] transition-colors ${
               t.id === activeId
                 ? 'text-flow-green bg-flow-green/5 border-l-2 border-flow-green'
-                : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30 border-l-2 border-transparent'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/30 border-l-2 border-transparent'
             }`}
           >
             {t.name}
@@ -35,13 +35,13 @@ export function TemplatePanel({ templates, activeId, argValues, onSelectTemplate
       </div>
       {active && active.args.length > 0 && (
         <div className="border-t border-zinc-800/60 p-3 bg-black/20">
-          <div className="text-[10px] text-zinc-600 tracking-wider mb-3 flex items-center gap-1.5">
+          <div className="text-[10px] text-zinc-500 tracking-wider mb-3 flex items-center gap-1.5">
             <span className="text-flow-green/60">&gt;</span> PARAMS
           </div>
           <div className="space-y-3">
             {active.args.map((arg) => (
               <div key={arg.name}>
-                <label className="text-[10px] text-zinc-600 block mb-1">{arg.name} <span className="text-zinc-700">({arg.type})</span></label>
+                <label className="text-[10px] text-zinc-400 block mb-1">{arg.name} <span className="text-zinc-500">({arg.type})</span></label>
                 <input
                   type="text"
                   value={argValues[arg.name] ?? arg.defaultValue}

@@ -23,9 +23,9 @@ const FEATURES = [
 
 export function Features() {
   return (
-    <section className="py-24 px-6">
+    <section className="py-24 px-6 retro-grid">
       <div className="mx-auto max-w-5xl">
-        <div className="text-[10px] text-flow-green/40 tracking-[3px] mb-8 crt-glow">// FEATURES</div>
+        <div className="text-[10px] text-flow-green/60 tracking-[3px] mb-8 crt-glow">// FEATURES</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {FEATURES.map((f) => (
             <div key={f.title} className="crt-bezel group">
@@ -34,7 +34,7 @@ export function Features() {
                   <span className="text-flow-green text-sm crt-glow">{f.icon}</span>
                   <h3 className="text-sm font-semibold text-zinc-200 group-hover:text-flow-green transition-colors">{f.title}</h3>
                 </div>
-                <p className="text-xs text-zinc-500 leading-relaxed">{f.desc}</p>
+                <p className="text-xs text-zinc-400 leading-relaxed">{f.desc}</p>
               </div>
             </div>
           ))}
