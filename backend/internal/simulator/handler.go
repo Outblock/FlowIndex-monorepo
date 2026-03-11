@@ -46,19 +46,33 @@ type Handler struct {
 }
 
 // NewHandler creates a new simulation handler and starts background warmup.
+// Warmup runs immediately on start, then repeats every hour to keep the
+// emulator's fork-mode cache fresh.
 func NewHandler(client *Client) *Handler {
 	h := &Handler{client: client}
-	go h.warmup()
+	go h.warmupLoop()
 	return h
 }
 
-// warmup pre-caches common mainnet contract state by running a simple transaction.
-// This makes the first real user request much faster.
+// warmupLoop runs warmup on start and then every hour.
+func (h *Handler) warmupLoop() {
+	h.warmup()
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		log.Println("[simulator] periodic warmup starting...")
+		h.warmup()
+	}
+}
+
+// warmup pre-caches common mainnet contract state by running transactions that
+// import frequently-used contracts. This forces the fork-mode emulator to fetch
+// and cache account state, making the first real user request much faster.
 func (h *Handler) warmup() {
 	// Wait for emulator to be ready
 	time.Sleep(3 * time.Second)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
 	// Check emulator health first
@@ -72,9 +86,13 @@ func (h *Handler) warmup() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Simple FlowToken transfer that touches FungibleToken + FlowToken contracts
-	warmupCadence := `import FungibleToken from 0xf233dcee88fe0abe
+	start := time.Now()
+
+	// Phase 1: Core token contracts (FlowToken transfer touches FungibleToken, FlowToken, FlowFees)
+	h.runWarmupTx(ctx, "core-tokens", `
+import FungibleToken from 0xf233dcee88fe0abe
 import FlowToken from 0x1654653399040a61
+import FungibleTokenSwitchboard from 0xf233dcee88fe0abe
 
 transaction(amount: UFix64, to: Address) {
     let sentVault: @{FungibleToken.Vault}
@@ -90,16 +108,89 @@ transaction(amount: UFix64, to: Address) {
             ?? panic("Could not borrow receiver reference")
         receiverRef.deposit(from: <- self.sentVault)
     }
-}`
-
-	txReq := &TxRequest{
-		Cadence: warmupCadence,
-		Arguments: []json.RawMessage{
+}`,
+		[]json.RawMessage{
 			json.RawMessage(`{"type":"UFix64","value":"0.001"}`),
 			json.RawMessage(`{"type":"Address","value":"0x1654653399040a61"}`),
 		},
-		Authorizers: []string{"1654653399040a61"},
-		Payer:       "1654653399040a61",
+	)
+
+	// Phase 2: NFT + metadata contracts
+	h.runWarmupTx(ctx, "nft-metadata", `
+import NonFungibleToken from 0x1d7e57aa55817448
+import MetadataViews from 0x1d7e57aa55817448
+import ViewResolver from 0x1d7e57aa55817448
+import NFTCatalog from 0x49a7cda3a1eecc29
+import NFTRetrieval from 0x49a7cda3a1eecc29
+import NFTStorefrontV2 from 0x4eb8a10cb9f87357
+
+transaction {
+    prepare(signer: &Account) { log("nft-metadata warmup") }
+}`, nil)
+
+	// Phase 3: Staking contracts
+	h.runWarmupTx(ctx, "staking", `
+import FlowIDTableStaking from 0x8624b52f9ddcd04a
+import FlowStakingCollection from 0x8d0e87b65159ae63
+import FlowEpoch from 0x8624b52f9ddcd04a
+import FlowClusterQC from 0x8624b52f9ddcd04a
+import LockedTokens from 0x8d0e87b65159ae63
+
+transaction {
+    prepare(signer: &Account) { log("staking warmup") }
+}`, nil)
+
+	// Phase 4: EVM + bridge contracts
+	h.runWarmupTx(ctx, "evm-bridge", `
+import EVM from 0xe467b9dd11fa00df
+import FlowEVMBridge from 0x1e4aa0b87d10b141
+
+transaction {
+    prepare(signer: &Account) { log("evm-bridge warmup") }
+}`, nil)
+
+	// Phase 5: Hybrid custody + capability contracts
+	h.runWarmupTx(ctx, "hybrid-custody", `
+import HybridCustody from 0xd8a7e05a7ac670c0
+import CapabilityFactory from 0xd8a7e05a7ac670c0
+import CapabilityFilter from 0xd8a7e05a7ac670c0
+
+transaction {
+    prepare(signer: &Account) { log("hybrid-custody warmup") }
+}`, nil)
+
+	// Phase 6: Naming + utility contracts
+	h.runWarmupTx(ctx, "naming-utils", `
+import Find from 0x097bafa4e0b48eef
+import Flowns from 0x233eb012d34b0070
+import Domains from 0x233eb012d34b0070
+import StringUtils from 0xa340dc0a4ec828ab
+import FlowDomainUtils from 0x1b3930856571a52b
+
+transaction {
+    prepare(signer: &Account) { log("naming-utils warmup") }
+}`, nil)
+
+	// Phase 7: Misc contracts
+	h.runWarmupTx(ctx, "misc", `
+import TransactionGeneration from 0xe52522745adf5c34
+import FlowviewAccountBookmark from 0x39b144ab4d348e2b
+
+transaction {
+    prepare(signer: &Account) { log("misc warmup") }
+}`, nil)
+
+	elapsed := time.Since(start)
+	log.Printf("[simulator] warmup: all phases completed in %s", elapsed)
+}
+
+// runWarmupTx sends a single warmup transaction and logs the result.
+func (h *Handler) runWarmupTx(ctx context.Context, name string, cadence string, args []json.RawMessage) {
+	txReq := &TxRequest{
+		Cadence:     cadence,
+		Arguments:   args,
+		Authorizers: []string{"e467b9dd11fa00df"},
+		Payer:       "e467b9dd11fa00df",
 	}
 
 	start := time.Now()
@@ -107,14 +198,14 @@ transaction(amount: UFix64, to: Address) {
 	elapsed := time.Since(start)
 
 	if err != nil {
-		log.Printf("[simulator] warmup: transaction failed after %s: %v", elapsed, err)
+		log.Printf("[simulator] warmup [%s]: failed after %s: %v", name, elapsed, err)
 		return
 	}
 
 	if result.Success {
-		log.Printf("[simulator] warmup: completed successfully in %s (computation: %d)", elapsed, result.ComputationUsed)
+		log.Printf("[simulator] warmup [%s]: OK in %s (computation: %d)", name, elapsed, result.ComputationUsed)
 	} else {
-		log.Printf("[simulator] warmup: transaction error after %s: %s", elapsed, result.Error)
+		log.Printf("[simulator] warmup [%s]: error after %s: %s", name, elapsed, result.Error)
 	}
 }
 
