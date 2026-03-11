@@ -130,7 +130,7 @@ transaction(recipientAddr: Address, momentID: UInt64) {
 }`,
     args: [
       { name: 'recipientAddr', type: 'Address', defaultValue: '0xc8b75d0745d3f284' },
-      { name: 'momentID', type: 'UInt64', defaultValue: '10000052' },
+      { name: 'momentID', type: 'UInt64', defaultValue: '18412224' },
     ],
     defaultPayer: '0x220cb8d928c0b076',
   },
