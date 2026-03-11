@@ -40,13 +40,10 @@ export default function TransactionPreview({
     return buildSummaryItems(decoded);
   }, [decoded]);
 
-  // Show footer when: not simulating, or simulation done, or simulation not enabled
-  const showFooter = !simLoading;
-
-  // Focus confirm button when footer appears
+  // Focus confirm button on mount and when simulation completes
   useEffect(() => {
-    if (showFooter) confirmRef.current?.focus();
-  }, [showFooter, simResult]);
+    confirmRef.current?.focus();
+  }, [simResult]);
 
   // Escape to cancel
   useEffect(() => {
@@ -292,24 +289,22 @@ export default function TransactionPreview({
           )}
         </div>
 
-        {/* Footer */}
-        {showFooter && (
-          <div className="px-4 py-3 border-t border-zinc-800 flex items-center justify-end gap-2">
-            <button
-              onClick={onCancel}
-              className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              ref={confirmRef}
-              onClick={onConfirm}
-              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${confirmBtn.className}`}
-            >
-              {confirmBtn.label}
-            </button>
-          </div>
-        )}
+        {/* Footer — always visible; simulation is optional and never blocks sending */}
+        <div className="px-4 py-3 border-t border-zinc-800 flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            ref={confirmRef}
+            onClick={onConfirm}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${confirmBtn.className}`}
+          >
+            {confirmBtn.label}
+          </button>
+        </div>
       </div>
     </div>
   );
