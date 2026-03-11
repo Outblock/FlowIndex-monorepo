@@ -125,9 +125,9 @@ jobs:
               - 'packages/**'
               - '.github/workflows/deploy.yml'
             simulator:
-              - 'simulator/**'
+              - 'simulate/emulator/**'
             simulate-landing:
-              - 'simulate/**'
+              - 'simulate/frontend/**'
       - name: Resolve outputs
         id: result
         run: |
@@ -1291,8 +1291,8 @@ jobs:
       - name: Build & push simulator
         uses: docker/build-push-action@v6
         with:
-          context: simulator
-          file: simulator/Dockerfile
+          context: simulate/emulator
+          file: simulate/emulator/Dockerfile
           push: true
           provenance: false
           tags: |
@@ -1343,8 +1343,8 @@ jobs:
       - name: Build & push simulate-landing
         uses: docker/build-push-action@v6
         with:
-          context: simulate
-          file: simulate/Dockerfile
+          context: simulate/frontend
+          file: simulate/frontend/Dockerfile
           push: true
           provenance: false
           tags: |

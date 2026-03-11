@@ -15,11 +15,14 @@ Always verify which server/project/directory a change should go in before starti
 **Top-level directories:**
 - `backend/` — Go indexer + API server
 - `frontend/` — TanStack Start SSR app (React 19, TypeScript)
-- `runner/` — Runner service
+- `runner/` — Runner service (Cadence playground + wallet)
+- `simulate/` — Transaction simulator (frontend landing page + Flow Emulator)
+  - `simulate/frontend/` — TanStack Start landing page (deployed to Cloud Run)
+  - `simulate/emulator/` — Flow Emulator in mainnet-fork mode (deployed to GCE VM)
+- `packages/` — Shared workspace packages (event-decoder, auth-core, webhooks-sdk, etc.)
 - `supabase/` — Self-hosted Supabase auth stack (edge functions, migrations, gateway)
 - `devportal/` — Developer portal (Fumadocs + Scalar)
 - `ai/` — AI chat assistant
-- `sdk/` — SDK
 - `sim-workflow/` — Simulation workflow
 - `studio/` — Supabase Studio proxy
 - `scripts/` — Utility scripts
