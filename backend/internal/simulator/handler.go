@@ -72,17 +72,6 @@ func (h *Handler) warmup() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Create + revert snapshot around warmup
-	snapName := "warmup-init"
-	if _, err := h.client.CreateSnapshot(ctx, snapName); err != nil {
-		log.Printf("[simulator] warmup: snapshot create failed: %v", err)
-	}
-	defer func() {
-		if err := h.client.RevertSnapshot(ctx, snapName); err != nil {
-			log.Printf("[simulator] warmup: snapshot revert failed: %v", err)
-		}
-	}()
-
 	// Simple FlowToken transfer that touches FungibleToken + FlowToken contracts
 	warmupCadence := `import FungibleToken from 0xf233dcee88fe0abe
 import FlowToken from 0x1654653399040a61
@@ -160,18 +149,16 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Create a snapshot before simulation
+	// Try snapshot/revert for state isolation (may not work in fork mode)
 	snapName := fmt.Sprintf("sim-%d", time.Now().UnixNano())
-	if _, err := h.client.CreateSnapshot(r.Context(), snapName); err != nil {
-		log.Printf("[simulator] warning: could not create snapshot: %v", err)
+	snapOK := false
+	if _, err := h.client.CreateSnapshot(r.Context(), snapName); err == nil {
+		snapOK = true
+		defer func() {
+			h.client.RevertSnapshot(r.Context(), snapName)
+		}()
 	}
-
-	// Always revert after simulation
-	defer func() {
-		if err := h.client.RevertSnapshot(r.Context(), snapName); err != nil {
-			log.Printf("[simulator] warning: could not revert snapshot: %v", err)
-		}
-	}()
+	_ = snapOK
 
 	// Build and send the transaction
 	txReq := &TxRequest{
@@ -293,17 +280,46 @@ func parseCadenceEventPayload(payload json.RawMessage) (amount float64, address 
 				amount, _ = strconv.ParseFloat(val.Value, 64)
 			}
 		case "from", "to":
-			var val struct {
-				Type  string `json:"type"`
-				Value string `json:"value"`
-			}
-			if err := json.Unmarshal(field.Value, &val); err == nil {
-				address = normalizeAddress(val.Value)
-			}
+			address = extractAddress(field.Value)
 		}
 	}
 
 	return amount, address
+}
+
+// extractAddress handles both Address and Optional<Address> Cadence JSON values.
+// Address:          {"type":"Address","value":"0x1654653399040a61"}
+// Optional<Address>: {"type":"Optional","value":{"type":"Address","value":"0x1654653399040a61"}}
+func extractAddress(raw json.RawMessage) string {
+	var outer struct {
+		Type  string          `json:"type"`
+		Value json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(raw, &outer); err != nil {
+		return ""
+	}
+
+	if outer.Type == "Address" {
+		var addr string
+		if err := json.Unmarshal(outer.Value, &addr); err != nil {
+			return ""
+		}
+		return normalizeAddress(addr)
+	}
+
+	if outer.Type == "Optional" {
+		// Unwrap: value is {"type":"Address","value":"0x..."}
+		var inner struct {
+			Type  string `json:"type"`
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal(outer.Value, &inner); err != nil {
+			return ""
+		}
+		return normalizeAddress(inner.Value)
+	}
+
+	return ""
 }
 
 // normalizeAddress strips 0x prefix and lowercases.
