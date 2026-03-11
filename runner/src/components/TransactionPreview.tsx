@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Loader2, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Send, Rocket } from 'lucide-react';
-import { decodeEvents, buildSummaryItems } from '@flowindex/event-decoder';
-import type { DecodedEvents, DecodedSummaryItem } from '@flowindex/event-decoder';
 import type { SimulateResponse } from '../flow/simulate';
 
 interface TransactionPreviewProps {
@@ -29,16 +27,10 @@ export default function TransactionPreview({
   const confirmRef = useRef<HTMLButtonElement>(null);
   const isContract = codeType === 'contract';
   const title = isContract ? 'Deploy Contract' : 'Send Transaction';
-
-  const decoded = useMemo(() => {
-    if (!simResult?.events?.length) return null;
-    return decodeEvents(simResult.events);
-  }, [simResult]);
-
-  const summaryItems = useMemo(() => {
-    if (!decoded) return [];
-    return buildSummaryItems(decoded);
-  }, [decoded]);
+  const summaryItems = simResult?.summaryItems ?? [];
+  const transfers = simResult?.transfers ?? [];
+  const nftTransfers = simResult?.nftTransfers ?? [];
+  const systemEvents = simResult?.systemEvents ?? [];
 
   // Focus confirm button on mount and when simulation completes
   useEffect(() => {
@@ -185,13 +177,13 @@ export default function TransactionPreview({
                   )}
 
                   {/* Token Transfers */}
-                  {decoded && decoded.transfers.length > 0 && (
+                  {transfers.length > 0 && (
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
                         Token Transfers
                       </div>
                       <div className="space-y-1">
-                        {decoded.transfers.map((ft, i) => {
+                        {transfers.map((ft, i) => {
                           const tokenName = ft.token.split('.').pop() || ft.token;
                           const amount = Number(ft.amount).toLocaleString(undefined, { maximumFractionDigits: 4 });
                           const typeLabel = ft.transfer_type === 'mint' ? 'Mint' : ft.transfer_type === 'burn' ? 'Burn' : 'Transfer';
@@ -215,13 +207,13 @@ export default function TransactionPreview({
                   )}
 
                   {/* NFT Transfers */}
-                  {decoded && decoded.nftTransfers.length > 0 && (
+                  {nftTransfers.length > 0 && (
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
                         NFT Transfers
                       </div>
                       <div className="space-y-1">
-                        {decoded.nftTransfers.map((nft, i) => {
+                        {nftTransfers.map((nft, i) => {
                           const collectionName = nft.token.split('.').pop() || nft.token;
                           const typeLabel = nft.transfer_type === 'mint' ? 'Mint' : nft.transfer_type === 'burn' ? 'Burn' : 'Transfer';
                           const typeColor = nft.transfer_type === 'mint' ? 'text-emerald-400' : nft.transfer_type === 'burn' ? 'text-red-400' : 'text-zinc-400';
@@ -244,13 +236,13 @@ export default function TransactionPreview({
                   )}
 
                   {/* Account Changes (system events) */}
-                  {decoded && decoded.systemEvents.length > 0 && (
+                  {systemEvents.length > 0 && (
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
                         Account Changes
                       </div>
                       <div className="space-y-1">
-                        {decoded.systemEvents.map((evt, i) => (
+                        {systemEvents.map((evt, i) => (
                           <div key={i} className="flex items-center gap-2 bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5">
                             <span className="text-[10px] text-zinc-500 uppercase w-16 shrink-0">{evt.category}</span>
                             <span className="text-xs text-zinc-200">{evt.detail}</span>

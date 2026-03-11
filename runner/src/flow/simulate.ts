@@ -14,12 +14,49 @@ export interface BalanceChange {
   delta: string;
 }
 
+export interface RawEvent {
+  type: string;
+  payload: any;
+}
+
+export interface SummaryItem {
+  icon: string;
+  text: string;
+}
+
+export interface FTTransfer {
+  token: string;
+  amount: string;
+  transfer_type: 'transfer' | 'mint' | 'burn';
+  from_address?: string;
+  to_address?: string;
+}
+
+export interface NFTTransfer {
+  token: string;
+  token_id: string;
+  transfer_type: 'transfer' | 'mint' | 'burn';
+  from_address?: string;
+  to_address?: string;
+}
+
+export interface SystemEvent {
+  category: string;
+  detail: string;
+}
+
 export interface SimulateResponse {
   success: boolean;
   error?: string;
-  events: Array<{ type: string; payload: any }>;
+  events: RawEvent[];
   balanceChanges: BalanceChange[];
   computationUsed: number;
+  summary: string;
+  summaryItems: SummaryItem[];
+  transfers: FTTransfer[];
+  nftTransfers: NFTTransfer[];
+  systemEvents: SystemEvent[];
+  tags: string[];
 }
 
 export async function simulateTransaction(req: SimulateRequest): Promise<SimulateResponse> {
@@ -37,10 +74,16 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
       events: [],
       balanceChanges: [],
       computationUsed: 0,
+      summary: '',
+      summaryItems: [],
+      transfers: [],
+      nftTransfers: [],
+      systemEvents: [],
+      tags: [],
     };
   }
 
-  // Backend returns snake_case keys and omits empty arrays; normalize here
+  // Simulator frontend returns decoded payloads; keep a few snake_case fallbacks for older responses.
   const raw = await resp.json();
   return {
     success: raw.success,
@@ -48,5 +91,11 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
     events: raw.events ?? [],
     balanceChanges: raw.balance_changes ?? raw.balanceChanges ?? [],
     computationUsed: raw.computation_used ?? raw.computationUsed ?? 0,
+    summary: raw.summary ?? '',
+    summaryItems: raw.summaryItems ?? [],
+    transfers: raw.transfers ?? [],
+    nftTransfers: raw.nftTransfers ?? [],
+    systemEvents: raw.systemEvents ?? [],
+    tags: raw.tags ?? [],
   };
 }

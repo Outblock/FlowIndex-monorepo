@@ -17,8 +17,7 @@ RUN bun -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8')
 RUN cd runner && bun install
 
 # Build shared packages (generate dist/ via tsup)
-RUN cd packages/event-decoder && bun run build \
- && cd ../flow-passkey && bun run build \
+RUN cd packages/flow-passkey && bun run build \
  && cd ../auth-core && bun run build \
  && cd ../auth-ui && bun run build
 

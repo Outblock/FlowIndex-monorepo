@@ -14,6 +14,10 @@ describe('simulateTransaction', () => {
         events: [{ type: 'FlowToken.TokensWithdrawn', payload: {} }],
         balanceChanges: [{ address: '0x1234', token: 'FLOW', delta: '-10.0' }],
         computationUsed: 42,
+        summaryItems: [{ icon: 'transfer', text: 'Transfer 10 FLOW' }],
+        transfers: [{ token: 'A.1654653399040a61.FlowToken', amount: '10.0', transfer_type: 'transfer' }],
+        systemEvents: [{ category: 'account', detail: 'something changed' }],
+        tags: ['FT_TRANSFER'],
       }),
     });
 
@@ -27,6 +31,10 @@ describe('simulateTransaction', () => {
     expect(result.success).toBe(true);
     expect(result.balanceChanges).toHaveLength(1);
     expect(result.computationUsed).toBe(42);
+    expect(result.summaryItems).toHaveLength(1);
+    expect(result.transfers).toHaveLength(1);
+    expect(result.systemEvents).toHaveLength(1);
+    expect(result.tags).toEqual(['FT_TRANSFER']);
   });
 
   it('returns error on network failure', async () => {

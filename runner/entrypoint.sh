@@ -18,7 +18,7 @@ if [ -z "${BACKEND_API:-}" ]; then
     export BACKEND_API="http://10.128.0.4:8080"
 fi
 if [ -z "${SIMULATOR_API:-}" ]; then
-    export SIMULATOR_API="http://10.128.0.5:9090"
+    export SIMULATOR_API="https://simulator.flowindex.io"
 fi
 
 echo "Listen port:         $LISTEN_PORT"
