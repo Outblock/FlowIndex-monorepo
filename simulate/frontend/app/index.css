@@ -1,28 +1,34 @@
-@font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Geist Pixel Square';
-  src: url('/fonts/GeistPixel-Square.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Geist Pixel Grid';
-  src: url('/fonts/GeistPixel-Grid.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('https://cdn.jsdelivr.net/npm/geist@1.7.0/dist/fonts/geist-mono/GeistMonoVF.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist Pixel Square';
+  src: url('https://cdn.jsdelivr.net/npm/geist@1.7.0/dist/fonts/geist-pixel/GeistPixel-Square.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist Pixel Circle';
+  src: url('https://cdn.jsdelivr.net/npm/geist@1.7.0/dist/fonts/geist-pixel/GeistPixel-Circle.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Geist Pixel Grid';
+  src: url('https://cdn.jsdelivr.net/npm/geist@1.7.0/dist/fonts/geist-pixel/GeistPixel-Grid.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
 
 @layer base {
   * { @apply border-zinc-800; }
@@ -35,12 +41,7 @@
   }
 }
 
-/* ═══════════════════════════════════════════════════
-   Page-level retro textures — applied via ::before/::after
-   on body so they layer over the bg color
-   ═══════════════════════════════════════════════════ */
-
-/* Film grain noise — visible but not distracting */
+/* Page-level retro textures */
 body::before {
   content: '';
   position: fixed;
@@ -53,7 +54,6 @@ body::before {
   mix-blend-mode: overlay;
 }
 
-/* Very faint page-level horizontal scanlines */
 body::after {
   content: '';
   position: fixed;
@@ -72,7 +72,6 @@ body::after {
 
 /* CRT Monitor Effects */
 @layer utilities {
-  /* Scanline overlay */
   .crt-scanlines {
     position: relative;
   }
@@ -81,53 +80,50 @@ body::after {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.06) 2px,
-      rgba(0, 0, 0, 0.06) 4px
+    background: linear-gradient(
+      rgba(18, 16, 16, 0) 50%,
+      rgba(0, 0, 0, 0.25) 50%
+    ), linear-gradient(
+      90deg,
+      rgba(255, 0, 0, 0.04),
+      rgba(0, 255, 0, 0.01),
+      rgba(0, 255, 0, 0.04)
     );
+    background-size: 100% 3px, 3px 100%;
     z-index: 10;
     border-radius: inherit;
   }
 
-  /* Phosphor glow effect on text */
   .crt-glow {
     text-shadow:
-      0 0 4px rgba(0, 239, 139, 0.4),
-      0 0 11px rgba(0, 239, 139, 0.2),
-      0 0 19px rgba(0, 239, 139, 0.1);
+      0 0 6px rgba(0, 239, 139, 0.5),
+      0 0 12px rgba(0, 239, 139, 0.2);
   }
 
-  /* Subtle screen flicker */
   .crt-flicker {
-    animation: crt-flicker 0.15s infinite;
+    animation: crt-flicker 0.1s infinite;
   }
 
-  /* Curved screen bezel */
   .crt-screen {
     position: relative;
-    border-radius: 12px;
+    border-radius: 8px;
     box-shadow:
-      inset 0 0 60px rgba(0, 239, 139, 0.03),
-      inset 0 0 4px rgba(0, 239, 139, 0.05),
-      0 0 30px rgba(0, 239, 139, 0.04);
+      inset 0 0 100px rgba(0, 0, 0, 0.8),
+      inset 0 0 10px rgba(0, 239, 139, 0.05);
     overflow: hidden;
+    animation: screen-on 0.8s cubic-bezier(0.23, 1, 0.32, 1);
   }
 
-  /* Monitor housing/bezel */
   .crt-bezel {
-    border-radius: 18px;
-    padding: 8px;
-    background: linear-gradient(145deg, #1a1a1a 0%, #0a0a0a 50%, #111 100%);
+    border-radius: 14px;
+    padding: 12px;
+    background: linear-gradient(135deg, #2a2a2a 0%, #111 100%);
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255,255,255,0.05),
-      inset 0 -1px 0 rgba(0,0,0,0.3);
+      0 30px 60px rgba(0, 0, 0, 0.8),
+      inset 0 1px 1px rgba(255, 255, 255, 0.05),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.6);
   }
 
-  /* Power LED indicator */
   .crt-led {
     width: 6px;
     height: 6px;
@@ -139,7 +135,6 @@ body::after {
     animation: led-pulse 2s ease-in-out infinite;
   }
 
-  /* Blinking cursor */
   .crt-cursor {
     display: inline-block;
     width: 8px;
@@ -150,7 +145,6 @@ body::after {
     box-shadow: 0 0 6px rgba(0, 239, 139, 0.5);
   }
 
-  /* Screen vignette */
   .crt-vignette {
     position: relative;
   }
@@ -168,7 +162,6 @@ body::after {
     border-radius: inherit;
   }
 
-  /* Retro grid background for sections */
   .retro-grid {
     background-image:
       linear-gradient(rgba(0, 239, 139, 0.03) 1px, transparent 1px),
@@ -176,13 +169,11 @@ body::after {
     background-size: 40px 40px;
   }
 
-  /* Boot text animation */
   .crt-boot-line {
     opacity: 0;
     animation: boot-in 0.1s forwards;
   }
 
-  /* Section divider glow — use on border-t sections */
   .glow-divider {
     border-image: linear-gradient(
       90deg,
@@ -193,12 +184,16 @@ body::after {
       transparent 100%
     ) 1;
   }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
-/* ═══════════════════════════════════════════════════
-   Ambient glow spots — large soft radial gradients
-   that give depth to the dark background
-   ═══════════════════════════════════════════════════ */
 main {
   position: relative;
 }
@@ -209,11 +204,8 @@ main::before {
   pointer-events: none;
   z-index: 0;
   background:
-    /* Top-center green glow (hero area) */
     radial-gradient(ellipse 60% 40% at 50% 5%, rgba(0, 239, 139, 0.04) 0%, transparent 70%),
-    /* Mid-left accent */
     radial-gradient(ellipse 40% 30% at 10% 50%, rgba(0, 239, 139, 0.02) 0%, transparent 70%),
-    /* Bottom-right accent */
     radial-gradient(ellipse 50% 35% at 85% 80%, rgba(0, 180, 120, 0.025) 0%, transparent 70%);
 }
 main > * {
@@ -222,9 +214,17 @@ main > * {
 }
 
 @keyframes crt-flicker {
-  0% { opacity: 0.97; }
-  50% { opacity: 1; }
-  100% { opacity: 0.98; }
+  0% { opacity: 0.993; }
+  10% { opacity: 0.98; }
+  20% { opacity: 0.995; }
+  30% { opacity: 0.985; }
+  40% { opacity: 0.992; }
+  50% { opacity: 0.99; }
+  60% { opacity: 0.982; }
+  70% { opacity: 0.994; }
+  80% { opacity: 0.988; }
+  90% { opacity: 0.996; }
+  100% { opacity: 1; }
 }
 
 @keyframes led-pulse {
@@ -246,11 +246,7 @@ main > * {
   0%, 100% { transform: translateY(0); opacity: 1; }
   50% { transform: translateY(-4px); opacity: 0.8; }
 }
-.animate-bounce-gentle {
-  animation: bounce-gentle 1.5s ease-in-out infinite;
-}
 
-/* Screen curvature via subtle transform */
 .crt-screen::before {
   content: '';
   position: absolute;
@@ -259,4 +255,10 @@ main > * {
   border-radius: inherit;
   border: 1px solid rgba(0, 239, 139, 0.08);
   z-index: 11;
+}
+
+@keyframes screen-on {
+  0% { transform: scaleY(0.005) scaleX(0); filter: brightness(30); opacity: 0; }
+  50% { transform: scaleY(0.005) scaleX(1); filter: brightness(15); opacity: 1; }
+  100% { transform: scaleY(1) scaleX(1); filter: brightness(1); opacity: 1; }
 }

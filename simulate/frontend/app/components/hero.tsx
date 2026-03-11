@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 /* ── Typewriter tagline ── */
-const TAGLINE_1 = 'See what happens. '
-const TAGLINE_2 = 'Before it happens.'
-const SUBTITLE = 'Real mainnet state. Simulated execution. Full visibility.'
+const TAGLINE_1 = 'SEE WHAT HAPPENS. '
+const TAGLINE_2 = 'BEFORE IT HAPPENS.'
+const SUBTITLE = 'REAL MAINNET STATE. SIMULATED EXECUTION. FULL VISIBILITY.'
 
 function Typewriter({ phase, onClickPlayground }: { phase: Phase; onClickPlayground: () => void }) {
   const [charIdx, setCharIdx] = useState(0)
@@ -36,10 +36,10 @@ function Typewriter({ phase, onClickPlayground }: { phase: Phase; onClickPlaygro
               clearInterval(subTimer)
               setTimeout(() => setShowButton(true), 300)
             }
-          }, 20)
-        }, 400)
+          }, 15)
+        }, 300)
       }
-    }, 50)
+    }, 40)
 
     return () => clearInterval(taglineTimer)
   }, [phase])
@@ -52,76 +52,70 @@ function Typewriter({ phase, onClickPlayground }: { phase: Phase; onClickPlaygro
   const visibleSubtitle = SUBTITLE.slice(0, subtitleIdx)
 
   return (
-    <div className={`text-center mt-16 transition-opacity duration-300 ${phase === 'done' ? 'opacity-100' : 'opacity-0'}`}>
-      <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tighter text-white">
+    <div className={`text-center mt-4 transition-all duration-700 ${phase === 'done' ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      <h1 className="text-3xl sm:text-5xl font-black tracking-[0.02em] text-white font-pixel-circle leading-tight inline-block relative whitespace-pre-wrap">
         {part1}
         {part2 && (
-          <span className="text-flow-green" style={{ textShadow: '0 0 30px rgba(0,239,139,0.35)' }}>
+          <span className="text-flow-green" style={{ textShadow: '0 0 20px rgba(0,239,139,0.5)' }}>
             {part2}
           </span>
         )}
-        {showCursor && charIdx < totalChars && (
-          <span
-            className="inline-block w-[0.55em] h-[1.05em] ml-[2px] animate-[cursor-blink_1s_step-end_infinite] align-middle"
-            style={{ background: '#00ef8b', boxShadow: '0 0 8px rgba(0,239,139,0.6), 0 0 16px rgba(0,239,139,0.2)' }}
-          />
+        {showCursor && (
+          <span className="crt-cursor ml-3 !w-[0.35em] !h-[0.7em]" />
         )}
       </h1>
-      <p className="mt-4 text-sm text-zinc-400 h-5">
+      <p className="mt-3 text-[10px] sm:text-xs text-emerald-500/60 font-mono tracking-[0.2em] h-5 uppercase">
         {visibleSubtitle}
-        {showCursor && charIdx >= totalChars && (
-          <span
-            className="inline-block w-[0.5em] h-[1.05em] ml-[1px] animate-[cursor-blink_1s_step-end_infinite] align-middle"
-            style={{ background: '#00ef8b', boxShadow: '0 0 6px rgba(0,239,139,0.5), 0 0 12px rgba(0,239,139,0.15)' }}
-          />
-        )}
       </p>
-      <button
-        onClick={onClickPlayground}
-        className={`mt-8 px-6 py-2.5 border border-zinc-600 rounded text-xs text-zinc-300 hover:border-flow-green hover:text-flow-green hover:shadow-[0_0_12px_rgba(0,239,139,0.15)] transition-all ${showButton ? 'opacity-100' : 'opacity-0'}`}
-      >
-        Try it below &darr;
-      </button>
-
+      <div className="mt-6 flex flex-col items-center gap-4">
+        <button
+          onClick={onClickPlayground}
+          className={`group relative px-12 py-4 bg-flow-green text-black overflow-hidden transition-all hover:bg-emerald-400 active:scale-95 shadow-[0_0_30px_rgba(0,239,139,0.3)] ${showButton ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}
+        >
+          <div className="relative flex items-center gap-3 text-sm font-black tracking-[4px] uppercase">
+            Try it below ↓
+          </div>
+        </button>
+      </div>
     </div>
   )
 }
 
 /* ── Cadence syntax highlighting tokens ── */
 const CODE_LINES = [
-  { tokens: [{ text: '// Transfer FLOW tokens between accounts', cl: 'text-zinc-600' }] },
-  { tokens: [{ text: 'import', cl: 'text-purple-400' }, { text: ' FungibleToken ', cl: 'text-yellow-300' }, { text: 'from ', cl: 'text-purple-400' }, { text: '0xf233dcee88fe0abe', cl: 'text-emerald-400' }] },
-  { tokens: [{ text: 'import', cl: 'text-purple-400' }, { text: ' FlowToken ', cl: 'text-yellow-300' }, { text: 'from ', cl: 'text-purple-400' }, { text: '0x1654653399040a61', cl: 'text-emerald-400' }] },
+  { tokens: [{ text: '// Transfer FLOW tokens between accounts', cl: 'text-emerald-700/60' }] },
+  { tokens: [{ text: 'import', cl: 'text-emerald-500' }, { text: ' FungibleToken ', cl: 'text-emerald-200' }, { text: 'from ', cl: 'text-emerald-500' }, { text: '0xf233dcee88fe0abe', cl: 'text-emerald-400' }] },
+  { tokens: [{ text: 'import', cl: 'text-emerald-500' }, { text: ' FlowToken ', cl: 'text-emerald-200' }, { text: 'from ', cl: 'text-emerald-500' }, { text: '0x1654653399040a61', cl: 'text-emerald-400' }] },
   { tokens: [] },
-  { tokens: [{ text: 'transaction', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'UFix64', cl: 'text-cyan-400' }, { text: ', ', cl: 'text-zinc-400' }, { text: 'to', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'Address', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: 'transaction', cl: 'text-emerald-500' }, { text: '(', cl: 'text-emerald-300' }, { text: 'amount', cl: 'text-emerald-400' }, { text: ': ', cl: 'text-emerald-600' }, { text: 'UFix64', cl: 'text-emerald-300' }, { text: ', ', cl: 'text-emerald-600' }, { text: 'to', cl: 'text-emerald-400' }, { text: ': ', cl: 'text-emerald-600' }, { text: 'Address', cl: 'text-emerald-300' }, { text: ') {', cl: 'text-emerald-300' }] },
   { tokens: [] },
-  { tokens: [{ text: '  ', cl: '' }, { text: 'let', cl: 'text-purple-400' }, { text: ' sentVault', cl: 'text-zinc-200' }, { text: ': ', cl: 'text-zinc-400' }, { text: '@{FungibleToken.Vault}', cl: 'text-cyan-400' }] },
+  { tokens: [{ text: '  ', cl: '' }, { text: 'let', cl: 'text-emerald-500' }, { text: ' sentVault', cl: 'text-emerald-200' }, { text: ': ', cl: 'text-emerald-600' }, { text: '@{FungibleToken.Vault}', cl: 'text-emerald-300' }] },
   { tokens: [] },
-  { tokens: [{ text: '  ', cl: '' }, { text: 'prepare', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'auth', cl: 'text-purple-400' }, { text: '(BorrowValue) ', cl: 'text-zinc-400' }, { text: '&Account', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '    ', cl: '' }, { text: 'let', cl: 'text-purple-400' }, { text: ' vaultRef', cl: 'text-zinc-200' }, { text: ' = ', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: '.storage.borrow<', cl: 'text-zinc-300' }] },
-  { tokens: [{ text: '      auth(FungibleToken.Withdraw)', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '      &FlowToken.Vault', cl: 'text-cyan-400' }] },
-  { tokens: [{ text: '    >', cl: 'text-zinc-300' }, { text: '(', cl: 'text-zinc-400' }, { text: 'from', cl: 'text-orange-300' }, { text: ': /storage/flowTokenVault', cl: 'text-zinc-400' }, { text: ')', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '      ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-red-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow vault"', cl: 'text-emerald-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '  ', cl: '' }, { text: 'prepare', cl: 'text-emerald-500' }, { text: '(', cl: 'text-emerald-300' }, { text: 'signer', cl: 'text-emerald-400' }, { text: ': ', cl: 'text-emerald-600' }, { text: 'auth', cl: 'text-emerald-500' }, { text: '(BorrowValue) ', cl: 'text-emerald-600' }, { text: '&Account', cl: 'text-emerald-300' }, { text: ') {', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '    ', cl: '' }, { text: 'let', cl: 'text-emerald-500' }, { text: ' vaultRef', cl: 'text-emerald-200' }, { text: ' = ', cl: 'text-emerald-600' }, { text: 'signer', cl: 'text-emerald-400' }, { text: '.storage.borrow<', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '      auth(FungibleToken.Withdraw)', cl: 'text-emerald-500/80' }] },
+  { tokens: [{ text: '      &FlowToken.Vault', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '    >', cl: 'text-emerald-300' }, { text: '(', cl: 'text-emerald-600' }, { text: 'from', cl: 'text-emerald-400' }, { text: ': /storage/flowTokenVault', cl: 'text-emerald-600' }, { text: ')', cl: 'text-emerald-600' }] },
+  { tokens: [{ text: '      ?? ', cl: 'text-emerald-600' }, { text: 'panic', cl: 'text-red-500/80' }, { text: '(', cl: 'text-emerald-600' }, { text: '"Could not borrow vault"', cl: 'text-emerald-400' }, { text: ')', cl: 'text-emerald-600' }] },
   { tokens: [] },
-  { tokens: [{ text: '    ', cl: '' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault ', cl: 'text-zinc-200' }, { text: '<- ', cl: 'text-red-400' }, { text: 'vaultRef', cl: 'text-zinc-200' }, { text: '.withdraw(', cl: 'text-zinc-300' }] },
-  { tokens: [{ text: '      ', cl: '' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': amount', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '    )', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '  }', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    ', cl: '' }, { text: 'self', cl: 'text-emerald-500' }, { text: '.sentVault ', cl: 'text-emerald-200' }, { text: '<- ', cl: 'text-red-500/80' }, { text: 'vaultRef', cl: 'text-emerald-200' }, { text: '.withdraw(', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '      ', cl: '' }, { text: 'amount', cl: 'text-emerald-400' }, { text: ': amount', cl: 'text-emerald-600' }] },
+  { tokens: [{ text: '    )', cl: 'text-emerald-600' }] },
+  { tokens: [{ text: '  }', cl: 'text-emerald-600' }] },
   { tokens: [] },
-  { tokens: [{ text: '  ', cl: '' }, { text: 'execute', cl: 'text-purple-400' }, { text: ' {', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '    ', cl: '' }, { text: 'let', cl: 'text-purple-400' }, { text: ' receiver', cl: 'text-zinc-200' }, { text: ' = ', cl: 'text-zinc-400' }, { text: 'getAccount', cl: 'text-purple-400' }, { text: '(to)', cl: 'text-zinc-300' }] },
-  { tokens: [{ text: '      .capabilities.borrow<', cl: 'text-zinc-300' }] },
-  { tokens: [{ text: '        &{FungibleToken.Receiver}', cl: 'text-cyan-400' }] },
-  { tokens: [{ text: '      >', cl: 'text-zinc-300' }, { text: '(/public/flowTokenReceiver)', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '      ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-red-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow receiver"', cl: 'text-emerald-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '  ', cl: '' }, { text: 'execute', cl: 'text-emerald-500' }, { text: ' {', cl: 'text-emerald-600' }] },
+  { tokens: [{ text: '    ', cl: '' }, { text: 'let', cl: 'text-emerald-500' }, { text: ' receiver', cl: 'text-emerald-200' }, { text: ' = ', cl: 'text-emerald-600' }, { text: 'getAccount', cl: 'text-emerald-500' }, { text: '(to)', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '      .capabilities.borrow<', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '        &{FungibleToken.Receiver}', cl: 'text-emerald-300' }] },
+  { tokens: [{ text: '      >', cl: 'text-emerald-300' }, { text: '(/public/flowTokenReceiver)', cl: 'text-emerald-600' }] },
+  { tokens: [{ text: '      ?? ', cl: 'text-emerald-600' }, { text: 'panic', cl: 'text-red-500/80' }, { text: '(', cl: 'text-emerald-600' }, { text: '"Could not borrow receiver"', cl: 'text-emerald-400' }, { text: ')', cl: 'text-emerald-600' }] },
   { tokens: [] },
-  { tokens: [{ text: '    receiver.deposit(', cl: 'text-zinc-300' }, { text: 'from', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: '<- ', cl: 'text-red-400' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault)', cl: 'text-zinc-200' }] },
-  { tokens: [{ text: '  }', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '}', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    receiver.deposit(', cl: 'text-emerald-300' }, { text: 'from', cl: 'text-emerald-400' }, { text: ': ', cl: 'text-emerald-600' }, { text: '<- ', cl: 'text-red-500/80' }, { text: 'self', cl: 'text-emerald-500' }, { text: '.sentVault)', cl: 'text-emerald-200' }] },
+  { tokens: [{ text: '  }', cl: 'text-emerald-600' }] },
+  { tokens: [{ text: '}', cl: 'text-emerald-600' }] },
 ]
 
-type Phase = 'idle' | 'typing' | 'ready' | 'running' | 'done'
+type Phase = 'idle' | 'boot' | 'typing' | 'ready' | 'running' | 'done'
 
 /* ── Build flat character stream for typewriter ── */
 const CHAR_STREAM: { char: string; cl: string; lineIdx: number; isNewline: boolean }[] = []
@@ -139,8 +133,27 @@ CODE_LINES.forEach((line, lineIdx) => {
 })
 const TOTAL_CHARS = CHAR_STREAM.length
 
+const BOOT_LOGS = [
+  '[ OK ] Initializing core.sys',
+  '[ OK ] Loading mainnet.state... 100%',
+  '[ OK ] Establishing secure link 0x165...a61',
+  '[ OK ] Virtual machine ready',
+  '[ OK ] Simulation kernel 1.0.4 loaded',
+  '> sh run simulate.sh',
+]
+
+function Screw({ className }: { className?: string }) {
+  return (
+    <div className={`w-3 h-3 rounded-full bg-zinc-800 border border-zinc-700 shadow-inner flex items-center justify-center ${className}`}>
+      <div className="w-2 h-[1px] bg-zinc-700 rotate-45" />
+    </div>
+  )
+}
+
+/* ── Physical Monitor Housing ── */
 export function Hero() {
   const [phase, setPhase] = useState<Phase>('idle')
+  const [bootIdx, setBootIdx] = useState(0)
   const [charIdx, setCharIdx] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -161,9 +174,23 @@ export function Hero() {
   useEffect(() => {
     const run = () => {
       clearTimers()
-      setPhase('typing')
-      setCharIdx(0)
+      setPhase('boot')
+      
+      let bIdx = 0
+      const bootInterval = setInterval(() => {
+        bIdx++
+        setBootIdx(bIdx)
+        if (bIdx >= BOOT_LOGS.length) {
+          clearInterval(bootInterval)
+          setTimeout(() => {
+            setPhase('typing')
+            startTyping()
+          }, 400)
+        }
+      }, 150)
+    }
 
+    const startTyping = () => {
       let idx = 0
       intervalRef.current = setInterval(() => {
         idx += 3
@@ -192,170 +219,214 @@ export function Hero() {
   }
 
   return (
-    <section className="min-h-screen flex flex-col items-center justify-center px-4 pt-16 pb-8">
+    <section className="min-h-screen flex flex-col items-center justify-center px-4 pt-12 pb-8 relative overflow-hidden retro-grid">
+      {/* Background ambient lighting */}
+      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent via-flow-green/[0.02] to-transparent pointer-events-none z-0" />
 
-      <div className="w-full max-w-3xl sm:max-w-4xl mx-auto">
-        {/* ══════ Dark Monitor ══════ */}
-        <div
-          className="relative"
-          style={{ filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.6))' }}
-        >
-          {/* ── Monitor shell — dark aluminum ── */}
-          <div
-            className="relative rounded-[12px] sm:rounded-[16px]"
-            style={{
-              background: 'linear-gradient(180deg, #1e1e1e 0%, #181818 20%, #141414 50%, #111 80%, #0e0e0e 100%)',
-              boxShadow: `
-                inset 0 1px 0 rgba(255,255,255,0.08),
-                inset 0 -1px 0 rgba(0,0,0,0.4),
-                inset 1px 0 0 rgba(255,255,255,0.04),
-                inset -1px 0 0 rgba(255,255,255,0.04),
-                0 0 0 1px rgba(255,255,255,0.03)
-              `,
-              padding: '14px 14px 10px 14px',
-            }}
-          >
-            {/* ── Screen bezel ── */}
-            <div
-              className="relative rounded-[6px] sm:rounded-[8px]"
-              style={{
-                background: '#0a0a0a',
-                padding: '3px',
-                boxShadow: `
-                  inset 0 2px 6px rgba(0,0,0,0.8),
-                  inset 0 0 12px rgba(0,0,0,0.4),
-                  0 1px 0 rgba(255,255,255,0.05)
-                `,
-              }}
-            >
-              {/* ── CRT screen — green phosphor ── */}
-              <div
-                className="relative overflow-hidden rounded-[4px] sm:rounded-[6px]"
-                style={{
-                  background: '#010a03',
-                  height: 'clamp(400px, 65vw, 560px)',
-                }}
-              >
-                {/* Scanlines */}
-                <div className="absolute inset-0 pointer-events-none z-[3]" style={{
-                  background: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.08) 1px, rgba(0,0,0,0.08) 2px)',
-                }} />
-                {/* Vignette */}
-                <div className="absolute inset-0 pointer-events-none z-[4]" style={{
-                  background: 'radial-gradient(ellipse 80% 80% at 50% 50%, transparent 55%, rgba(0,0,0,0.3) 100%)',
-                }} />
-                {/* Phosphor glow */}
-                <div className="absolute inset-0 pointer-events-none z-[2]" style={{
-                  boxShadow: 'inset 0 0 80px rgba(0,239,139,0.03)',
-                }} />
-                {/* Reflection highlight */}
-                <div className="absolute inset-0 pointer-events-none z-[5]" style={{
-                  background: 'radial-gradient(ellipse 40% 25% at 25% 15%, rgba(255,255,255,0.04) 0%, transparent 100%)',
-                }} />
+      <div className="w-full max-w-5xl mx-auto relative z-10">
+        {/* ══════ Physical CRT Monitor Unit ══════ */}
+        <div className="relative group perspective-1000">
+          
+          {/* Main Chassis */}
+          <div className="relative z-20 rounded-[2rem] p-3 sm:p-5 bg-[#1a1a1b] border-t-2 border-white/10 border-l border-white/5 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.9),inset_0_2px_10px_rgba(255,255,255,0.05)]">
+            
+            {/* Top Vents */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="w-6 h-1 bg-black/60 rounded-full shadow-inner" />
+              ))}
+            </div>
 
-                {/* Screen content */}
-                <div className="relative z-[1] h-full flex flex-col">
-                  {/* Title bar */}
-                  <div className="px-3 py-1.5 border-b border-emerald-900/20 flex items-center justify-between shrink-0">
-                    <span className="text-[9px] sm:text-[10px] text-emerald-500/70 flex items-center gap-1.5">
-                      <span className="text-emerald-400/70">$</span> transfer.cdc
-                    </span>
-                    <button
-                      className={`px-3 py-0.5 rounded text-[9px] sm:text-[10px] font-bold transition-all duration-300 ${
-                        phase === 'ready'
-                          ? 'bg-flow-green text-black shadow-[0_0_20px_rgba(0,239,139,0.6)]'
-                          : phase === 'running'
-                            ? 'bg-flow-green text-black animate-pulse'
-                            : phase === 'done'
-                              ? 'bg-flow-green text-black'
-                              : 'bg-emerald-950/40 text-emerald-600/60 border border-emerald-800/30'
-                      }`}
-                    >
-                      {phase === 'running' ? '◉ Running...' : phase === 'done' ? '✓ Passed' : '▶ Simulate'}
-                    </button>
-                  </div>
+            {/* Screws */}
+            <Screw className="absolute top-6 left-6 opacity-40" />
+            <Screw className="absolute top-6 right-6 opacity-40" />
+            <Screw className="absolute bottom-16 left-6 opacity-40" />
+            <Screw className="absolute bottom-16 right-6 opacity-40" />
 
-                  {/* Code + Result */}
-                  <div className="flex-1 flex min-h-0">
-                    {/* Code */}
-                    <div className="flex-1 overflow-hidden">
-                      <div className="p-2 sm:p-3 text-[8px] sm:text-[10px] leading-relaxed font-mono whitespace-pre overflow-hidden">
-                        {(() => {
-                          const visible = CHAR_STREAM.slice(0, charIdx)
-                          const lines: { char: string; cl: string }[][] = [[]]
-                          for (const c of visible) {
-                            if (c.isNewline || c.char === '\n') { lines.push([]) }
-                            else { lines[lines.length - 1].push(c) }
-                          }
-                          return lines.map((lineChars, i) => (
-                            <div key={i} style={{ textShadow: '0 0 8px rgba(0,239,139,0.1)' }}>
-                              <span className="text-emerald-700/50 mr-2 select-none text-[7px] sm:text-[8px] inline-block w-3 text-right">{String(i + 1).padStart(2)}</span>
-                              {lineChars.length === 0 && <span>&nbsp;</span>}
-                              {lineChars.map((c, j) => (
-                                <span key={j} className={c.cl}>{c.char}</span>
-                              ))}
-                              {phase === 'typing' && i === lines.length - 1 && charIdx < TOTAL_CHARS && (
-                                <span className="inline-block w-[6px] h-[11px] bg-flow-green animate-[cursor-blink_1s_step-end_infinite] align-middle" style={{ boxShadow: '0 0 8px rgba(0,239,139,0.7)' }} />
-                              )}
+            {/* The Screen Well */}
+            <div className="relative bg-[#080808] rounded-[1rem] sm:rounded-[1.5rem] p-2 sm:p-8 border-2 sm:border-4 border-black shadow-[inset_0_0_40px_rgba(0,0,0,1)]">
+
+              {/* Glass / CRT Layer */}
+              <div className="crt-screen crt-scanlines crt-vignette crt-flicker relative bg-[#010a03] h-[360px] sm:h-[520px] flex flex-col border border-emerald-950/40 rounded-[0.8rem] sm:rounded-[1rem]">
+
+                {/* Internal Screen Content */}
+                <div className="relative z-[10] p-3 sm:p-8 flex-1 flex flex-col font-mono text-emerald-500 overflow-hidden">
+
+                  {phase === 'boot' ? (
+                    <div className="flex flex-col gap-1.5 mt-2 sm:mt-4">
+                      {BOOT_LOGS.slice(0, bootIdx).map((log, i) => (
+                        <div key={i} className="text-[9px] sm:text-xs tracking-wider crt-boot-line opacity-80">
+                          {log}
+                        </div>
+                      ))}
+                      <span className="crt-cursor ml-1" />
+                    </div>
+                  ) : (
+                    <>
+                      {/* Header Readout */}
+                      <div className="flex items-center justify-between mb-4 sm:mb-6 border-b border-emerald-900/40 pb-2 sm:pb-3 shrink-0">
+                        <div className="flex items-center gap-2 sm:gap-4">
+                          <div className="flex flex-col">
+                            <span className="text-[7px] sm:text-[8px] uppercase tracking-[2px] sm:tracking-[3px] text-emerald-500/40">Sim Unit</span>
+                            <span className="text-[8px] sm:text-[10px] text-emerald-400 font-bold tracking-[1px]">ID://F_774</span>
+                          </div>
+                          <div className="w-px h-4 sm:h-6 bg-emerald-900/30" />
+                          <div className="hidden xs:flex flex-col">
+                            <span className="text-[7px] sm:text-[8px] uppercase tracking-[2px] sm:tracking-[3px] text-emerald-500/40">Network</span>
+                            <span className="text-[8px] sm:text-[10px] text-flow-green animate-pulse tracking-[1px]">MAINNET</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className={`px-2 sm:px-4 py-1 sm:py-1.5 text-[8px] sm:text-10px font-bold tracking-[2px] sm:tracking-[3px] uppercase transition-all duration-300 border-2 ${
+                            phase === 'ready' ? 'bg-flow-green text-black border-flow-green shadow-[0_0_20px_rgba(0,239,139,0.4)]' : 
+                            phase === 'running' ? 'bg-amber-500 text-black border-amber-500' :
+                            phase === 'done' ? 'bg-transparent text-flow-green border-flow-green/40' : 'bg-transparent text-emerald-900 border-emerald-900/20'
+                          }`}>
+                            {phase === 'running' ? 'EXEC' : phase === 'done' ? 'PASSED' : 'READY'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Code Area */}
+                      <div className="flex-1 flex min-h-0 gap-4 sm:gap-8 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto pr-2 sm:pr-4 scrollbar-hide">
+                          <div className="text-[9px] sm:text-[12px] leading-relaxed whitespace-pre font-mono">
+                            {(() => {
+                              const visible = CHAR_STREAM.slice(0, charIdx)
+                              const lines: { char: string; cl: string }[][] = [[]]
+                              for (const c of visible) {
+                                if (c.isNewline || c.char === '\n') { lines.push([]) }
+                                else { lines[lines.length - 1].push(c) }
+                              }
+                              return lines.map((lineChars, i) => (
+                                <div key={i} className="flex group/line">
+                                  <span className="text-emerald-900/30 mr-3 sm:mr-6 select-none w-3 sm:w-5 text-right font-bold shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                                  <div className="flex-1">
+                                    {lineChars.map((c, j) => (
+                                      <span key={j} className={`${c.cl} crt-glow brightness-125`}>{c.char}</span>
+                                    ))}
+                                    {phase === 'typing' && i === lines.length - 1 && charIdx < TOTAL_CHARS && (
+                                      <span className="crt-cursor ml-1" />
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Telemetry Sidebar - Hide on small screens */}
+                        <div className={`hidden lg:block w-64 border-l border-emerald-900/30 pl-6 transition-all duration-1000 ${phase === 'done' ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
+                          <div className="space-y-8">
+                            <div className="p-3 bg-emerald-950/20 border border-emerald-900/30 rounded">
+                              <div className="text-[9px] tracking-[3px] text-emerald-500/60 uppercase mb-3 font-bold">Execution Metrics</div>
+                              <div className="space-y-4">
+                                <div>
+                                  <div className="flex justify-between text-[8px] uppercase mb-1">
+                                    <span className="opacity-40">Comp_Load</span>
+                                    <span>65%</span>
+                                  </div>
+                                  <div className="h-1 bg-emerald-950/50 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 w-[65%] shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="flex justify-between text-[8px] uppercase mb-1">
+                                    <span className="opacity-40">Memory_Leak_Test</span>
+                                    <span className="text-flow-green">STABLE</span>
+                                  </div>
+                                  <div className="h-1 bg-emerald-950/50 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-700 w-[20%]" />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          ))
-                        })()}
-                      </div>
-                    </div>
 
-                    {/* Result panel */}
-                    <div className="hidden sm:block w-52 border-l border-zinc-700/30">
-                      <div className={`p-3 transition-all duration-500 ${phase === 'done' ? 'opacity-100' : 'opacity-0 translate-x-3'}`}>
-                        <div className="flex items-center gap-1.5 mb-3">
-                          <div className="w-2 h-2 rounded-full bg-flow-green" style={{ boxShadow: '0 0 8px rgba(0,239,139,0.8)' }} />
-                          <span className="text-flow-green text-[10px] font-semibold" style={{ textShadow: '0 0 10px rgba(0,239,139,0.5)' }}>Passed</span>
-                          <span className="ml-auto text-[8px] text-zinc-500">1,204 ops</span>
-                        </div>
-                        <div className="text-[7px] text-emerald-500/60 tracking-wider mb-2" style={{ textShadow: '0 0 6px rgba(0,239,139,0.2)' }}>BALANCE CHANGES</div>
-                        <div className="rounded p-2 text-[9px] space-y-1.5 border border-emerald-800/30 bg-black/40">
-                          <div className="flex justify-between">
-                            <span className="text-zinc-300">0x1654..0a61</span>
-                            <span className="text-red-400 font-semibold" style={{ textShadow: '0 0 8px rgba(248,113,113,0.4)' }}>-10.0 FLOW</span>
+                            <div>
+                              <div className="text-[9px] tracking-[3px] text-emerald-500/60 uppercase mb-3 font-bold">State Changes</div>
+                              <div className="rounded border-l-2 border-emerald-500/40 p-3 bg-black/40 text-[10px] space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="opacity-60 text-[8px]">ACCOUNT_A</span>
+                                  <span className="text-red-400 font-bold">-10.0 FLOW</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="opacity-60 text-[8px]">ACCOUNT_B</span>
+                                  <span className="text-flow-green font-bold">+10.0 FLOW</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="pt-6 border-t border-emerald-900/30">
+                              <div className="text-[12px] text-flow-green font-bold tracking-[3px]">RESULT://SUCCESS</div>
+                              <div className="text-[9px] opacity-40 mt-1 uppercase tracking-widest">Hash: 0xFD...22E</div>
+                            </div>
                           </div>
-                          <div className="flex justify-between">
-                            <span className="text-zinc-300">0xf8d6..20c7</span>
-                            <span className="text-flow-green font-semibold" style={{ textShadow: '0 0 10px rgba(0,239,139,0.6)' }}>+10.0 FLOW</span>
-                          </div>
-                        </div>
-                        <div className="text-[7px] text-emerald-500/60 tracking-wider mb-2 mt-4" style={{ textShadow: '0 0 6px rgba(0,239,139,0.2)' }}>EVENTS</div>
-                        <div className="rounded p-2 text-[9px] space-y-1 border border-emerald-800/30 bg-black/40">
-                          <div className="text-zinc-300">TokensWithdrawn <span className="text-zinc-400">x1</span></div>
-                          <div className="text-zinc-300">TokensDeposited <span className="text-zinc-400">x1</span></div>
-                        </div>
-                        <div className="mt-4 text-[8px] text-zinc-400">
-                          Fee: <span className="text-zinc-200">0.00001</span>
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* ── Bottom bar: label + LED ── */}
-            <div className="mt-2 flex items-center justify-between px-2">
-              <div
-                className="text-[9px] sm:text-[11px] tracking-[3px] font-bold select-none uppercase"
-                style={{
-                  color: '#3a3a3a',
-                  textShadow: '0 1px 0 rgba(255,255,255,0.05)',
-                }}
-              >
-                FlowIndex Simulator
+            {/* Control Panel / Branding Strip */}
+            <div className="mt-4 sm:mt-8 flex flex-col sm:flex-row items-center sm:items-end justify-between gap-6 sm:gap-0 px-4 sm:px-10 pb-6 sm:pb-4 bg-gradient-to-t from-black/20 to-transparent pt-4 rounded-b-[1.5rem] sm:rounded-b-[2rem]">
+              <div className="flex items-center gap-4 sm:gap-8">
+                <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
+                  <span className="text-lg sm:text-2xl font-black tracking-[4px] sm:tracking-[8px] text-zinc-500 uppercase font-pixel-square leading-none">FlowIndex</span>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="hidden sm:block h-[2px] w-4 bg-zinc-800" />
+                    <span className="text-[6px] sm:text-[7px] tracking-[3px] sm:tracking-[5px] text-zinc-600 uppercase font-bold">Strategic Dynamics Simulator</span>
+                  </div>
+                </div>
+
+                {/* Physical Plate - Clean and Centered */}
+                <div className="hidden xs:block px-2 sm:px-4 py-1 sm:py-1.5 bg-zinc-900 border border-zinc-800 rounded-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+                  <span className="text-[6px] sm:text-[8px] font-bold text-zinc-500 tracking-[2px] sm:tracking-[3px] uppercase font-mono">S-774/VX</span>
+                </div>
               </div>
-              <div className="crt-led" />
+
+              <div className="flex items-center gap-6 sm:gap-10">
+                {/* Interface Port - Refined */}
+                <div className="hidden sm:flex flex-col items-center gap-2">
+                  <div className="w-12 h-7 bg-[#0a0a0a] rounded-sm border-b border-zinc-800 shadow-[inset_0_2px_10px_rgba(0,0,0,1)] flex flex-col justify-around py-1.5 px-2">
+                    <div className="w-full h-[1px] bg-zinc-900" />
+                    <div className="w-full h-[1px] bg-zinc-900" />
+                    <div className="w-full h-[1px] bg-zinc-900" />
+                  </div>
+                  <span className="text-[7px] tracking-[2px] text-zinc-700 uppercase font-bold">Interface</span>
+                </div>
+
+                <div className="flex flex-col items-center sm:items-end gap-2 sm:gap-3">
+                  <div className="flex gap-2 sm:gap-2.5">
+                    <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-500 ${phase === 'done' ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-emerald-950/20'}`} />
+                    <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-500 ${phase === 'running' ? 'bg-amber-500 shadow-[0_0_12px_#f59e0b]' : 'bg-amber-900/30'}`} />
+                    <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-zinc-900 shadow-inner" />
+                  </div>
+                  <span className="text-[6px] sm:text-[7px] tracking-[2px] sm:tracking-[3px] text-zinc-700 uppercase font-bold whitespace-nowrap">System Load</span>
+                </div>
+
+                {/* Large Power Button - Refined */}
+                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-[#111] border-b-2 sm:border-b-4 border-black shadow-[0_4px_0_#080808,0_6px_10px_rgba(0,0,0,0.8)] sm:shadow-[0_6px_0_#080808,0_10px_20px_rgba(0,0,0,0.8)] flex items-center justify-center cursor-pointer hover:translate-y-[1px] sm:hover:translate-y-[2px] active:translate-y-[3px] sm:active:translate-y-[4px] transition-all">
+                  <div className="w-4 h-4 sm:w-6 sm:h-6 rounded-full bg-red-950 border border-red-900/20 flex items-center justify-center shadow-inner">
+                    <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full bg-red-800 shadow-[0_0_5px_rgba(153,27,27,0.8)]" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
+          {/* Heavy Base / Stand */}
+          <div className="mx-auto w-[40%] h-6 bg-[#1a1a1b] rounded-b-[2rem] border-x border-b border-black shadow-[0_10px_30px_rgba(0,0,0,0.8)] -mt-1 relative z-10">
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent" />
+          </div>
+          
+          {/* Ground Shadow */}
+          <div className="mx-auto w-[80%] h-12 bg-black/60 blur-[40px] rounded-full -mt-4 opacity-70" />
         </div>
       </div>
 
-      {/* ── Tagline with typewriter effect ── */}
+      {/* ── Headline Section ── */}
       <Typewriter phase={phase} onClickPlayground={scrollToPlayground} />
     </section>
   )

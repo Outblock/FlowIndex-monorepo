@@ -5,6 +5,9 @@ export default {
   content: ['./app/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        xs: '480px',
+      },
       colors: {
         flow: {
           green: '#00ef8b',
@@ -13,6 +16,12 @@ export default {
       },
       fontFamily: {
         mono: ['"Geist Mono"', '"SF Mono"', 'monospace'],
+        'pixel-square': ['"Geist Pixel Square"', 'monospace'],
+        'pixel-circle': ['"Geist Pixel Circle"', 'monospace'],
+        'pixel-grid': ['"Geist Pixel Grid"', 'monospace'],
+      },
+      backgroundImage: {
+        'radial-gradient': 'radial-gradient(var(--tw-gradient-stops))',
       },
     },
   },
