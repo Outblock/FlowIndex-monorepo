@@ -82,7 +82,7 @@ func main() {
 		startBlock, _ = strconv.ParseUint(startBlockStr, 10, 64)
 	}
 
-	log.Println("Initializing FlowScan Clone Backend...")
+	log.Println("Initializing FlowIndex Backend...")
 	log.Printf("DB: %s", redactDatabaseURL(dbURL))
 	log.Printf("Flow Node: %s", flowURL)
 	log.Printf("API Port: %s", apiPort)
