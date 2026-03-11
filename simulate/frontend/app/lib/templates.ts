@@ -10,6 +10,7 @@ export interface Template {
   filename: string
   cadence: string
   args: TemplateArg[]
+  defaultPayer?: string
 }
 
 /**
@@ -106,7 +107,7 @@ transaction(amount: UFix64, to: Address) {
     name: 'Transfer NBA Moment',
     filename: 'transfer-nba-moment.cdc',
     cadence: `import NonFungibleToken from 0x1d7e57aa55817448
-import TopShot from 0x220cb8d928c0b076
+import TopShot from 0x0b2a3299cc857e29
 
 transaction(recipientAddr: Address, momentID: UInt64) {
     let transferToken: @{NonFungibleToken.NFT}
@@ -131,6 +132,7 @@ transaction(recipientAddr: Address, momentID: UInt64) {
       { name: 'recipientAddr', type: 'Address', defaultValue: '0xc8b75d0745d3f284' },
       { name: 'momentID', type: 'UInt64', defaultValue: '10000052' },
     ],
+    defaultPayer: '0x220cb8d928c0b076',
   },
   {
     id: 'deploy-contract',

@@ -103,6 +103,7 @@ export function Playground() {
     setCode(t.cadence)
     setResult(null)
     setCustomArgs([])
+    setPayer(t.defaultPayer || '0x1654653399040a61')
     const newArgs: Record<string, string> = {}
     for (const arg of t.args) {
       newArgs[arg.name] = arg.defaultValue
