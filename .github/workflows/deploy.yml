@@ -1343,7 +1343,7 @@ jobs:
       - name: Build & push simulate-landing
         uses: docker/build-push-action@v6
         with:
-          context: simulate/frontend
+          context: .
           file: simulate/frontend/Dockerfile
           push: true
           provenance: false

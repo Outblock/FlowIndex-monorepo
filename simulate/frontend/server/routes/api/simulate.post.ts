@@ -1,7 +1,14 @@
 import { defineEventHandler, readBody, createError } from 'h3'
+import { decodeEvents, buildSummary, buildSummaryItems } from '@flowindex/event-decoder'
+import type { RawEvent } from '@flowindex/event-decoder'
 
 const BACKEND_URL = process.env.SIMULATOR_BACKEND_URL || 'http://localhost:8080'
 
+/**
+ * POST /api/simulate
+ * Decoded simulation — returns human-readable event summaries,
+ * token transfers, NFT transfers, system events, and more.
+ */
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
@@ -24,12 +31,35 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Normalize snake_case → camelCase and always return JSON
+  const success = (data.success ?? false) as boolean
+  const error = (data.error ?? (data.message as string) ?? null) as string | null
+  const rawEvents = ((data.events as unknown[]) ?? []) as RawEvent[]
+  const balanceChanges = (data.balance_changes ?? data.balanceChanges ?? []) as unknown[]
+  const computationUsed = (data.computation_used ?? data.computationUsed ?? 0) as number
+
+  // Decode events using the shared event-decoder package
+  const cadenceScript = (body as Record<string, unknown>)?.cadence as string | undefined
+  const decoded = rawEvents.length > 0 ? decodeEvents(rawEvents, cadenceScript) : null
+  const summary = decoded ? buildSummary(decoded) : ''
+  const summaryItems = decoded ? buildSummaryItems(decoded) : []
+
   return {
-    success: data.success ?? false,
-    error: data.error ?? (data.message as string) ?? null,
-    events: (data.events as unknown[]) ?? [],
-    balanceChanges: (data.balance_changes ?? data.balanceChanges ?? []) as unknown[],
-    computationUsed: (data.computation_used ?? data.computationUsed ?? 0) as number,
+    success,
+    error,
+    computationUsed,
+    balanceChanges,
+    // Decoded output
+    summary,
+    summaryItems,
+    transfers: decoded?.transfers ?? [],
+    nftTransfers: decoded?.nftTransfers ?? [],
+    evmExecutions: decoded?.evmExecutions ?? [],
+    systemEvents: decoded?.systemEvents ?? [],
+    defiEvents: decoded?.defiEvents ?? [],
+    stakingEvents: decoded?.stakingEvents ?? [],
+    fee: decoded?.fee ?? 0,
+    tags: decoded?.tags ?? [],
+    // Raw events still available
+    events: rawEvents,
   }
 })

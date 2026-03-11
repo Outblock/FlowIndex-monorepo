@@ -26,6 +26,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
         </span>
       </div>
       <div className="p-4 space-y-4">
+        {/* Status + computation */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${result.success ? 'bg-flow-green shadow-[0_0_6px_rgba(0,239,139,0.6)]' : 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]'}`} />
@@ -40,12 +41,108 @@ export function ResultPanel({ result }: ResultPanelProps) {
           )}
         </div>
 
+        {/* Error */}
         {result.error && (
           <div className="bg-red-950/20 border border-red-900/30 rounded p-3">
             <pre className="text-[11px] text-red-400 whitespace-pre-wrap break-all">{result.error}</pre>
           </div>
         )}
 
+        {/* Summary */}
+        {result.summary && (
+          <div className="bg-flow-green/5 border border-flow-green/20 rounded px-3 py-2">
+            <span className="text-[11px] text-flow-green">{result.summary}</span>
+          </div>
+        )}
+
+        {/* Summary items */}
+        {result.summaryItems.length > 0 && (
+          <div>
+            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">SUMMARY</div>
+            <div className="space-y-1">
+              {result.summaryItems.map((item, i) => (
+                <div key={i} className="flex items-center gap-2 bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5">
+                  <span className="text-[9px] text-zinc-600 uppercase w-14 shrink-0">{item.icon}</span>
+                  <span className="text-[11px] text-zinc-300">{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Token transfers */}
+        {result.transfers.length > 0 && (
+          <div>
+            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">TOKEN TRANSFERS</div>
+            <div className="space-y-1">
+              {result.transfers.map((ft, i) => {
+                const tokenName = ft.token.split('.').pop() || ft.token
+                const amount = Number(ft.amount).toLocaleString(undefined, { maximumFractionDigits: 4 })
+                const typeColor = ft.transfer_type === 'mint' ? 'text-flow-green' : ft.transfer_type === 'burn' ? 'text-red-400' : 'text-zinc-400'
+                const typeLabel = ft.transfer_type === 'mint' ? 'Mint' : ft.transfer_type === 'burn' ? 'Burn' : 'Transfer'
+                return (
+                  <div key={i} className="bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-[9px] font-medium ${typeColor}`}>{typeLabel}</span>
+                        <span className="text-[11px] text-zinc-200 font-mono">{amount} {tokenName}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-[9px] text-zinc-600 font-mono mt-0.5">
+                      {ft.from_address && <span>{ft.from_address.slice(0, 10)}...</span>}
+                      {ft.from_address && ft.to_address && <span className="text-zinc-700">&rarr;</span>}
+                      {ft.to_address && <span>{ft.to_address.slice(0, 10)}...</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* NFT transfers */}
+        {result.nftTransfers.length > 0 && (
+          <div>
+            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">NFT TRANSFERS</div>
+            <div className="space-y-1">
+              {result.nftTransfers.map((nft, i) => {
+                const name = nft.token.split('.').pop() || nft.token
+                const typeColor = nft.transfer_type === 'mint' ? 'text-flow-green' : nft.transfer_type === 'burn' ? 'text-red-400' : 'text-zinc-400'
+                const typeLabel = nft.transfer_type === 'mint' ? 'Mint' : nft.transfer_type === 'burn' ? 'Burn' : 'Transfer'
+                return (
+                  <div key={i} className="bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[9px] font-medium ${typeColor}`}>{typeLabel}</span>
+                      <span className="text-[11px] text-zinc-200 font-mono">{name} #{nft.token_id}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[9px] text-zinc-600 font-mono mt-0.5">
+                      {nft.from_address && <span>{nft.from_address.slice(0, 10)}...</span>}
+                      {nft.from_address && nft.to_address && <span className="text-zinc-700">&rarr;</span>}
+                      {nft.to_address && <span>{nft.to_address.slice(0, 10)}...</span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* System events (account changes) */}
+        {result.systemEvents.length > 0 && (
+          <div>
+            <div className="text-[10px] text-zinc-600 tracking-wider mb-2">ACCOUNT CHANGES</div>
+            <div className="space-y-1">
+              {result.systemEvents.map((evt, i) => (
+                <div key={i} className="flex items-center gap-2 bg-black/40 border border-zinc-800/30 rounded px-3 py-1.5">
+                  <span className="text-[9px] text-zinc-600 uppercase w-14 shrink-0">{evt.category}</span>
+                  <span className="text-[11px] text-zinc-300">{evt.detail}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Balance changes */}
         {result.balanceChanges.length > 0 && (
           <div>
             <div className="text-[10px] text-zinc-600 tracking-wider mb-2">BALANCE CHANGES</div>
@@ -67,13 +164,32 @@ export function ResultPanel({ result }: ResultPanelProps) {
           </div>
         )}
 
+        {/* Tags */}
+        {result.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {result.tags.map((tag, i) => (
+              <span key={i} className="text-[9px] bg-zinc-800/60 border border-zinc-700/40 text-zinc-400 px-1.5 py-0.5 rounded">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Fee */}
+        {result.fee > 0 && (
+          <div className="text-[10px] text-zinc-600">
+            Fee: <span className="text-zinc-400 font-mono">{result.fee.toFixed(8)} FLOW</span>
+          </div>
+        )}
+
+        {/* Raw events (collapsed) */}
         {result.events.length > 0 && (
           <div>
             <button
               onClick={() => setEventsExpanded(!eventsExpanded)}
               className="text-[10px] text-zinc-600 tracking-wider hover:text-flow-green transition-colors"
             >
-              {eventsExpanded ? '▾' : '▸'} EVENTS ({result.events.length})
+              {eventsExpanded ? '▾' : '▸'} RAW EVENTS ({result.events.length})
             </button>
             {eventsExpanded && (
               <div className="mt-2 space-y-1">

@@ -1,3 +1,5 @@
+import type { FTTransfer, NFTTransfer, EVMExecution, SystemEvent, DefiEvent, StakingEvent, DecodedSummaryItem } from '@flowindex/event-decoder'
+
 export interface SimulateRequest {
   cadence: string
   arguments: Array<Record<string, unknown>>
@@ -13,10 +15,22 @@ export interface BalanceChange {
 
 export interface SimulateResponse {
   success: boolean
-  error?: string
-  events: Array<{ type: string; payload: unknown }>
-  balanceChanges: BalanceChange[]
+  error?: string | null
   computationUsed: number
+  balanceChanges: BalanceChange[]
+  // Decoded fields from event-decoder
+  summary: string
+  summaryItems: DecodedSummaryItem[]
+  transfers: FTTransfer[]
+  nftTransfers: NFTTransfer[]
+  evmExecutions: EVMExecution[]
+  systemEvents: SystemEvent[]
+  defiEvents: DefiEvent[]
+  stakingEvents: StakingEvent[]
+  fee: number
+  tags: string[]
+  // Raw events
+  events: Array<{ type: string; payload: unknown }>
 }
 
 export async function simulateTransaction(req: SimulateRequest): Promise<SimulateResponse> {
@@ -34,15 +48,18 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
       events: [],
       balanceChanges: [],
       computationUsed: 0,
+      summary: '',
+      summaryItems: [],
+      transfers: [],
+      nftTransfers: [],
+      evmExecutions: [],
+      systemEvents: [],
+      defiEvents: [],
+      stakingEvents: [],
+      fee: 0,
+      tags: [],
     }
   }
 
-  const raw = await resp.json()
-  return {
-    success: raw.success,
-    error: raw.error,
-    events: raw.events ?? [],
-    balanceChanges: raw.balance_changes ?? raw.balanceChanges ?? [],
-    computationUsed: raw.computation_used ?? raw.computationUsed ?? 0,
-  }
+  return await resp.json()
 }

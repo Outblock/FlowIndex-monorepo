@@ -5,6 +5,7 @@
     "packages/*",
     "frontend",
     "runner",
+    "simulate/frontend",
     "ai/chat/web",
     "wallet"
   ],
