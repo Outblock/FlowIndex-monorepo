@@ -81,57 +81,47 @@ jobs:
       simulator: ${{ steps.result.outputs.simulator }}
       simulate-landing: ${{ steps.result.outputs.simulate-landing }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Detect changed paths
         id: filter
         if: github.event_name == 'push'
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-              - 'openapi-v2.json'
-              - '.github/workflows/deploy.yml'
-            frontend:
-              - 'frontend/**'
-              - 'openapi-v2.json'
-              - 'packages/**'
-              - '.github/workflows/deploy.yml'
-            runner:
-              - 'runner/**'
-              - 'packages/**'
-              - '.github/workflows/deploy.yml'
-            docs:
-              - 'devportal/**'
-              - 'docs/**'
-            ai-chat:
-              - 'ai/chat/**'
-              - 'packages/**'
-              - '.github/workflows/deploy.yml'
-            supabase:
-              - 'supabase/**'
-              - '.github/workflows/deploy.yml'
-            studio:
-              - 'studio/Dockerfile'
-              - 'studio/entrypoint.sh'
-              - 'studio/login.html'
-              - 'studio/nginx.conf'
-            sim-studio:
-              - 'studio/seed/simstudio_seed.sql'
-              - 'sim-workflow/**'
-            sim-studio-images:
-              - 'sim-workflow/**'
-            sim-studio-seed:
-              - 'studio/seed/simstudio_seed.sql'
-            wallet:
-              - 'wallet/**'
-              - 'packages/**'
-              - '.github/workflows/deploy.yml'
-            simulator:
-              - 'simulate/emulator/**'
-              - 'simulate/api/**'
-              - '.github/workflows/deploy.yml'
-            simulate-landing:
-              - 'simulate/frontend/**'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BEFORE_SHA="${{ github.event.before }}"
+          AFTER_SHA="${{ github.sha }}"
+
+          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE_SHA="$(git hash-object -t tree /dev/null)"
+          fi
+
+          changed() {
+            local output_name="$1"
+            shift
+
+            if git diff --quiet "$BEFORE_SHA" "$AFTER_SHA" -- "$@"; then
+              echo "${output_name}=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "${output_name}=true" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          changed backend ':(glob)backend/**' 'openapi-v2.json' '.github/workflows/deploy.yml'
+          changed frontend ':(glob)frontend/**' 'openapi-v2.json' ':(glob)packages/**' '.github/workflows/deploy.yml'
+          changed runner ':(glob)runner/**' ':(glob)packages/**' '.github/workflows/deploy.yml'
+          changed docs ':(glob)devportal/**' ':(glob)docs/**'
+          changed ai-chat ':(glob)ai/chat/**' ':(glob)packages/**' '.github/workflows/deploy.yml'
+          changed supabase ':(glob)supabase/**' '.github/workflows/deploy.yml'
+          changed studio 'studio/Dockerfile' 'studio/entrypoint.sh' 'studio/login.html' 'studio/nginx.conf'
+          changed sim-studio 'studio/seed/simstudio_seed.sql' ':(glob)sim-workflow/**'
+          changed sim-studio-images ':(glob)sim-workflow/**'
+          changed sim-studio-seed 'studio/seed/simstudio_seed.sql'
+          changed wallet ':(glob)wallet/**' ':(glob)packages/**' '.github/workflows/deploy.yml'
+          changed simulator ':(glob)simulate/emulator/**' ':(glob)simulate/api/**' '.github/workflows/deploy.yml'
+          changed simulate-landing ':(glob)simulate/frontend/**'
       - name: Resolve outputs
         id: result
         run: |
@@ -178,7 +168,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -242,7 +232,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -312,7 +302,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -418,7 +408,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -623,7 +613,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -674,7 +664,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -733,7 +723,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -797,7 +787,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -985,7 +975,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -1031,7 +1021,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -1278,7 +1268,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
@@ -1358,7 +1348,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: google-github-actions/auth@v2
         with:
