@@ -55,7 +55,7 @@ export function Playground() {
     if (!isCustom) return []
     return parseParamsFromCode(urlParams!.code!)
   })
-  const [payer, setPayer] = useState(urlParams?.payer || '0x1654653399040a61')
+  const [payer, setPayer] = useState(urlParams?.payer || templates[0].defaultPayer || '0x1654653399040a61')
   const [argValues, setArgValues] = useState<Record<string, string>>(() => {
     if (isCustom) {
       const parsed = parseParamsFromCode(urlParams!.code!)
