@@ -192,8 +192,8 @@ function ResponseHighlighted() {
 
 export function ApiSection() {
   return (
-    <section className="py-24 px-6 border-t border-zinc-800/50">
-      <div className="mx-auto max-w-4xl">
+    <section className="py-24 px-6 border-t border-zinc-800/50 glow-divider">
+      <div className="mx-auto max-w-5xl">
         <div className="text-[10px] text-flow-green/60 tracking-[3px] mb-4 crt-glow">// REST API</div>
         <h2 className="text-xl font-bold text-zinc-100 mb-2">Programmatic Access</h2>
         <p className="text-xs text-zinc-400 mb-8">

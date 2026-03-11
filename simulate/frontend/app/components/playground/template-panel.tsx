@@ -14,7 +14,7 @@ interface TemplatePanelProps {
 
 export function TemplatePanel({ templates, activeId, argValues, currentArgs, isCustom, payer, onSelectTemplate, onArgChange, onPayerChange }: TemplatePanelProps) {
   return (
-    <div className="w-[220px] border-r border-zinc-800/40 flex flex-col shrink-0">
+    <div className="hidden md:flex w-[220px] border-r border-zinc-800/40 flex-col shrink-0">
       <div className="px-3 py-2 border-b border-zinc-800/60 bg-black/40">
         <span className="text-[10px] text-zinc-500 tracking-wider flex items-center gap-1.5">
           <span className="text-flow-green/60">~</span> TEMPLATES
@@ -43,10 +43,10 @@ export function TemplatePanel({ templates, activeId, argValues, currentArgs, isC
         ))}
       </div>
 
-      {/* Payer */}
+      {/* Authorizer (also used as payer) */}
       <div className="border-t border-zinc-800/60 p-3 bg-black/20">
         <div className="text-[10px] text-zinc-500 tracking-wider mb-2 flex items-center gap-1.5">
-          <span className="text-flow-green/60">⚡</span> PAYER
+          <span className="text-flow-green/60">⚡</span> AUTHORIZER
         </div>
         <input
           type="text"

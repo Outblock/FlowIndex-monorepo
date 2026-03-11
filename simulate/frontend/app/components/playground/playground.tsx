@@ -182,16 +182,24 @@ export function Playground() {
     : templates.find((t) => t.id === activeId)?.filename ?? 'code.cdc'
 
   return (
-    <section id="playground" className="border-t border-zinc-800/50 retro-grid flex flex-col" style={{ height: '100dvh' }} ref={containerRef}>
-      <div className="px-4 pt-3 pb-1 shrink-0 flex items-center gap-3">
-        <div className="text-[10px] text-flow-green/60 tracking-[3px] crt-glow">// PLAYGROUND</div>
-        <h2 className="text-sm font-bold text-zinc-100">Try it now</h2>
-      </div>
+    <section id="playground" className="py-12 sm:py-24 px-4 sm:px-6 border-t border-zinc-800/50 glow-divider retro-grid" ref={containerRef}>
+      <div className="mx-auto max-w-7xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="text-[10px] text-flow-green/60 tracking-[3px] crt-glow">// PLAYGROUND</div>
+          <h2 className="text-sm font-bold text-zinc-100">Try it now</h2>
+          {!result && !loading && (
+            <div className="ml-auto flex items-center gap-2 animate-bounce-gentle">
+              <span className="text-[11px] text-flow-green/80" style={{ textShadow: '0 0 8px rgba(0,239,139,0.4)' }}>
+                Click ▶ Simulate to run
+              </span>
+              <span className="text-flow-green/50">&darr;</span>
+            </div>
+          )}
+        </div>
 
-      <div className="flex-1 px-2 pb-2 flex flex-col min-h-0">
-        <div className="crt-bezel flex-1 flex flex-col min-h-0">
-          <div className="crt-screen crt-scanlines crt-vignette bg-[#0a0a0a] flex-1 flex flex-col min-h-0">
-            <div className="flex flex-1 min-h-0">
+        <div className="crt-bezel">
+          <div className="crt-screen crt-scanlines crt-vignette bg-[#0a0a0a] h-[400px] sm:h-[500px] md:h-[600px]">
+            <div className="flex flex-col md:flex-row h-full">
               {visible ? (
                 <>
                   <TemplatePanel

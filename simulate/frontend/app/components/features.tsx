@@ -23,7 +23,7 @@ const FEATURES = [
 
 export function Features() {
   return (
-    <section className="py-24 px-6 retro-grid">
+    <section className="py-24 px-6 retro-grid border-t border-zinc-800/50 glow-divider">
       <div className="mx-auto max-w-5xl">
         <div className="text-[10px] text-flow-green/60 tracking-[3px] mb-8 crt-glow">// FEATURES</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -10,7 +10,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
 
   if (!result) {
     return (
-      <div className="w-[340px] border-l border-zinc-800/40 flex items-center justify-center shrink-0">
+      <div className="w-full md:w-[340px] border-t md:border-t-0 md:border-l border-zinc-800/40 flex items-center justify-center shrink-0">
         <p className="text-[11px] text-zinc-500 flex items-center gap-2">
           <span className="text-flow-green/40">&gt;</span> Run a simulation to see results
         </p>
@@ -19,7 +19,7 @@ export function ResultPanel({ result }: ResultPanelProps) {
   }
 
   return (
-    <div className="w-[340px] border-l border-zinc-800/40 shrink-0 overflow-y-auto">
+    <div className="w-full md:w-[340px] border-t md:border-t-0 md:border-l border-zinc-800/40 shrink-0 overflow-y-auto">
       <div className="px-3 py-2 border-b border-zinc-800/60 bg-black/40">
         <span className="text-[10px] text-zinc-500 tracking-wider flex items-center gap-1.5">
           <span className="text-flow-green/60">&gt;</span> RESULT

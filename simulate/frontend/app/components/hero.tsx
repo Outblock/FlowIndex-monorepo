@@ -89,27 +89,35 @@ function Typewriter({ phase, onClickPlayground }: { phase: Phase; onClickPlaygro
 
 /* ── Cadence syntax highlighting tokens ── */
 const CODE_LINES = [
+  { tokens: [{ text: '// Transfer FLOW tokens between accounts', cl: 'text-zinc-600' }] },
   { tokens: [{ text: 'import', cl: 'text-purple-400' }, { text: ' FungibleToken ', cl: 'text-yellow-300' }, { text: 'from ', cl: 'text-purple-400' }, { text: '0xf233dcee88fe0abe', cl: 'text-emerald-400' }] },
   { tokens: [{ text: 'import', cl: 'text-purple-400' }, { text: ' FlowToken ', cl: 'text-yellow-300' }, { text: 'from ', cl: 'text-purple-400' }, { text: '0x1654653399040a61', cl: 'text-emerald-400' }] },
   { tokens: [] },
   { tokens: [{ text: 'transaction', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'UFix64', cl: 'text-cyan-400' }, { text: ', ', cl: 'text-zinc-400' }, { text: 'to', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'Address', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '    ', cl: 'text-zinc-400' }, { text: 'let', cl: 'text-purple-400' }, { text: ' sentVault', cl: 'text-zinc-200' }, { text: ': ', cl: 'text-zinc-400' }, { text: '@{FungibleToken.Vault}', cl: 'text-cyan-400' }] },
   { tokens: [] },
-  { tokens: [{ text: '    ', cl: 'text-zinc-400' }, { text: 'prepare', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'auth', cl: 'text-purple-400' }, { text: '(BorrowValue) ', cl: 'text-zinc-400' }, { text: '&Account', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '        ', cl: 'text-zinc-400' }, { text: 'let', cl: 'text-purple-400' }, { text: ' vaultRef ', cl: 'text-zinc-200' }, { text: '= ', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: '.storage.borrow', cl: 'text-zinc-300' }, { text: '<...>', cl: 'text-zinc-500' }, { text: '(', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '            ', cl: 'text-zinc-400' }, { text: 'from', cl: 'text-orange-300' }, { text: ': /storage/flowTokenVault', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '        ) ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow"', cl: 'text-amber-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '  ', cl: '' }, { text: 'let', cl: 'text-purple-400' }, { text: ' sentVault', cl: 'text-zinc-200' }, { text: ': ', cl: 'text-zinc-400' }, { text: '@{FungibleToken.Vault}', cl: 'text-cyan-400' }] },
   { tokens: [] },
-  { tokens: [{ text: '        ', cl: 'text-zinc-400' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault ', cl: 'text-zinc-200' }, { text: '<- ', cl: 'text-red-400' }, { text: 'vaultRef', cl: 'text-zinc-200' }, { text: '.withdraw(', cl: 'text-zinc-300' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': amount)', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '    }', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '  ', cl: '' }, { text: 'prepare', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: 'auth', cl: 'text-purple-400' }, { text: '(BorrowValue) ', cl: 'text-zinc-400' }, { text: '&Account', cl: 'text-cyan-400' }, { text: ') {', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    ', cl: '' }, { text: 'let', cl: 'text-purple-400' }, { text: ' vaultRef', cl: 'text-zinc-200' }, { text: ' = ', cl: 'text-zinc-400' }, { text: 'signer', cl: 'text-orange-300' }, { text: '.storage.borrow<', cl: 'text-zinc-300' }] },
+  { tokens: [{ text: '      auth(FungibleToken.Withdraw)', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '      &FlowToken.Vault', cl: 'text-cyan-400' }] },
+  { tokens: [{ text: '    >', cl: 'text-zinc-300' }, { text: '(', cl: 'text-zinc-400' }, { text: 'from', cl: 'text-orange-300' }, { text: ': /storage/flowTokenVault', cl: 'text-zinc-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '      ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-red-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow vault"', cl: 'text-emerald-400' }, { text: ')', cl: 'text-zinc-400' }] },
   { tokens: [] },
-  { tokens: [{ text: '    ', cl: 'text-zinc-400' }, { text: 'execute', cl: 'text-purple-400' }, { text: ' {', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '        ', cl: 'text-zinc-400' }, { text: 'let', cl: 'text-purple-400' }, { text: ' receiverRef ', cl: 'text-zinc-200' }, { text: '= ', cl: 'text-zinc-400' }, { text: 'getAccount', cl: 'text-purple-400' }, { text: '(to)', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '            .capabilities.borrow', cl: 'text-zinc-300' }, { text: '<...>', cl: 'text-zinc-500' }, { text: '(/public/flowTokenReceiver)', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '            ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-purple-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow receiver"', cl: 'text-amber-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    ', cl: '' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault ', cl: 'text-zinc-200' }, { text: '<- ', cl: 'text-red-400' }, { text: 'vaultRef', cl: 'text-zinc-200' }, { text: '.withdraw(', cl: 'text-zinc-300' }] },
+  { tokens: [{ text: '      ', cl: '' }, { text: 'amount', cl: 'text-orange-300' }, { text: ': amount', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    )', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '  }', cl: 'text-zinc-400' }] },
   { tokens: [] },
-  { tokens: [{ text: '        receiverRef.deposit(', cl: 'text-zinc-300' }, { text: 'from', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: '<- ', cl: 'text-red-400' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault', cl: 'text-zinc-200' }, { text: ')', cl: 'text-zinc-400' }] },
-  { tokens: [{ text: '    }', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '  ', cl: '' }, { text: 'execute', cl: 'text-purple-400' }, { text: ' {', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '    ', cl: '' }, { text: 'let', cl: 'text-purple-400' }, { text: ' receiver', cl: 'text-zinc-200' }, { text: ' = ', cl: 'text-zinc-400' }, { text: 'getAccount', cl: 'text-purple-400' }, { text: '(to)', cl: 'text-zinc-300' }] },
+  { tokens: [{ text: '      .capabilities.borrow<', cl: 'text-zinc-300' }] },
+  { tokens: [{ text: '        &{FungibleToken.Receiver}', cl: 'text-cyan-400' }] },
+  { tokens: [{ text: '      >', cl: 'text-zinc-300' }, { text: '(/public/flowTokenReceiver)', cl: 'text-zinc-400' }] },
+  { tokens: [{ text: '      ?? ', cl: 'text-zinc-400' }, { text: 'panic', cl: 'text-red-400' }, { text: '(', cl: 'text-zinc-400' }, { text: '"Could not borrow receiver"', cl: 'text-emerald-400' }, { text: ')', cl: 'text-zinc-400' }] },
+  { tokens: [] },
+  { tokens: [{ text: '    receiver.deposit(', cl: 'text-zinc-300' }, { text: 'from', cl: 'text-orange-300' }, { text: ': ', cl: 'text-zinc-400' }, { text: '<- ', cl: 'text-red-400' }, { text: 'self', cl: 'text-purple-400' }, { text: '.sentVault)', cl: 'text-zinc-200' }] },
+  { tokens: [{ text: '  }', cl: 'text-zinc-400' }] },
   { tokens: [{ text: '}', cl: 'text-zinc-400' }] },
 ]
 
@@ -158,20 +166,21 @@ export function Hero() {
 
       let idx = 0
       intervalRef.current = setInterval(() => {
-        idx += 1
+        idx += 3
         if (idx >= TOTAL_CHARS) {
+          idx = TOTAL_CHARS
           setCharIdx(TOTAL_CHARS)
           if (intervalRef.current) clearInterval(intervalRef.current)
           intervalRef.current = null
           return
         }
         setCharIdx(idx)
-      }, 15)
+      }, 8)
 
-      const typingDuration = TOTAL_CHARS * 15
-      schedule(() => setPhase('ready'), typingDuration + 400)
-      schedule(() => setPhase('running'), typingDuration + 1200)
-      schedule(() => setPhase('done'), typingDuration + 2200)
+      const typingDuration = Math.ceil(TOTAL_CHARS / 3) * 8
+      schedule(() => setPhase('ready'), typingDuration + 300)
+      schedule(() => setPhase('running'), typingDuration + 800)
+      schedule(() => setPhase('done'), typingDuration + 1600)
     }
 
     schedule(run, 500)
@@ -185,223 +194,141 @@ export function Hero() {
   return (
     <section className="min-h-screen flex flex-col items-center justify-center px-4 pt-16 pb-8">
 
-      <div className="w-full max-w-5xl">
-        {/* ══════ Old beige/cream CRT monitor ══════ */}
-
-        {/* Back depth shadow — the CRT is DEEP */}
+      <div className="w-full max-w-3xl sm:max-w-4xl mx-auto">
+        {/* ══════ Dark Monitor ══════ */}
         <div
           className="relative"
-          style={{
-            filter: 'drop-shadow(0 30px 40px rgba(0,0,0,0.6))',
-          }}
+          style={{ filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.6))' }}
         >
-          {/* ── Outer plastic shell — chunky beige/warm gray ── */}
+          {/* ── Monitor shell — dark aluminum ── */}
           <div
-            className="relative rounded-[20px]"
+            className="relative rounded-[12px] sm:rounded-[16px]"
             style={{
-              background: `linear-gradient(
-                180deg,
-                #3a3a3e 0%,
-                #353538 4%,
-                #313134 10%,
-                #2e2e32 20%,
-                #2a2a2e 50%,
-                #26262a 80%,
-                #232326 95%,
-                #202024 100%
-              )`,
-              padding: '36px 36px 0 36px',
+              background: 'linear-gradient(180deg, #1e1e1e 0%, #181818 20%, #141414 50%, #111 80%, #0e0e0e 100%)',
               boxShadow: `
                 inset 0 1px 0 rgba(255,255,255,0.08),
                 inset 0 -1px 0 rgba(0,0,0,0.4),
                 inset 1px 0 0 rgba(255,255,255,0.04),
-                inset -1px 0 0 rgba(0,0,0,0.2),
-                0 0 80px rgba(0,0,0,0.5),
-                0 20px 60px rgba(0,0,0,0.4)
+                inset -1px 0 0 rgba(255,255,255,0.04),
+                0 0 0 1px rgba(255,255,255,0.03)
               `,
+              padding: '14px 14px 10px 14px',
             }}
           >
-            {/* Embossed brand top-center */}
+            {/* ── Screen bezel ── */}
             <div
-              className="absolute top-[12px] left-1/2 -translate-x-1/2 text-[10px] tracking-[6px] uppercase font-bold select-none"
+              className="relative rounded-[6px] sm:rounded-[8px]"
               style={{
-                color: 'rgba(255,255,255,0.06)',
-                textShadow: '0 -1px 0 rgba(0,0,0,0.3)',
-              }}
-            >
-              FlowIndex
-            </div>
-
-            {/* ── Recessed screen area — dark inner frame ── */}
-            <div
-              className="relative rounded-[8px] overflow-hidden"
-              style={{
+                background: '#0a0a0a',
+                padding: '3px',
                 boxShadow: `
-                  inset 0 6px 20px rgba(0,0,0,0.7),
-                  inset 0 0 60px rgba(0,0,0,0.5),
-                  inset 6px 0 20px rgba(0,0,0,0.4),
-                  inset -6px 0 20px rgba(0,0,0,0.4),
-                  inset 0 -4px 12px rgba(0,0,0,0.6),
-                  0 0 0 2px rgba(10,10,14,0.8),
-                  0 0 0 4px rgba(50,50,55,0.3)
+                  inset 0 2px 6px rgba(0,0,0,0.8),
+                  inset 0 0 12px rgba(0,0,0,0.4),
+                  0 1px 0 rgba(255,255,255,0.05)
                 `,
-                border: '3px solid #1a1a1e',
               }}
             >
-              {/* ── CRT phosphor tube ── */}
+              {/* ── CRT screen — green phosphor ── */}
               <div
-                className="relative overflow-hidden"
+                className="relative overflow-hidden rounded-[4px] sm:rounded-[6px]"
                 style={{
                   background: '#010a03',
-                  minHeight: '460px',
-                  borderRadius: '4px',
+                  height: 'clamp(400px, 65vw, 560px)',
                 }}
               >
-                {/* Scanlines — subtle so text stays readable */}
-                <div
-                  className="absolute inset-0 pointer-events-none z-[3]"
-                  style={{
-                    background: `repeating-linear-gradient(
-                      0deg,
-                      transparent,
-                      transparent 1px,
-                      rgba(0,0,0,0.12) 1px,
-                      rgba(0,0,0,0.12) 2px
-                    )`,
-                  }}
-                />
-
-                {/* Barrel distortion vignette — lighter for readability */}
-                <div
-                  className="absolute inset-0 pointer-events-none z-[4]"
-                  style={{
-                    background: `radial-gradient(
-                      ellipse 70% 70% at 50% 50%,
-                      transparent 40%,
-                      rgba(0,0,0,0.2) 70%,
-                      rgba(0,0,0,0.5) 100%
-                    )`,
-                  }}
-                />
-
-                {/* Glass bulge reflection */}
-                <div
-                  className="absolute inset-0 pointer-events-none z-[5]"
-                  style={{
-                    background: `
-                      radial-gradient(ellipse 50% 35% at 30% 25%, rgba(255,255,255,0.05) 0%, transparent 100%),
-                      radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,239,139,0.015) 0%, transparent 100%)
-                    `,
-                  }}
-                />
-
-                {/* Phosphor ambient */}
-                <div
-                  className="absolute inset-0 pointer-events-none z-[2]"
-                  style={{
-                    boxShadow: `
-                      inset 0 0 100px rgba(0, 239, 139, 0.04),
-                      inset 0 0 30px rgba(0, 239, 139, 0.02)
-                    `,
-                  }}
-                />
+                {/* Scanlines */}
+                <div className="absolute inset-0 pointer-events-none z-[3]" style={{
+                  background: 'repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0,0,0,0.08) 1px, rgba(0,0,0,0.08) 2px)',
+                }} />
+                {/* Vignette */}
+                <div className="absolute inset-0 pointer-events-none z-[4]" style={{
+                  background: 'radial-gradient(ellipse 80% 80% at 50% 50%, transparent 55%, rgba(0,0,0,0.3) 100%)',
+                }} />
+                {/* Phosphor glow */}
+                <div className="absolute inset-0 pointer-events-none z-[2]" style={{
+                  boxShadow: 'inset 0 0 80px rgba(0,239,139,0.03)',
+                }} />
+                {/* Reflection highlight */}
+                <div className="absolute inset-0 pointer-events-none z-[5]" style={{
+                  background: 'radial-gradient(ellipse 40% 25% at 25% 15%, rgba(255,255,255,0.04) 0%, transparent 100%)',
+                }} />
 
                 {/* Screen content */}
-                <div className="relative z-[1] flex items-stretch min-h-[460px]">
-                  {/* Code panel */}
-                  <div className="flex-1 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-emerald-900/20 flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-500/70 flex items-center gap-2">
-                        <span className="text-emerald-400/70">$</span> transfer.cdc
-                      </span>
-                      <button
-                        className={`px-4 py-1.5 rounded text-[12px] font-bold transition-all duration-300 ${
-                          phase === 'ready'
-                            ? 'bg-flow-green text-black shadow-[0_0_30px_rgba(0,239,139,0.6)]'
-                            : phase === 'running'
-                              ? 'bg-flow-green text-black animate-pulse shadow-[0_0_20px_rgba(0,239,139,0.4)]'
-                              : phase === 'done'
-                                ? 'bg-flow-green text-black'
-                                : 'bg-emerald-950/40 text-emerald-600/60 border border-emerald-800/30'
-                        }`}
-                      >
-                        {phase === 'running' ? '◉ Running...' : phase === 'done' ? '✓ Passed' : '▶ Simulate'}
-                      </button>
-                    </div>
-                    <div className="p-6 text-[13px] leading-[2]">
-                      {(() => {
-                        const visible = CHAR_STREAM.slice(0, charIdx)
-                        const lines: { char: string; cl: string }[][] = [[]]
-                        for (const c of visible) {
-                          if (c.isNewline || c.char === '\n') {
-                            lines.push([])
-                          } else {
-                            lines[lines.length - 1].push(c)
-                          }
-                        }
-                        return lines.map((lineChars, i) => (
-                          <div
-                            key={i}
-                            style={{ textShadow: '0 0 10px rgba(0, 239, 139, 0.12)' }}
-                          >
-                            <span className="text-emerald-700/50 mr-4 select-none text-[10px] inline-block w-4 text-right">{String(i + 1).padStart(2)}</span>
-                            {lineChars.length === 0 && <span>&nbsp;</span>}
-                            {lineChars.map((c, j) => (
-                              <span key={j} className={c.cl}>{c.char}</span>
-                            ))}
-                            {phase === 'typing' && i === lines.length - 1 && charIdx < TOTAL_CHARS && (
-                              <span
-                                className="inline-block w-[8px] h-[15px] bg-flow-green animate-[cursor-blink_1s_step-end_infinite] align-middle"
-                                style={{ boxShadow: '0 0 10px rgba(0,239,139,0.7), 0 0 20px rgba(0,239,139,0.3)' }}
-                              />
-                            )}
-                          </div>
-                        ))
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Arrow */}
-                  <div className="w-14 flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-1">
-                      <div
-                        className={`h-[2px] transition-all duration-500 ${
-                          phase === 'running' || phase === 'done' ? 'w-12 bg-flow-green' : 'w-0 bg-emerald-900/20'
-                        }`}
-                        style={phase === 'running' || phase === 'done' ? { boxShadow: '0 0 16px rgba(0,239,139,0.7), 0 0 4px rgba(0,239,139,0.9)' } : {}}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Result panel */}
-                  <div className="w-72 border-l border-zinc-700/30 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-zinc-700/20">
-                      <span className="text-[11px] text-zinc-400 tracking-wider flex items-center gap-1.5">
-                        <span className="text-flow-green/70">&gt;</span> RESULT
-                      </span>
-                    </div>
-                    <div
-                      className={`p-5 transition-all duration-500 ${
-                        phase === 'done' ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3'
+                <div className="relative z-[1] h-full flex flex-col">
+                  {/* Title bar */}
+                  <div className="px-3 py-1.5 border-b border-emerald-900/20 flex items-center justify-between shrink-0">
+                    <span className="text-[9px] sm:text-[10px] text-emerald-500/70 flex items-center gap-1.5">
+                      <span className="text-emerald-400/70">$</span> transfer.cdc
+                    </span>
+                    <button
+                      className={`px-3 py-0.5 rounded text-[9px] sm:text-[10px] font-bold transition-all duration-300 ${
+                        phase === 'ready'
+                          ? 'bg-flow-green text-black shadow-[0_0_20px_rgba(0,239,139,0.6)]'
+                          : phase === 'running'
+                            ? 'bg-flow-green text-black animate-pulse'
+                            : phase === 'done'
+                              ? 'bg-flow-green text-black'
+                              : 'bg-emerald-950/40 text-emerald-600/60 border border-emerald-800/30'
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-5">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full bg-flow-green"
-                          style={{ boxShadow: '0 0 10px rgba(0,239,139,0.9), 0 0 20px rgba(0,239,139,0.4)' }}
-                        />
-                        <span className="text-flow-green text-sm font-semibold" style={{ textShadow: '0 0 12px rgba(0,239,139,0.6)' }}>Passed</span>
-                        <span className="ml-auto text-[11px] text-zinc-400 bg-zinc-800/40 px-2 py-0.5 rounded border border-zinc-700/30">1,204 comp</span>
+                      {phase === 'running' ? '◉ Running...' : phase === 'done' ? '✓ Passed' : '▶ Simulate'}
+                    </button>
+                  </div>
+
+                  {/* Code + Result */}
+                  <div className="flex-1 flex min-h-0">
+                    {/* Code */}
+                    <div className="flex-1 overflow-hidden">
+                      <div className="p-2 sm:p-3 text-[8px] sm:text-[10px] leading-relaxed font-mono whitespace-pre overflow-hidden">
+                        {(() => {
+                          const visible = CHAR_STREAM.slice(0, charIdx)
+                          const lines: { char: string; cl: string }[][] = [[]]
+                          for (const c of visible) {
+                            if (c.isNewline || c.char === '\n') { lines.push([]) }
+                            else { lines[lines.length - 1].push(c) }
+                          }
+                          return lines.map((lineChars, i) => (
+                            <div key={i} style={{ textShadow: '0 0 8px rgba(0,239,139,0.1)' }}>
+                              <span className="text-emerald-700/50 mr-2 select-none text-[7px] sm:text-[8px] inline-block w-3 text-right">{String(i + 1).padStart(2)}</span>
+                              {lineChars.length === 0 && <span>&nbsp;</span>}
+                              {lineChars.map((c, j) => (
+                                <span key={j} className={c.cl}>{c.char}</span>
+                              ))}
+                              {phase === 'typing' && i === lines.length - 1 && charIdx < TOTAL_CHARS && (
+                                <span className="inline-block w-[6px] h-[11px] bg-flow-green animate-[cursor-blink_1s_step-end_infinite] align-middle" style={{ boxShadow: '0 0 8px rgba(0,239,139,0.7)' }} />
+                              )}
+                            </div>
+                          ))
+                        })()}
                       </div>
-                      <div className="text-[10px] text-zinc-400 tracking-wider mb-3">BALANCE CHANGES</div>
-                      <div className="rounded-lg p-3 text-[12px] space-y-2.5 border border-zinc-700/20 bg-zinc-900/30">
-                        <div className="flex justify-between">
-                          <span className="text-zinc-400">0x1654...0a61</span>
-                          <span className="text-red-400 font-medium" style={{ textShadow: '0 0 8px rgba(248,113,113,0.4)' }}>-10.0 FLOW</span>
+                    </div>
+
+                    {/* Result panel */}
+                    <div className="hidden sm:block w-52 border-l border-zinc-700/30">
+                      <div className={`p-3 transition-all duration-500 ${phase === 'done' ? 'opacity-100' : 'opacity-0 translate-x-3'}`}>
+                        <div className="flex items-center gap-1.5 mb-3">
+                          <div className="w-2 h-2 rounded-full bg-flow-green" style={{ boxShadow: '0 0 8px rgba(0,239,139,0.8)' }} />
+                          <span className="text-flow-green text-[10px] font-semibold" style={{ textShadow: '0 0 10px rgba(0,239,139,0.5)' }}>Passed</span>
+                          <span className="ml-auto text-[8px] text-zinc-500">1,204 ops</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-zinc-400">0xf8d6...20c7</span>
-                          <span className="text-flow-green font-medium" style={{ textShadow: '0 0 10px rgba(0,239,139,0.6)' }}>+10.0 FLOW</span>
+                        <div className="text-[7px] text-emerald-500/60 tracking-wider mb-2" style={{ textShadow: '0 0 6px rgba(0,239,139,0.2)' }}>BALANCE CHANGES</div>
+                        <div className="rounded p-2 text-[9px] space-y-1.5 border border-emerald-800/30 bg-black/40">
+                          <div className="flex justify-between">
+                            <span className="text-zinc-300">0x1654..0a61</span>
+                            <span className="text-red-400 font-semibold" style={{ textShadow: '0 0 8px rgba(248,113,113,0.4)' }}>-10.0 FLOW</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-zinc-300">0xf8d6..20c7</span>
+                            <span className="text-flow-green font-semibold" style={{ textShadow: '0 0 10px rgba(0,239,139,0.6)' }}>+10.0 FLOW</span>
+                          </div>
+                        </div>
+                        <div className="text-[7px] text-emerald-500/60 tracking-wider mb-2 mt-4" style={{ textShadow: '0 0 6px rgba(0,239,139,0.2)' }}>EVENTS</div>
+                        <div className="rounded p-2 text-[9px] space-y-1 border border-emerald-800/30 bg-black/40">
+                          <div className="text-zinc-300">TokensWithdrawn <span className="text-zinc-400">x1</span></div>
+                          <div className="text-zinc-300">TokensDeposited <span className="text-zinc-400">x1</span></div>
+                        </div>
+                        <div className="mt-4 text-[8px] text-zinc-400">
+                          Fee: <span className="text-zinc-200">0.00001</span>
                         </div>
                       </div>
                     </div>
@@ -410,98 +337,21 @@ export function Hero() {
               </div>
             </div>
 
-            {/* ── Bottom face panel with physical controls ── */}
-            <div
-              className="flex items-center justify-between px-5 py-4 mt-0"
-              style={{
-                borderTop: '1px solid rgba(255,255,255,0.03)',
-                background: 'linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.2) 100%)',
-                borderRadius: '0 0 20px 20px',
-              }}
-            >
-              {/* Left: physical push buttons */}
-              <div className="flex items-center gap-2">
-                {['PWR', 'MENU'].map((label) => (
-                  <div key={label} className="flex flex-col items-center gap-1">
-                    <div
-                      className="w-[18px] h-[10px] rounded-[2px]"
-                      style={{
-                        background: 'linear-gradient(180deg, #404044 0%, #353538 40%, #2a2a2e 100%)',
-                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 3px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3)',
-                      }}
-                    />
-                    <span className="text-[5px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>{label}</span>
-                  </div>
-                ))}
+            {/* ── Bottom bar: label + LED ── */}
+            <div className="mt-2 flex items-center justify-between px-2">
+              <div
+                className="text-[9px] sm:text-[11px] tracking-[3px] font-bold select-none uppercase"
+                style={{
+                  color: '#3a3a3a',
+                  textShadow: '0 1px 0 rgba(255,255,255,0.05)',
+                }}
+              >
+                FlowIndex Simulator
               </div>
-
-              {/* Center: model badge */}
-              <div className="flex items-center gap-3">
-                <div
-                  className="px-3 py-[2px] rounded-sm text-[8px] tracking-[3px] uppercase font-bold"
-                  style={{
-                    background: 'linear-gradient(180deg, #35353a 0%, #2a2a2e 100%)',
-                    color: 'rgba(255,255,255,0.2)',
-                    textShadow: '0 -1px 0 rgba(0,0,0,0.3)',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  Simulator VM-2000
-                </div>
-                {/* Power LED */}
-                <div
-                  className="w-[6px] h-[6px] rounded-full"
-                  style={{
-                    background: '#00ef8b',
-                    boxShadow: '0 0 4px #00ef8b, 0 0 10px rgba(0,239,139,0.6), 0 0 20px rgba(0,239,139,0.2)',
-                  }}
-                />
-              </div>
-
-              {/* Right: round dial knobs */}
-              <div className="flex items-center gap-3">
-                {['▪ BRIGHT', '▪ CNTRST'].map((label) => (
-                  <div key={label} className="flex flex-col items-center gap-1">
-                    <div
-                      className="w-[20px] h-[20px] rounded-full"
-                      style={{
-                        background: `radial-gradient(circle at 35% 35%, #48484e 0%, #35353a 50%, #2a2a2e 100%)`,
-                        boxShadow: 'inset 0 2px 3px rgba(255,255,255,0.06), inset 0 -2px 3px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.3)',
-                        border: '1px solid rgba(60,60,65,0.5)',
-                      }}
-                    >
-                      {/* Knob indicator line */}
-                      <div className="w-full h-full flex items-start justify-center pt-[3px]">
-                        <div className="w-[1px] h-[5px] bg-white/10 rounded-full" />
-                      </div>
-                    </div>
-                    <span className="text-[5px] uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>{label}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="crt-led" />
             </div>
           </div>
-        </div>
 
-        {/* ── Chunky stand ── */}
-        <div className="flex flex-col items-center -mt-[1px]">
-          {/* Neck — thick trapezoidal */}
-          <div
-            className="w-[70px] h-[35px]"
-            style={{
-              background: `linear-gradient(180deg, #38383e 0%, #30303a 50%, #2a2a30 100%)`,
-              clipPath: 'polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%)',
-              boxShadow: '4px 0 6px rgba(0,0,0,0.2), -4px 0 6px rgba(0,0,0,0.2)',
-            }}
-          />
-          {/* Base — wide oval */}
-          <div
-            className="w-[220px] h-[14px] rounded-[7px]"
-            style={{
-              background: `linear-gradient(180deg, #35353b 0%, #30303a 40%, #2a2a30 100%)`,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.4), 0 8px 20px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.2)',
-            }}
-          />
         </div>
       </div>
 

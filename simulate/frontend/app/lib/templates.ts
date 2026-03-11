@@ -72,7 +72,7 @@ transaction(amount: UFix64, to: Address) {
 }`,
     args: [
       { name: 'amount', type: 'UFix64', defaultValue: '10.0' },
-      { name: 'to', type: 'Address', defaultValue: '0x1654653399040a61' },
+      { name: 'to', type: 'Address', defaultValue: '0xf8d6e0586b0a20c7' },
     ],
   },
   {

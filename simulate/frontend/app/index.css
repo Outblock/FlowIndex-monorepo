@@ -5,6 +5,20 @@
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: 'Geist Pixel Square';
+  src: url('/fonts/GeistPixel-Square.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Pixel Grid';
+  src: url('/fonts/GeistPixel-Grid.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 @tailwind base;
 @tailwind components;
@@ -13,11 +27,47 @@
 @layer base {
   * { @apply border-zinc-800; }
   body {
-    @apply bg-black text-zinc-300 font-mono antialiased;
-    /* Retro film grain noise texture */
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-    background-size: 256px 256px;
+    @apply bg-[#050505] text-zinc-300 font-mono antialiased;
+    font-family: 'Geist Mono', ui-monospace, monospace;
   }
+  h1, h2, h3, h4 {
+    font-family: 'Geist Pixel Square', 'Geist Mono', monospace;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Page-level retro textures — applied via ::before/::after
+   on body so they layer over the bg color
+   ═══════════════════════════════════════════════════ */
+
+/* Film grain noise — visible but not distracting */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  mix-blend-mode: overlay;
+}
+
+/* Very faint page-level horizontal scanlines */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.08) 3px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  opacity: 0.3;
 }
 
 /* CRT Monitor Effects */
@@ -131,6 +181,44 @@
     opacity: 0;
     animation: boot-in 0.1s forwards;
   }
+
+  /* Section divider glow — use on border-t sections */
+  .glow-divider {
+    border-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(0, 239, 139, 0.15) 30%,
+      rgba(0, 239, 139, 0.25) 50%,
+      rgba(0, 239, 139, 0.15) 70%,
+      transparent 100%
+    ) 1;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Ambient glow spots — large soft radial gradients
+   that give depth to the dark background
+   ═══════════════════════════════════════════════════ */
+main {
+  position: relative;
+}
+main::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    /* Top-center green glow (hero area) */
+    radial-gradient(ellipse 60% 40% at 50% 5%, rgba(0, 239, 139, 0.04) 0%, transparent 70%),
+    /* Mid-left accent */
+    radial-gradient(ellipse 40% 30% at 10% 50%, rgba(0, 239, 139, 0.02) 0%, transparent 70%),
+    /* Bottom-right accent */
+    radial-gradient(ellipse 50% 35% at 85% 80%, rgba(0, 180, 120, 0.025) 0%, transparent 70%);
+}
+main > * {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes crt-flicker {
@@ -152,6 +240,14 @@
 @keyframes boot-in {
   from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce-gentle {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(-4px); opacity: 0.8; }
+}
+.animate-bounce-gentle {
+  animation: bounce-gentle 1.5s ease-in-out infinite;
 }
 
 /* Screen curvature via subtle transform */
