@@ -17,6 +17,7 @@
     "@ai-sdk/react": "^3.0.103",
     "@flowindex/auth-core": "workspace:*",
     "@flowindex/auth-ui": "workspace:*",
+    "@flowindex/event-decoder": "workspace:*",
     "@flowindex/flow-passkey": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@onflow/fcl": "^1.21.9",
