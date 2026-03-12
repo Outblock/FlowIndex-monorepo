@@ -219,38 +219,38 @@ export function Hero() {
   }
 
   return (
-    <section className="min-h-screen flex flex-col items-center justify-center px-4 pt-12 pb-8 relative overflow-hidden retro-grid">
+    <section className="h-screen min-h-[600px] flex flex-col items-center justify-center px-4 pt-8 pb-4 relative overflow-hidden retro-grid">
       {/* Background ambient lighting */}
       <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-transparent via-flow-green/[0.02] to-transparent pointer-events-none z-0" />
 
-      <div className="w-full max-w-5xl mx-auto relative z-10">
+      <div className="w-full max-w-5xl mx-auto relative z-10 flex flex-col items-center">
         {/* ══════ Physical CRT Monitor Unit ══════ */}
-        <div className="relative group perspective-1000">
-          
+        <div className="relative group perspective-1000 w-full">
+
           {/* Main Chassis */}
-          <div className="relative z-20 rounded-[2rem] p-3 sm:p-5 bg-[#1a1a1b] border-t-2 border-white/10 border-l border-white/5 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.9),inset_0_2px_10px_rgba(255,255,255,0.05)]">
-            
+          <div className="relative z-20 rounded-[2rem] p-2 sm:p-4 bg-[#1a1a1b] border-t-2 border-white/10 border-l border-white/5 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.9),inset_0_2px_10px_rgba(255,255,255,0.05)]">
+
             {/* Top Vents */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 flex gap-2">
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex gap-2">
               {[...Array(8)].map((_, i) => (
-                <div key={i} className="w-6 h-1 bg-black/60 rounded-full shadow-inner" />
+                <div key={i} className="w-5 h-0.5 bg-black/60 rounded-full shadow-inner" />
               ))}
             </div>
 
             {/* Screws */}
-            <Screw className="absolute top-6 left-6 opacity-40" />
-            <Screw className="absolute top-6 right-6 opacity-40" />
-            <Screw className="absolute bottom-16 left-6 opacity-40" />
-            <Screw className="absolute bottom-16 right-6 opacity-40" />
+            <Screw className="absolute top-5 left-5 opacity-30" />
+            <Screw className="absolute top-5 right-5 opacity-30" />
+            <Screw className="absolute bottom-14 left-5 opacity-30" />
+            <Screw className="absolute bottom-14 right-5 opacity-30" />
 
             {/* The Screen Well */}
-            <div className="relative bg-[#080808] rounded-[1rem] sm:rounded-[1.5rem] p-2 sm:p-8 border-2 sm:border-4 border-black shadow-[inset_0_0_40px_rgba(0,0,0,1)]">
+            <div className="relative bg-[#080808] rounded-[1rem] sm:rounded-[1.5rem] p-2 sm:p-6 border-2 sm:border-4 border-black shadow-[inset_0_0_40px_rgba(0,0,0,1)]">
 
               {/* Glass / CRT Layer */}
-              <div className="crt-screen crt-scanlines crt-vignette crt-flicker relative bg-[#010a03] h-[360px] sm:h-[520px] flex flex-col border border-emerald-950/40 rounded-[0.8rem] sm:rounded-[1rem]">
+              <div className="crt-screen crt-scanlines crt-vignette crt-flicker relative bg-[#010a03] h-[320px] sm:h-[460px] flex flex-col border border-emerald-950/40 rounded-[0.8rem] sm:rounded-[1rem]">
 
                 {/* Internal Screen Content */}
-                <div className="relative z-[10] p-3 sm:p-8 flex-1 flex flex-col font-mono text-emerald-500 overflow-hidden">
+                <div className="relative z-[10] p-3 sm:p-6 flex-1 flex flex-col font-mono text-emerald-500 overflow-hidden">
 
                   {phase === 'boot' ? (
                     <div className="flex flex-col gap-1.5 mt-2 sm:mt-4">
@@ -264,7 +264,7 @@ export function Hero() {
                   ) : (
                     <>
                       {/* Header Readout */}
-                      <div className="flex items-center justify-between mb-4 sm:mb-6 border-b border-emerald-900/40 pb-2 sm:pb-3 shrink-0">
+                      <div className="flex items-center justify-between mb-3 sm:mb-5 border-b border-emerald-900/40 pb-2 sm:pb-3 shrink-0">
                         <div className="flex items-center gap-2 sm:gap-4">
                           <div className="flex flex-col">
                             <span className="text-[7px] sm:text-[8px] uppercase tracking-[2px] sm:tracking-[3px] text-emerald-500/40">Sim Unit</span>
@@ -290,7 +290,7 @@ export function Hero() {
                       {/* Code Area */}
                       <div className="flex-1 flex min-h-0 gap-4 sm:gap-8 overflow-hidden">
                         <div className="flex-1 overflow-y-auto pr-2 sm:pr-4 scrollbar-hide">
-                          <div className="text-[9px] sm:text-[12px] leading-relaxed whitespace-pre font-mono">
+                          <div className="text-[9px] sm:text-[11px] leading-relaxed whitespace-pre font-mono">
                             {(() => {
                               const visible = CHAR_STREAM.slice(0, charIdx)
                               const lines: { char: string; cl: string }[][] = [[]]
@@ -316,8 +316,8 @@ export function Hero() {
                         </div>
 
                         {/* Telemetry Sidebar - Hide on small screens */}
-                        <div className={`hidden lg:block w-64 border-l border-emerald-900/30 pl-6 transition-all duration-1000 ${phase === 'done' ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
-                          <div className="space-y-8">
+                        <div className={`hidden lg:block w-56 border-l border-emerald-900/30 pl-6 transition-all duration-1000 ${phase === 'done' ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
+                          <div className="space-y-6">
                             <div className="p-3 bg-emerald-950/20 border border-emerald-900/30 rounded">
                               <div className="text-[9px] tracking-[3px] text-emerald-500/60 uppercase mb-3 font-bold">Execution Metrics</div>
                               <div className="space-y-4">
@@ -332,7 +332,7 @@ export function Hero() {
                                 </div>
                                 <div>
                                   <div className="flex justify-between text-[8px] uppercase mb-1">
-                                    <span className="opacity-40">Memory_Leak_Test</span>
+                                    <span className="opacity-40">Memory_Leak</span>
                                     <span className="text-flow-green">STABLE</span>
                                   </div>
                                   <div className="h-1 bg-emerald-950/50 rounded-full overflow-hidden">
@@ -347,18 +347,17 @@ export function Hero() {
                               <div className="rounded border-l-2 border-emerald-500/40 p-3 bg-black/40 text-[10px] space-y-2">
                                 <div className="flex justify-between items-center">
                                   <span className="opacity-60 text-[8px]">ACCOUNT_A</span>
-                                  <span className="text-red-400 font-bold">-10.0 FLOW</span>
+                                  <span className="text-red-400 font-bold">-10.0</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="opacity-60 text-[8px]">ACCOUNT_B</span>
-                                  <span className="text-flow-green font-bold">+10.0 FLOW</span>
+                                  <span className="text-flow-green font-bold">+10.0</span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="pt-6 border-t border-emerald-900/30">
-                              <div className="text-[12px] text-flow-green font-bold tracking-[3px]">RESULT://SUCCESS</div>
-                              <div className="text-[9px] opacity-40 mt-1 uppercase tracking-widest">Hash: 0xFD...22E</div>
+                            <div className="pt-4 border-t border-emerald-900/30">
+                              <div className="text-[11px] text-flow-green font-bold tracking-[3px]">RESULT://OK</div>
                             </div>
                           </div>
                         </div>
@@ -370,46 +369,45 @@ export function Hero() {
             </div>
 
             {/* Control Panel / Branding Strip */}
-            <div className="mt-4 sm:mt-8 flex flex-col sm:flex-row items-center sm:items-end justify-between gap-6 sm:gap-0 px-4 sm:px-10 pb-6 sm:pb-4 bg-gradient-to-t from-black/20 to-transparent pt-4 rounded-b-[1.5rem] sm:rounded-b-[2rem]">
+            <div className="mt-3 sm:mt-6 flex flex-col sm:flex-row items-center sm:items-end justify-between gap-4 sm:gap-0 px-4 sm:px-10 pb-4 sm:pb-3 bg-gradient-to-t from-black/20 to-transparent pt-3 rounded-b-[1.5rem] sm:rounded-b-[2rem]">
               <div className="flex items-center gap-4 sm:gap-8">
                 <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
                   <span className="text-lg sm:text-2xl font-black tracking-[4px] sm:tracking-[8px] text-zinc-500 uppercase font-pixel-square leading-none">FlowIndex</span>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex items-center gap-2 mt-1.5">
                     <div className="hidden sm:block h-[2px] w-4 bg-zinc-800" />
                     <span className="text-[6px] sm:text-[7px] tracking-[3px] sm:tracking-[5px] text-zinc-600 uppercase font-bold">Strategic Dynamics Simulator</span>
                   </div>
                 </div>
 
                 {/* Physical Plate - Clean and Centered */}
-                <div className="hidden xs:block px-2 sm:px-4 py-1 sm:py-1.5 bg-zinc-900 border border-zinc-800 rounded-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
-                  <span className="text-[6px] sm:text-[8px] font-bold text-zinc-500 tracking-[2px] sm:tracking-[3px] uppercase font-mono">S-774/VX</span>
+                <div className="hidden xs:block px-2 sm:px-4 py-1 bg-zinc-900 border border-zinc-800 rounded-sm shadow-[inset_0_1px_3px_rgba(0,0,0,0.8)]">
+                  <span className="text-[6px] sm:text-[8px] font-bold text-zinc-500 tracking-[2px] sm:tracking-[3px] uppercase font-mono leading-none">MODEL S-774/VX</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-6 sm:gap-10">
                 {/* Interface Port - Refined */}
-                <div className="hidden sm:flex flex-col items-center gap-2">
-                  <div className="w-12 h-7 bg-[#0a0a0a] rounded-sm border-b border-zinc-800 shadow-[inset_0_2px_10px_rgba(0,0,0,1)] flex flex-col justify-around py-1.5 px-2">
-                    <div className="w-full h-[1px] bg-zinc-900" />
+                <div className="hidden sm:flex flex-col items-center gap-1.5">
+                  <div className="w-10 h-6 bg-[#0a0a0a] rounded-sm border-b border-zinc-800 shadow-[inset_0_2px_10px_rgba(0,0,0,1)] flex flex-col justify-around py-1.5 px-2">
                     <div className="w-full h-[1px] bg-zinc-900" />
                     <div className="w-full h-[1px] bg-zinc-900" />
                   </div>
-                  <span className="text-[7px] tracking-[2px] text-zinc-700 uppercase font-bold">Interface</span>
+                  <span className="text-[6px] tracking-[2px] text-zinc-700 uppercase font-bold">Interface</span>
                 </div>
 
-                <div className="flex flex-col items-center sm:items-end gap-2 sm:gap-3">
+                <div className="flex flex-col items-center sm:items-end gap-1.5 sm:gap-2.5">
                   <div className="flex gap-2 sm:gap-2.5">
-                    <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-500 ${phase === 'done' ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-emerald-950/20'}`} />
-                    <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full transition-all duration-500 ${phase === 'running' ? 'bg-amber-500 shadow-[0_0_12px_#f59e0b]' : 'bg-amber-900/30'}`} />
-                    <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-zinc-900 shadow-inner" />
+                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${phase === 'done' ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-emerald-950/20'}`} />
+                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${phase === 'running' ? 'bg-amber-500 shadow-[0_0_12px_#f59e0b]' : 'bg-amber-900/30'}`} />
+                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-zinc-900 shadow-inner" />
                   </div>
                   <span className="text-[6px] sm:text-[7px] tracking-[2px] sm:tracking-[3px] text-zinc-700 uppercase font-bold whitespace-nowrap">System Load</span>
                 </div>
 
                 {/* Large Power Button - Refined */}
-                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-[#111] border-b-2 sm:border-b-4 border-black shadow-[0_4px_0_#080808,0_6px_10px_rgba(0,0,0,0.8)] sm:shadow-[0_6px_0_#080808,0_10px_20px_rgba(0,0,0,0.8)] flex items-center justify-center cursor-pointer hover:translate-y-[1px] sm:hover:translate-y-[2px] active:translate-y-[3px] sm:active:translate-y-[4px] transition-all">
-                  <div className="w-4 h-4 sm:w-6 sm:h-6 rounded-full bg-red-950 border border-red-900/20 flex items-center justify-center shadow-inner">
-                    <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full bg-red-800 shadow-[0_0_5px_rgba(153,27,27,0.8)]" />
+                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-[#111] border-b-2 sm:border-b-4 border-black shadow-[0_4px_0_#080808,0_6px_10px_rgba(0,0,0,0.8)] flex items-center justify-center cursor-pointer hover:translate-y-[1px] active:translate-y-[3px] transition-all">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-950 border border-red-900/20 flex items-center justify-center shadow-inner">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-800 shadow-[0_0_5px_rgba(153,27,27,0.8)]" />
                   </div>
                 </div>
               </div>
@@ -417,17 +415,18 @@ export function Hero() {
           </div>
 
           {/* Heavy Base / Stand */}
-          <div className="mx-auto w-[40%] h-6 bg-[#1a1a1b] rounded-b-[2rem] border-x border-b border-black shadow-[0_10px_30px_rgba(0,0,0,0.8)] -mt-1 relative z-10">
+          <div className="mx-auto w-[30%] h-4 bg-[#1a1a1b] rounded-b-[2rem] border-x border-b border-black shadow-[0_8px_20px_rgba(0,0,0,0.8)] -mt-1 relative z-10">
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent" />
           </div>
-          
+
           {/* Ground Shadow */}
-          <div className="mx-auto w-[80%] h-12 bg-black/60 blur-[40px] rounded-full -mt-4 opacity-70" />
+          <div className="mx-auto w-[70%] h-8 bg-black/60 blur-[30px] rounded-full -mt-2 opacity-70" />
         </div>
       </div>
 
       {/* ── Headline Section ── */}
       <Typewriter phase={phase} onClickPlayground={scrollToPlayground} />
     </section>
+
   )
 }
