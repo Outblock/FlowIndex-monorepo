@@ -46,7 +46,7 @@ Once the server is running, Claude or any other MCP-compatible client can call t
 | Tool Group | Tools | Description |
 |---|---|---|
 | Wallet | `wallet_status`, `wallet_login`, `wallet_login_status` | Wallet configuration, status, and interactive login |
-| Templates | `list_templates`, `get_template`, `execute_script`, `simulate_template`, `execute_template` | Cadence template browsing, simulation, and execution |
+| Templates | `list_templates`, `get_template`, `execute_script`, `execute_cadence_script`, `simulate_cadence_transaction`, `simulate_template`, `execute_template` | Cadence template browsing, freeform script execution, and transaction simulation |
 | Approval | `confirm_transaction`, `cancel_transaction`, `list_pending` | Pending transaction review and execution |
 | Flow Query | `get_account`, `get_flow_balance`, `get_ft_balance`, `get_nft_collection`, `get_transaction` | Read-only Flow data access |
 | EVM | `evm_wallet_address`, `evm_get_balance`, `evm_get_token_balance`, `evm_transfer`, `evm_transfer_erc20`, `evm_read_contract`, `evm_write_contract`, `evm_get_transaction` | Flow EVM operations |
@@ -58,7 +58,7 @@ You do not need a stack of MCP servers just to let an agent sign transactions.
 | Mode | Install | Best For |
 |---|---|---|
 | Wallet Mode | `agent-wallet` only | Most users who want signing, approval, templates, and simulation |
-| Cadence Developer Mode | `agent-wallet` + Cadence MCP | Agents that need to research, check, and repair custom Cadence |
+| Cadence Developer Mode | `agent-wallet` + Cadence MCP | Agents that need to research, execute scripts, simulate, check, and repair custom Cadence |
 | Hybrid Mode | `agent-wallet` + Cadence MCP + Flow EVM MCP | Projects that span Cadence and Flow EVM |
 
 The Cadence skill is optional. It improves coding-agent output, but signing and approval should not depend on a skill being installed.
@@ -79,9 +79,12 @@ The server picks the signer mode from environment variables:
 On mainnet, the server can call FlowIndex Simulator before signing a Cadence transaction template.
 
 - `simulate_template` is the explicit read-only MCP tool
+- `simulate_cadence_transaction` does the same for raw Cadence transactions with typed arguments
 - `execute_template` also attaches `preflight_simulation` metadata when the simulator is enabled
 - simulation failures do not block the real wallet flow
 - set `FLOW_SIMULATOR_ENABLED=false` to disable all simulator calls
+
+For freeform read-only work, `execute_cadence_script` lets the agent run raw Cadence script source directly without adding a template first.
 
 Simulation uses a public mainnet fork, so it is mainnet-only.
 

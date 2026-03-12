@@ -99,7 +99,7 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `APPROVAL_REQUIRED` | `true` | Require confirmation before signing transactions |
 | `ETHERSCAN_API_KEY` | -- | For EVM contract ABI lookup |
 
-## Available Tools (24)
+## Available Tools (26)
 
 ### Wallet (3)
 
@@ -109,13 +109,15 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `wallet_login` | Start cloud wallet login (returns URL for user to open) |
 | `wallet_login_status` | Check if cloud wallet login completed |
 
-### Templates (5)
+### Templates (7)
 
 | Tool | Description |
 |---|---|
 | `list_templates` | List available Cadence templates by category |
 | `get_template` | Read a template's Cadence source code |
 | `execute_script` | Run a read-only Cadence script (no signing) |
+| `execute_cadence_script` | Run a read-only Cadence script from raw source code |
+| `simulate_cadence_transaction` | Simulate a raw Cadence transaction with typed arguments |
 | `simulate_template` | Run a mainnet preflight simulation for a transaction template without signing or submitting |
 | `execute_template` | Execute a transaction template (requires signing) |
 
@@ -157,7 +159,7 @@ You do not need multiple MCP servers just to let an agent sign transactions.
 | Mode | Install | Best For |
 |---|---|---|
 | Wallet Mode | `@flowindex/agent-wallet` only | Most users who want signing, approval, templates, and simulation |
-| Cadence Developer Mode | `@flowindex/agent-wallet` + Cadence MCP | Agents that need to research, check, and repair custom Cadence |
+| Cadence Developer Mode | `@flowindex/agent-wallet` + Cadence MCP | Agents that need to research, execute scripts, simulate, check, and repair custom Cadence |
 | Hybrid Mode | `@flowindex/agent-wallet` + Cadence MCP + Flow EVM MCP | Projects that span Cadence and Flow EVM |
 
 The Cadence skill is optional. It improves coding-agent output, but signing and approval should not depend on a skill being installed.
@@ -183,11 +185,18 @@ The agent can also call `cancel_transaction` to reject, or `list_pending` to see
 ### Preflight Simulation
 
 - `simulate_template` is a read-only tool that lets the agent preview a transaction before signing.
+- `simulate_cadence_transaction` does the same for raw Cadence transactions with typed arguments.
 - `execute_template` also attaches a preflight simulation result automatically on mainnet whenever the simulator is available.
 - Set `FLOW_SIMULATOR_ENABLED=false` to disable all simulator calls without changing the rest of the wallet flow.
 - Simulation currently uses the public FlowIndex mainnet-fork simulator, so it is **mainnet-only**. On testnet, simulation is skipped with an explicit reason.
 - Advanced scheduled transaction replay is available through `simulate_template.scheduled`.
   `advance_seconds` is capped at `5` and `advance_blocks` is capped at `20`.
+
+### Freeform Cadence
+
+- `execute_cadence_script` lets the agent run raw read-only Cadence without registering a template first.
+- `simulate_cadence_transaction` lets the agent preview a raw transaction with the configured wallet address as both authorizer and payer.
+- Raw Cadence transaction submission is intentionally not exposed yet. The current signing flow still routes real on-chain writes through templates and approvals.
 
 ### Passkey Approval (cloud wallet with passkey signing)
 

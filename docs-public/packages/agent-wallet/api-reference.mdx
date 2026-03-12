@@ -102,6 +102,55 @@ Executes a read-only Cadence script on the Flow network using a named template.
 | `template_name` | string | Yes | Name of a script template |
 | `args` | object | No | Named arguments matching the template arg schema |
 
+### `execute_cadence_script`
+
+Executes a read-only Cadence script from raw source code. This is the freeform alternative to `execute_script`.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `cadence` | string | Yes | Raw Cadence script source code |
+| `arguments` | array | No | Ordered typed arguments in `{ type, value }` form |
+
+**Returns:**
+```json
+{
+  "result": {
+    "ok": true
+  }
+}
+```
+
+### `simulate_cadence_transaction`
+
+Runs a read-only preflight simulation for a raw Cadence transaction using the configured wallet address as both authorizer and payer.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `cadence` | string | Yes | Raw Cadence transaction source code |
+| `arguments` | array | No | Ordered typed arguments in `{ type, value }` form |
+| `scheduled` | object | No | Optional scheduled replay controls |
+
+**`scheduled` fields:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `advance_seconds` | number | No | Wait time before replaying scheduled work, max `5` |
+| `advance_blocks` | number | No | Extra blocks to advance, max `20` |
+
+**Returns:**
+```json
+{
+  "simulation": {
+    "success": true,
+    "summary": "FLOW transfer"
+  }
+}
+```
+
 ### `simulate_template`
 
 Runs a read-only preflight simulation for a transaction template on the FlowIndex simulator. This does not sign or submit anything.

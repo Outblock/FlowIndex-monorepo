@@ -128,6 +128,8 @@ That gives the agent:
 - Flow wallet signing and approval through `agent-wallet`
 - documentation lookup through Cadence MCP
 - Cadence checking, symbol lookup, and security scanning through Cadence MCP
+- freeform read-only execution through `execute_cadence_script`
+- raw transaction preview through `simulate_cadence_transaction`
 
 If you are using a coding-focused agent such as Codex or Claude Code, you can also add the Cadence skill:
 
@@ -136,6 +138,12 @@ npx skills add outblock/cadence-lang.org
 ```
 
 The skill is optional. It improves long-lived context and language recall, but the signing path should still work with `agent-wallet` alone.
+
+Today the advanced freeform path is:
+
+- run raw scripts with `execute_cadence_script`
+- preview raw transactions with `simulate_cadence_transaction`
+- use template execution for actual transaction signing and submission
 
 ## 6. Approval Flow
 

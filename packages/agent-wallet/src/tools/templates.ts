@@ -11,8 +11,14 @@ import { getTemplate, listTemplates } from '../templates/registry.js';
 import { addPendingTx } from '../approval/manager.js';
 import type { CadenceService } from '../templates/cadence.gen.js';
 import type { SimulateTransactionResponse } from '../flowindex/client.js';
-import { maybeSimulateTemplate } from '../simulate/template.js';
+import { executeCadenceScript } from '../cadence/script.js';
+import { maybeSimulateCadenceTransaction, maybeSimulateTemplate } from '../simulate/template.js';
 import * as fcl from '@onflow/fcl';
+
+const cadenceArgumentSchema = z.object({
+  type: z.string().describe('Cadence type, for example Address, UFix64, [UInt64], or String?'),
+  value: z.unknown().describe('Argument value. Arrays may be passed as JSON arrays or JSON array strings.'),
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -234,6 +240,103 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
 
         const result = await executeViaCodegen(ctx.cadenceService, template_name, orderedArgs);
         return jsonContent({ result });
+      } catch (error) {
+        return jsonContent({ error: String(error) }, true);
+      }
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // execute_cadence_script
+  // -------------------------------------------------------------------------
+  server.registerTool(
+    'execute_cadence_script',
+    {
+      title: 'Execute Raw Cadence Script',
+      description:
+        'Execute a read-only Cadence script from raw source code. This is intended for advanced use when the built-in templates are not enough.',
+      inputSchema: {
+        cadence: z.string().describe('Raw Cadence script source code'),
+        arguments: z.array(cadenceArgumentSchema).optional().describe('Ordered typed arguments for the script'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({
+      cadence,
+      arguments: argumentsList = [],
+    }: {
+      cadence: string;
+      arguments?: Array<{ type: string; value?: unknown }>;
+    }) => {
+      try {
+        const normalizedArguments = argumentsList.map(({ type, value }) => ({ type, value }));
+        const result = await executeCadenceScript(cadence, normalizedArguments);
+        return jsonContent({ result });
+      } catch (error) {
+        return jsonContent({ error: String(error) }, true);
+      }
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // simulate_cadence_transaction
+  // -------------------------------------------------------------------------
+  server.registerTool(
+    'simulate_cadence_transaction',
+    {
+      title: 'Simulate Raw Cadence Transaction',
+      description:
+        'Run a preflight simulation for a raw Cadence transaction using the configured wallet address as authorizer and payer. This is mainnet-only and does not sign or submit anything.',
+      inputSchema: {
+        cadence: z.string().describe('Raw Cadence transaction source code'),
+        arguments: z.array(cadenceArgumentSchema).optional().describe('Ordered typed arguments for the transaction'),
+        scheduled: z
+          .object({
+            advance_seconds: z.number().min(0).max(5).optional(),
+            advance_blocks: z.number().int().min(0).max(20).optional(),
+          })
+          .optional()
+          .describe('Optional scheduled-transaction replay controls for mainnet simulation.'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({
+      cadence,
+      arguments: argumentsList = [],
+      scheduled,
+    }: {
+      cadence: string;
+      arguments?: Array<{ type: string; value?: unknown }>;
+      scheduled?: { advance_seconds?: number; advance_blocks?: number };
+    }) => {
+      try {
+        const normalizedArguments = argumentsList.map(({ type, value }) => ({ type, value }));
+        const preflight = await maybeSimulateCadenceTransaction(
+          ctx.config,
+          ctx.signer,
+          cadence,
+          normalizedArguments,
+          scheduled,
+        );
+
+        if (preflight.simulation) {
+          return jsonContent({
+            simulation: preflight.simulation,
+          });
+        }
+
+        const message = preflight.skippedReason ?? preflight.error ?? 'Simulation unavailable';
+        return jsonContent({ error: message }, true);
       } catch (error) {
         return jsonContent({ error: String(error) }, true);
       }

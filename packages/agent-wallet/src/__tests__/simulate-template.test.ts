@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildTemplateSimulationRequest,
   maybeSimulateTemplate,
-  toJsonCdcValue,
 } from '../simulate/template.js';
+import { toJsonCdcValue } from '../cadence/arguments.js';
 import type { Template } from '../templates/registry.js';
 import type { AgentWalletConfig } from '../config/env.js';
 import type { FlowSigner, SignerInfo } from '@flowindex/flow-signer';
@@ -75,6 +75,20 @@ describe('simulate/template helpers', () => {
           value: [{ type: 'UInt8', value: '3' }],
         },
       ],
+    });
+  });
+
+  it('serializes optional values to JSON-CDC', () => {
+    expect(toJsonCdcValue('String?', null)).toEqual({
+      type: 'Optional',
+      value: null,
+    });
+    expect(toJsonCdcValue('Address?', '1234')).toEqual({
+      type: 'Optional',
+      value: {
+        type: 'Address',
+        value: '0x1234',
+      },
     });
   });
 

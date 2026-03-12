@@ -39,6 +39,8 @@ function createMockContext(overrides?: Partial<ServerContext>): ServerContext {
       hashAlgo: 'SHA2_256',
       evmAccountIndex: 0,
       flowindexUrl: 'https://test.api',
+      flowSimulatorEnabled: true,
+      flowSimulatorUrl: 'https://simulator.flowindex.io/api',
       approvalRequired: true,
       signerType: 'local-key',
     },
