@@ -7,12 +7,30 @@ interface TemplatePanelProps {
   currentArgs: TemplateArg[]
   isCustom: boolean
   payer: string
+  scheduledAdvanceSeconds: string
+  scheduledAdvanceBlocks: string
   onSelectTemplate: (id: string) => void
   onArgChange: (name: string, value: string) => void
   onPayerChange: (payer: string) => void
+  onScheduledAdvanceSecondsChange: (value: string) => void
+  onScheduledAdvanceBlocksChange: (value: string) => void
 }
 
-export function TemplatePanel({ templates, activeId, argValues, currentArgs, isCustom, payer, onSelectTemplate, onArgChange, onPayerChange }: TemplatePanelProps) {
+export function TemplatePanel({
+  templates,
+  activeId,
+  argValues,
+  currentArgs,
+  isCustom,
+  payer,
+  scheduledAdvanceSeconds,
+  scheduledAdvanceBlocks,
+  onSelectTemplate,
+  onArgChange,
+  onPayerChange,
+  onScheduledAdvanceSecondsChange,
+  onScheduledAdvanceBlocksChange,
+}: TemplatePanelProps) {
   return (
     <div className="hidden md:flex w-[220px] border-r border-zinc-800/40 flex-col shrink-0">
       <div className="px-3 py-2 border-b border-zinc-800/60 bg-black/40">
@@ -54,6 +72,48 @@ export function TemplatePanel({ templates, activeId, argValues, currentArgs, isC
           onChange={(e) => onPayerChange(e.target.value)}
           className="w-full bg-black/40 border border-zinc-800/60 rounded px-2 py-1 text-[10px] text-zinc-400 font-mono focus:border-flow-green focus:shadow-[0_0_8px_rgba(0,239,139,0.15)] focus:outline-none transition-all"
         />
+      </div>
+
+      <div className="border-t border-zinc-800/60 p-3 bg-black/20">
+        <div className="text-[10px] text-zinc-500 tracking-wider mb-2 flex items-center gap-1.5">
+          <span className="text-flow-green/60">⏱</span> SCHEDULED
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-zinc-400 block mb-1">
+              Wait seconds <span className="text-zinc-500">(advance_seconds)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              step="0.1"
+              value={scheduledAdvanceSeconds}
+              onChange={(e) => onScheduledAdvanceSecondsChange(e.target.value)}
+              className="w-full bg-black/40 border border-zinc-800/60 rounded px-2 py-1 text-[11px] text-zinc-300 focus:border-flow-green focus:shadow-[0_0_8px_rgba(0,239,139,0.15)] focus:outline-none transition-all"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-zinc-400 block mb-1">
+              Extra blocks <span className="text-zinc-500">(advance_blocks)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="20"
+              step="1"
+              value={scheduledAdvanceBlocks}
+              onChange={(e) => onScheduledAdvanceBlocksChange(e.target.value)}
+              className="w-full bg-black/40 border border-zinc-800/60 rounded px-2 py-1 text-[11px] text-zinc-300 focus:border-flow-green focus:shadow-[0_0_8px_rgba(0,239,139,0.15)] focus:outline-none transition-all"
+            />
+          </div>
+        </div>
+        <p className="mt-3 text-[10px] leading-relaxed text-zinc-500">
+          Leave both at <span className="text-zinc-400 font-mono">0</span> for a normal simulation. Increasing extra
+          blocks is the main knob for simulating more scheduled callback rounds inside the same snapshot. Current
+          limits are <span className="text-zinc-400 font-mono">30s</span> and <span className="text-zinc-400 font-mono">20</span>{' '}
+          extra blocks.
+        </p>
       </div>
 
       {/* Params */}
