@@ -126,6 +126,8 @@ export default function CadenceEditor({
         renderLineHighlight: 'line',
         bracketPairColorization: { enabled: true },
         tabSize: 2,
+        snippetSuggestions: 'inline',
+        parameterHints: { enabled: true },
         // Force Cmd/Ctrl+Click and F12 to jump directly instead of opening peek UI.
         definitionLinkOpensInPeek: false,
         gotoLocation: {

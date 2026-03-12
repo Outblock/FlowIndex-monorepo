@@ -23,13 +23,25 @@ interface LSPCompletionItem {
   documentation?: string | { value: string; kind?: string };
   insertText?: string;
   insertTextFormat?: number;
-  textEdit?: any;
+  textEdit?: {
+    newText: string;
+    range: {
+      start: { line: number; character: number };
+      end: { line: number; character: number };
+    };
+  };
+  command?: {
+    title?: string;
+    command: string;
+    arguments?: unknown[];
+  };
   sortText?: string;
   filterText?: string;
 }
 
 const LSP_KIND_KEYWORD = 14;
 const LSP_KIND_SNIPPET = 15;
+const LSP_INSERT_TEXT_FORMAT_SNIPPET = 2;
 
 interface LSPHoverResult {
   contents: string | { value: string; language?: string; kind?: string } | Array<string | { value: string; language?: string }>;
@@ -122,6 +134,53 @@ function filterCompletionItemsForContext(
     }
     return item.kind !== LSP_KIND_KEYWORD && item.kind !== LSP_KIND_SNIPPET;
   });
+}
+
+function containsSnippetTabstop(text: string | undefined): boolean {
+  if (!text) {
+    return false;
+  }
+
+  return /\$(?:0|\d+|\{\d+(?::[^}]*)?\})/.test(text);
+}
+
+function getCompletionInsertText(item: LSPCompletionItem): string {
+  return item.textEdit?.newText || item.insertText || item.label;
+}
+
+function isSnippetCompletionItem(item: LSPCompletionItem): boolean {
+  if (item.insertTextFormat === LSP_INSERT_TEXT_FORMAT_SNIPPET) {
+    return true;
+  }
+
+  return containsSnippetTabstop(getCompletionInsertText(item));
+}
+
+function toMonacoRange(
+  monaco: typeof Monaco,
+  range: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  },
+): Monaco.IRange {
+  return new monaco.Range(
+    range.start.line + 1,
+    range.start.character + 1,
+    range.end.line + 1,
+    range.end.character + 1,
+  );
+}
+
+function toMonacoCommand(command: LSPCompletionItem['command']): Monaco.languages.Command | undefined {
+  if (!command?.command) {
+    return undefined;
+  }
+
+  return {
+    id: command.command,
+    title: command.title || command.command,
+    arguments: command.arguments,
+  };
 }
 
 /** Convert LSP severity (1=Error, 2=Warning, 3=Info, 4=Hint) to Monaco severity */
@@ -452,7 +511,7 @@ export class MonacoLspAdapter {
             // Filter out items with empty labels (Monaco rejects them)
             const items = contextualItems.filter((item) => item.label && item.label.length > 0);
             const word = model.getWordUntilPosition(position);
-            const range = new m.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
+            const fallbackRange = new m.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
             return {
               suggestions: items.map((item) => ({
                 label: item.label,
@@ -461,15 +520,18 @@ export class MonacoLspAdapter {
                 documentation: typeof item.documentation === 'string'
                   ? item.documentation
                   : item.documentation
-                    ? { value: item.documentation.value || '' }
-                    : undefined,
-                insertText: item.insertText || item.label,
-                insertTextRules: item.insertTextFormat === 2
+                  ? { value: item.documentation.value || '' }
+                  : undefined,
+                insertText: getCompletionInsertText(item),
+                insertTextRules: isSnippetCompletionItem(item)
                   ? m.languages.CompletionItemInsertTextRule.InsertAsSnippet
                   : undefined,
-                range,
+                range: item.textEdit?.range
+                  ? toMonacoRange(m, item.textEdit.range)
+                  : fallbackRange,
                 sortText: item.sortText,
                 filterText: item.filterText,
+                command: toMonacoCommand(item.command),
               })),
             };
           } catch {
