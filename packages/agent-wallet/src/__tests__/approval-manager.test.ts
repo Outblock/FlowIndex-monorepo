@@ -8,13 +8,14 @@ describe('approval/manager', () => {
   function addAndTrack(id: string, overrides?: Partial<Parameters<typeof addPendingTx>[1]>) {
     ids.push(id);
     addPendingTx(id, {
+      kind: 'template',
       template_name: 'transfer_tokens_v3',
       cadence: 'transaction() {}',
       args: { amount: '1.0' },
       summary: `test tx ${id}`,
       createdAt: Date.now(),
       ...overrides,
-    });
+    } as Parameters<typeof addPendingTx>[1]);
   }
 
   beforeEach(() => {
@@ -27,8 +28,11 @@ describe('approval/manager', () => {
     addAndTrack('tx-001');
     const tx = getPendingTx('tx-001');
     expect(tx).toBeDefined();
-    expect(tx!.template_name).toBe('transfer_tokens_v3');
-    expect(tx!.args).toEqual({ amount: '1.0' });
+    expect(tx!.kind).toBe('template');
+    if (tx?.kind === 'template') {
+      expect(tx.template_name).toBe('transfer_tokens_v3');
+      expect(tx.args).toEqual({ amount: '1.0' });
+    }
   });
 
   it('getPendingTx returns undefined for unknown id', () => {
@@ -52,6 +56,7 @@ describe('approval/manager', () => {
     const a = list.find((t) => t.tx_id === 'tx-a');
     const b = list.find((t) => t.tx_id === 'tx-b');
     expect(a).toBeDefined();
+    expect(a!.kind).toBe('template');
     expect(a!.summary).toBe('test tx tx-a');
     expect(b!.summary).toBe('second tx');
     expect(typeof a!.created_at).toBe('number');
@@ -62,5 +67,55 @@ describe('approval/manager', () => {
     removePendingTx('tx-rm');
     const list = listPendingTxs();
     expect(list.find((t) => t.tx_id === 'tx-rm')).toBeUndefined();
+  });
+
+  it('listPendingTxs includes preflight simulation summary when present', () => {
+    addAndTrack('tx-preflight', {
+      preflightSimulation: {
+        success: true,
+        summary: 'Transfer 1 FLOW',
+        computationUsed: 123,
+        balanceChanges: [],
+        tags: [],
+        events: [],
+        summaryItems: [],
+        transfers: [],
+        nftTransfers: [],
+        systemEvents: [],
+        evmExecutions: [],
+        evmLogTransfers: [],
+        defiEvents: [],
+        stakingEvents: [],
+        fee: 0,
+      },
+    });
+
+    const list = listPendingTxs();
+    const pending = list.find((t) => t.tx_id === 'tx-preflight');
+    expect(pending?.preflight_simulation).toEqual({
+      success: true,
+      summary: 'Transfer 1 FLOW',
+      error: null,
+    });
+  });
+
+  it('supports raw cadence pending transactions', () => {
+    ids.push('tx-raw');
+    addPendingTx('tx-raw', {
+      kind: 'raw_cadence',
+      cadence: 'transaction(amount: UFix64) {}',
+      arguments: [{ type: 'UFix64', value: '1.0' }],
+      summary: 'transaction(amount: UFix64) [arg_count=1]',
+      createdAt: Date.now(),
+    });
+
+    const tx = getPendingTx('tx-raw');
+    expect(tx?.kind).toBe('raw_cadence');
+    if (tx?.kind === 'raw_cadence') {
+      expect(tx.arguments).toEqual([{ type: 'UFix64', value: '1.0' }]);
+    }
+
+    const listed = listPendingTxs().find((entry) => entry.tx_id === 'tx-raw');
+    expect(listed?.kind).toBe('raw_cadence');
   });
 });

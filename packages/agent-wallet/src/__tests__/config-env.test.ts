@@ -33,6 +33,9 @@ describe('config/env — loadConfig', () => {
       EVM_PRIVATE_KEY: undefined,
       EVM_ACCOUNT_INDEX: undefined,
       FLOWINDEX_URL: undefined,
+      FLOW_SIMULATOR_ENABLED: undefined,
+      FLOW_SIMULATOR_URL: undefined,
+      ALLOW_RAW_CADENCE_SIGNING: undefined,
       APPROVAL_REQUIRED: undefined,
       ETHERSCAN_API_KEY: undefined,
     });
@@ -46,6 +49,9 @@ describe('config/env — loadConfig', () => {
     expect(config.hashAlgo).toBe('SHA2_256');
     expect(config.approvalRequired).toBe(true);
     expect(config.flowindexUrl).toBe('https://flowindex.io/api');
+    expect(config.flowSimulatorEnabled).toBe(true);
+    expect(config.flowSimulatorUrl).toBe('https://simulator.flowindex.io/api');
+    expect(config.allowRawCadenceSigning).toBe(false);
   });
 
   it('detects local-mnemonic signer when FLOW_MNEMONIC is set', () => {
@@ -108,6 +114,18 @@ describe('config/env — loadConfig', () => {
     setEnv({ APPROVAL_REQUIRED: 'false' });
     const config = loadConfig();
     expect(config.approvalRequired).toBe(false);
+  });
+
+  it('FLOW_SIMULATOR_ENABLED=false disables preflight simulation', () => {
+    setEnv({ FLOW_SIMULATOR_ENABLED: 'false' });
+    const config = loadConfig();
+    expect(config.flowSimulatorEnabled).toBe(false);
+  });
+
+  it('ALLOW_RAW_CADENCE_SIGNING=true enables headless raw cadence signing', () => {
+    setEnv({ ALLOW_RAW_CADENCE_SIGNING: 'true' });
+    const config = loadConfig();
+    expect(config.allowRawCadenceSigning).toBe(true);
   });
 
   it('accepts ECDSA_P256 + SHA3_256 combination', () => {

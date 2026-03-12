@@ -5,7 +5,7 @@ description: Complete reference for all MCP tools exposed by @flowindex/agent-wa
 
 # API Reference
 
-The `@flowindex/agent-wallet` MCP server exposes the following tools. Each tool is callable by any MCP-compatible client.
+The `@flowindex/agent-wallet` MCP server exposes the following MCP tools.
 
 ## Wallet Tools
 
@@ -75,7 +75,7 @@ Lists available Cadence transaction and script templates.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `category` | string | No | Filter by category (e.g., `token`, `collection`, `evm`, `bridge`) |
+| `category` | string | No | Filter by category such as `token`, `collection`, `evm`, or `bridge` |
 
 **Returns:** Array of template summaries with `name`, `category`, `type`, `description`, and `arg_count`.
 
@@ -87,34 +87,112 @@ Retrieves the full Cadence source code and argument schema for a named template.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `name` | string | Yes | Template name (e.g., `transfer_tokens_v3`) |
+| `name` | string | Yes | Template name such as `transfer_tokens_v3` |
 
-**Returns:** Template object with `name`, `category`, `type`, `description`, `cadence` (source code), and `args` (array of `{ name, type, description }`).
+**Returns:** Template object with `name`, `category`, `type`, `description`, `cadence`, and `args`.
 
 ### `execute_script`
 
-Executes a read-only Cadence script on the Flow network. Provide either a template name or raw Cadence code.
+Executes a read-only Cadence script on the Flow network using a named template.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `template_name` | string | No | Name of a script template |
-| `code` | string | No | Raw Cadence script code |
-| `args` | array | No | Script arguments in FCL arg format |
+| `template_name` | string | Yes | Name of a script template |
+| `args` | object | No | Named arguments matching the template arg schema |
 
-At least one of `template_name` or `code` must be provided.
+### `execute_cadence_script`
 
-### `execute_template`
+Executes a read-only Cadence script from raw source code. This is the freeform alternative to `execute_script`.
 
-Executes a Cadence transaction template. If approval is required and the signer is headless, the transaction is queued for manual approval.
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `cadence` | string | Yes | Raw Cadence script source code |
+| `arguments` | array | No | Ordered typed arguments in `{ type, value }` form |
+
+**Returns:**
+```json
+{
+  "result": {
+    "ok": true
+  }
+}
+```
+
+### `simulate_cadence_transaction`
+
+Runs a read-only preflight simulation for a raw Cadence transaction using the configured wallet address as both authorizer and payer.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `cadence` | string | Yes | Raw Cadence transaction source code |
+| `arguments` | array | No | Ordered typed arguments in `{ type, value }` form |
+| `scheduled` | object | No | Optional scheduled replay controls |
+
+**`scheduled` fields:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `advance_seconds` | number | No | Wait time before replaying scheduled work, max `5` |
+| `advance_blocks` | number | No | Extra blocks to advance, max `20` |
+
+**Returns:**
+```json
+{
+  "simulation": {
+    "success": true,
+    "summary": "FLOW transfer"
+  }
+}
+```
+
+### `simulate_template`
+
+Runs a read-only preflight simulation for a transaction template on the FlowIndex simulator. This does not sign or submit anything.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `template_name` | string | Yes | Name of the transaction template |
-| `args` | object | Yes | Named arguments matching the template's arg schema |
+| `args` | object | Yes | Named arguments matching the template arg schema |
+| `scheduled` | object | No | Optional scheduled replay controls |
+
+**`scheduled` fields:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `advance_seconds` | number | No | Wait time before replaying scheduled work, max `5` |
+| `advance_blocks` | number | No | Extra blocks to advance, max `20` |
+
+**Returns:**
+```json
+{
+  "success": true,
+  "summary": "FLOW transfer",
+  "transfers": [],
+  "nftTransfers": [],
+  "balanceChanges": [],
+  "scheduledResults": []
+}
+```
+
+### `execute_cadence_transaction`
+
+Submits a raw Cadence transaction with typed arguments. On mainnet, the server first attempts a non-blocking preflight simulation. Headless raw Cadence signing is approval-gated by default unless `ALLOW_RAW_CADENCE_SIGNING=true`.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `cadence` | string | Yes | Raw Cadence transaction source code |
+| `arguments` | array | No | Ordered typed arguments in `{ type, value }` form |
+| `scheduled` | object | No | Optional scheduled replay controls for the preflight simulation |
 
 **Returns (immediate execution):**
 ```json
@@ -122,7 +200,12 @@ Executes a Cadence transaction template. If approval is required and the signer 
   "status": "sealed",
   "tx_id": "abc123...",
   "block_height": 12345678,
-  "events": [{ "type": "A.xxx.FlowToken.TokensWithdrawn", "data": {} }]
+  "events": [],
+  "preflight_simulation": {
+    "success": true,
+    "summary": "FLOW transfer",
+    "error": null
+  }
 }
 ```
 
@@ -131,9 +214,52 @@ Executes a Cadence transaction template. If approval is required and the signer 
 {
   "status": "pending_approval",
   "tx_id": "uuid",
-  "summary": "transfer_tokens_v3(recipient=0x..., amount=1.0)"
+  "summary": "transaction(amount: UFix64, to: Address) [arg_count=2]",
+  "message": "Raw Cadence headless signing is disabled by default. Transaction queued for approval."
 }
 ```
+
+### `execute_template`
+
+Executes a Cadence transaction template. On mainnet, the server first attempts a non-blocking preflight simulation when simulator calls are enabled. If approval is required and the signer is headless, the transaction is queued for manual approval.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `template_name` | string | Yes | Name of the transaction template |
+| `args` | object | Yes | Named arguments matching the template arg schema |
+
+**Returns (immediate execution):**
+```json
+{
+  "status": "sealed",
+  "tx_id": "abc123...",
+  "block_height": 12345678,
+  "events": [{ "type": "A.xxx.FlowToken.TokensWithdrawn", "data": {} }],
+  "preflight_simulation": {
+    "success": true,
+    "summary": "FLOW transfer",
+    "error": null
+  }
+}
+```
+
+**Returns (approval required):**
+```json
+{
+  "status": "pending_approval",
+  "tx_id": "uuid",
+  "summary": "transfer_tokens_v3(recipient=0x..., amount=1.0)",
+  "preflight_simulation": {
+    "success": true,
+    "summary": "FLOW transfer",
+    "error": null
+  }
+}
+```
+
+If simulation is unavailable, the response may contain `preflight_simulation_skipped_reason` or `preflight_simulation_error` instead. Those cases do not block the real transaction flow.
 
 ## Approval Tools
 
@@ -147,7 +273,7 @@ Approves and executes a pending transaction.
 |------|------|----------|-------------|
 | `tx_id` | string | Yes | The pending transaction ID |
 
-**Returns:** Same as `execute_template` immediate execution result.
+**Returns:** Same as `execute_template` immediate execution result, including any stored `preflight_simulation`, `preflight_simulation_skipped_reason`, or `preflight_simulation_error`.
 
 ### `cancel_transaction`
 
@@ -171,9 +297,15 @@ Lists all transactions currently queued and awaiting approval.
   "count": 1,
   "transactions": [
     {
-      "id": "uuid",
+      "tx_id": "uuid",
+      "kind": "template",
       "summary": "transfer_tokens_v3(...)",
-      "createdAt": 1700000000000
+      "created_at": 1700000000000,
+      "preflight_simulation": {
+        "success": true,
+        "summary": "FLOW transfer",
+        "error": null
+      }
     }
   ]
 }
@@ -189,7 +321,7 @@ Returns detailed information about a Flow account including keys, contracts, and
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `address` | string | Yes | Flow address (hex, with or without `0x` prefix) |
+| `address` | string | Yes | Flow address, with or without `0x` prefix |
 
 ### `get_flow_balance`
 
@@ -203,7 +335,7 @@ Returns the native FLOW token balance for a Flow account.
 
 ### `get_ft_balance`
 
-Returns all fungible token vault balances for a Flow account (FLOW, USDC, stFlow, etc.).
+Returns all fungible token vault balances for a Flow account.
 
 **Parameters:**
 
@@ -213,7 +345,7 @@ Returns all fungible token vault balances for a Flow account (FLOW, USDC, stFlow
 
 ### `get_nft_collection`
 
-Returns all NFT collections and items held by a Flow account.
+Returns NFT collections and items held by a Flow account.
 
 **Parameters:**
 
@@ -229,7 +361,7 @@ Returns full details for a Flow transaction by its ID, including events, status,
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `tx_id` | string | Yes | Flow transaction ID (64-character hex) |
+| `tx_id` | string | Yes | Flow transaction ID |
 
 ## EVM Tools
 
@@ -247,7 +379,7 @@ Returns the native FLOW balance of an EVM address on Flow EVM.
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `address` | string | Yes | EVM address (`0x...`) |
+| `address` | string | Yes | EVM address |
 
 ### `evm_get_token_balance`
 
@@ -269,7 +401,7 @@ Sends native FLOW on Flow EVM from the agent wallet to a recipient address.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `to` | string | Yes | Recipient EVM address |
-| `amount` | string | Yes | Amount in FLOW (e.g., `"1.5"`) |
+| `amount` | string | Yes | Amount in FLOW, for example `"1.5"` |
 
 ### `evm_transfer_erc20`
 
@@ -281,12 +413,12 @@ Transfers an ERC-20 token on Flow EVM from the agent wallet to a recipient.
 |------|------|----------|-------------|
 | `token_address` | string | Yes | ERC-20 token contract address |
 | `to` | string | Yes | Recipient EVM address |
-| `amount` | string | Yes | Amount in human-readable units (e.g., `"100.0"`) |
-| `decimals` | number | No | Token decimals (default: 18) |
+| `amount` | string | Yes | Amount in human-readable units, for example `"100.0"` |
+| `decimals` | number | No | Token decimals, default `18` |
 
 ### `evm_read_contract`
 
-Calls a read-only (view/pure) function on an EVM smart contract.
+Calls a read-only function on an EVM contract.
 
 **Parameters:**
 
@@ -299,7 +431,7 @@ Calls a read-only (view/pure) function on an EVM smart contract.
 
 ### `evm_write_contract`
 
-Calls a state-changing function on an EVM smart contract.
+Calls a state-changing function on an EVM contract.
 
 **Parameters:**
 
@@ -309,14 +441,14 @@ Calls a state-changing function on an EVM smart contract.
 | `abi` | string | Yes | ABI as a JSON array string |
 | `function_name` | string | Yes | Function name to call |
 | `args` | string | No | Arguments as a JSON array string |
-| `value` | string | No | Native FLOW to send (e.g., `"0.5"`) |
+| `value` | string | No | Native FLOW to send, for example `"0.5"` |
 
 ### `evm_get_transaction`
 
-Returns details of an EVM transaction by its hash, including status, block number, gas used, and receipt.
+Returns details of an EVM transaction by its hash.
 
 **Parameters:**
 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `tx_hash` | string | Yes | Transaction hash (`0x...`) |
+| `tx_hash` | string | Yes | Transaction hash |

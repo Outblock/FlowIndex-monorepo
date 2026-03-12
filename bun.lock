@@ -334,7 +334,7 @@
         "@flowindex/flow-passkey": "workspace:*",
         "@monaco-editor/react": "^4.7.0",
         "@onflow/fcl": "^1.21.9",
-        "@outblock/cadence-language-server": "^2.0.0",
+        "@outblock/cadence-language-server": "2.1.2",
         "@outblock/flowtoken": "^1.0.0",
         "@outblock/wallet-core-lite": "^0.1.0",
         "@supabase/supabase-js": "^2.98.0",
@@ -895,7 +895,7 @@
 
     "@outblock/cadence-codegen": ["@outblock/cadence-codegen@1.1.0", "", { "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "cadence-codegen": "bin/cadence-codegen" } }, "sha512-jGtw92BjVvUie0v7tikNESVnH/ZOepw8yoohAy09gTRpVeN6TuxlYW1ypwgnu9tkyVl1EwHXU7W23t+UWD0oyg=="],
 
-    "@outblock/cadence-language-server": ["@outblock/cadence-language-server@2.0.0", "", {}, "sha512-UsS9XIrdHr5tArZpbAdTCddXAFygZUUAevyQ//f1AyIe4Lb+nSAyfIHB6u6iRBS/I/hpBKugUzMflW5e+d65+Q=="],
+    "@outblock/cadence-language-server": ["@outblock/cadence-language-server@2.1.2", "", {}, "sha512-iKQ3vjj0df1wBx1xl9V6dw+dHE7IKh6DEmZzILBos7yUZTEkze/5ndEIp399i9Ht7a8neCN3oTrxj7KlXrgyXA=="],
 
     "@outblock/flowtoken": ["@outblock/flowtoken@1.0.0", "", { "dependencies": { "react-markdown": "^9.0.1", "react-syntax-highlighter": "^15.5.0", "rehype-raw": "^7.0.0", "remark-gfm": "^4.0.0" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "sha512-9MMPLuDSIHIXxG/qZDw5zd7prikJLeiqEok6VPJguWCKZs4NqYe+2XPzgig3hgFH4jhzMlI4wr3QazcODe5hfg=="],
 

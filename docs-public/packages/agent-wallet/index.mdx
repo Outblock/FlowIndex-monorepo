@@ -1,62 +1,17 @@
 ---
-title: "@flowindex/agent-wallet"
-description: MCP server for AI agent wallets on the Flow blockchain with local keys, cloud wallet, and passkey signing
+title: Agent Wallet MCP Server
+description: Use FlowIndex Agent Wallet as an MCP server for AI agents on Flow, with local keys, cloud wallet, approval queues, and optional preflight simulation
 ---
 
-# @flowindex/agent-wallet
+# Agent Wallet MCP Server
 
-An [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that gives AI agents a full Flow blockchain wallet. Supports local key signing, cloud-custodied wallets, and passkey-based approval flows. Includes native Flow EVM support.
+`@flowindex/agent-wallet` is an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server first.
 
-```bash
-bun add @flowindex/agent-wallet
-```
+You install it from npm because MCP hosts need a local command to launch, but the primary product is the MCP server: wallet tools, Cadence templates, approval flows, Flow EVM support, and optional transaction simulation before signing.
 
-**Requirements:** Node.js 20+
+## Quick Start
 
-## Features
-
-- **MCP Protocol** -- Exposes wallet operations as MCP tools that any MCP-compatible AI client (Claude, etc.) can call
-- **Multiple Signer Types** -- Local mnemonic, local private key, cloud wallet (JWT-authenticated), and interactive cloud login
-- **Flow + Flow EVM** -- Full support for both Cadence transactions and EVM operations (transfers, ERC-20, contract calls)
-- **Cadence Template Library** -- Built-in library of Cadence transaction and script templates (token transfers, NFT operations, EVM bridging, etc.)
-- **Transaction Approval** -- Optional approval queue that lets agents propose transactions for human review before execution
-- **Account Discovery** -- Automatically discovers Flow accounts associated with a public key
-
-## Architecture
-
-The server registers five groups of MCP tools:
-
-| Tool Group | Tools | Description |
-|------------|-------|-------------|
-| **Wallet** | `wallet_status`, `wallet_login`, `wallet_login_status` | Wallet configuration, status, and interactive login |
-| **Templates** | `list_templates`, `get_template`, `execute_script`, `execute_template` | Cadence template browsing and execution |
-| **Approval** | `confirm_transaction`, `cancel_transaction`, `list_pending` | Transaction approval queue management |
-| **Flow Query** | `get_account`, `get_flow_balance`, `get_ft_balance`, `get_nft_collection`, `get_transaction` | Read-only Flow blockchain queries |
-| **EVM** | `evm_wallet_address`, `evm_get_balance`, `evm_get_token_balance`, `evm_transfer`, `evm_transfer_erc20`, `evm_read_contract`, `evm_write_contract`, `evm_get_transaction` | Flow EVM operations |
-
-## Signer Types
-
-The signer type is determined automatically from environment variables:
-
-| Priority | Signer Type | Trigger | Behavior |
-|----------|-------------|---------|----------|
-| 1 | `local-mnemonic` | `FLOW_MNEMONIC` is set | Derives Flow key via BIP-44 (`m/44'/539'/0'/0/0`), EVM key via standard path |
-| 2 | `local-key` | `FLOW_PRIVATE_KEY` is set | Uses the raw private key directly |
-| 3 | `cloud` | `FLOWINDEX_TOKEN` is set | Delegates signing to the FlowIndex custodial API |
-| 4 | `cloud-interactive` | None of the above | Requires user to authenticate via `wallet_login` before signing |
-
-## Quick Example
-
-Run the server with a local key:
-
-```bash
-FLOW_PRIVATE_KEY=abc123... \
-FLOW_ADDRESS=0x1234567890abcdef \
-FLOW_NETWORK=mainnet \
-npx @flowindex/agent-wallet
-```
-
-Or add it to your Claude Desktop MCP configuration:
+Add it to your MCP host config. Claude Desktop example:
 
 ```json
 {
@@ -67,9 +22,80 @@ Or add it to your Claude Desktop MCP configuration:
       "env": {
         "FLOW_PRIVATE_KEY": "your-private-key",
         "FLOW_ADDRESS": "0x1234567890abcdef",
-        "FLOW_NETWORK": "mainnet"
+        "FLOW_NETWORK": "mainnet",
+        "APPROVAL_REQUIRED": "true"
       }
     }
   }
 }
 ```
+
+Once the server is running, Claude or any other MCP-compatible client can call the wallet tools directly.
+
+## Why Use It As MCP
+
+- MCP-native wallet tools instead of a custom integration layer
+- Local signing, cloud wallet signing, and interactive login in one server
+- Built-in Cadence transaction and script templates
+- Approval queue for human-in-the-loop transaction review
+- Flow and Flow EVM support in the same tool surface
+- Optional preflight simulation on mainnet before a transaction is signed
+
+## Core Tool Groups
+
+| Tool Group | Tools | Description |
+|---|---|---|
+| Wallet | `wallet_status`, `wallet_login`, `wallet_login_status` | Wallet configuration, status, and interactive login |
+| Templates | `list_templates`, `get_template`, `execute_script`, `execute_cadence_script`, `simulate_cadence_transaction`, `simulate_template`, `execute_cadence_transaction`, `execute_template` | Cadence template browsing, freeform script execution, transaction simulation, and submission |
+| Approval | `confirm_transaction`, `cancel_transaction`, `list_pending` | Pending transaction review and execution |
+| Flow Query | `get_account`, `get_flow_balance`, `get_ft_balance`, `get_nft_collection`, `get_transaction` | Read-only Flow data access |
+| EVM | `evm_wallet_address`, `evm_get_balance`, `evm_get_token_balance`, `evm_transfer`, `evm_transfer_erc20`, `evm_read_contract`, `evm_write_contract`, `evm_get_transaction` | Flow EVM operations |
+
+## Recommended Setup Modes
+
+You do not need a stack of MCP servers just to let an agent sign transactions.
+
+| Mode | Install | Best For |
+|---|---|---|
+| Wallet Mode | `agent-wallet` only | Most users who want signing, approval, templates, and simulation |
+| Cadence Developer Mode | `agent-wallet` + Cadence MCP | Agents that need to research, execute scripts, simulate, check, and repair custom Cadence |
+| Hybrid Mode | `agent-wallet` + Cadence MCP + Flow EVM MCP | Projects that span Cadence and Flow EVM |
+
+The Cadence skill is optional. It improves coding-agent output, but signing and approval should not depend on a skill being installed.
+
+## Signer Modes
+
+The server picks the signer mode from environment variables:
+
+| Priority | Signer Type | Trigger | Behavior |
+|---|---|---|---|
+| 1 | `local-mnemonic` | `FLOW_MNEMONIC` is set | Derives the Flow key via BIP-44 and keeps signing local |
+| 2 | `local-key` | `FLOW_PRIVATE_KEY` is set | Uses the raw private key directly |
+| 3 | `cloud` | `FLOWINDEX_TOKEN` is set | Delegates signing to the FlowIndex custodial wallet API |
+| 4 | `cloud-interactive` | No local key env vars and no token | Requires `wallet_login` before signing |
+
+## Preflight Simulation
+
+On mainnet, the server can call FlowIndex Simulator before signing a Cadence transaction template.
+
+- `simulate_template` is the explicit read-only MCP tool
+- `simulate_cadence_transaction` does the same for raw Cadence transactions with typed arguments
+- `execute_cadence_transaction` submits raw transactions, but headless raw signing is approval-gated by default
+- `execute_template` also attaches `preflight_simulation` metadata when the simulator is enabled
+- simulation failures do not block the real wallet flow
+- set `FLOW_SIMULATOR_ENABLED=false` to disable all simulator calls
+- set `ALLOW_RAW_CADENCE_SIGNING=true` only if you want headless raw Cadence transactions to skip that extra approval gate
+
+For freeform read-only work, `execute_cadence_script` lets the agent run raw Cadence script source directly without adding a template first.
+
+Simulation uses a public mainnet fork, so it is mainnet-only.
+
+## npm Package, But As Runtime
+
+If you want to install it directly, you still can:
+
+```bash
+bun add @flowindex/agent-wallet
+```
+
+That install step is just how your MCP host gets the executable. The recommended usage model remains: configure it as an MCP server and let your AI client call the tools.

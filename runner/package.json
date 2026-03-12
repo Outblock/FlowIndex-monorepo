@@ -20,7 +20,7 @@
     "@flowindex/flow-passkey": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@onflow/fcl": "^1.21.9",
-    "@outblock/cadence-language-server": "^2.0.0",
+    "@outblock/cadence-language-server": "2.1.2",
     "@outblock/flowtoken": "^1.0.0",
     "@outblock/wallet-core-lite": "^0.1.0",
     "@supabase/supabase-js": "^2.98.0",

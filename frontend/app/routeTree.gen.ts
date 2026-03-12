@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as PlaygroundRouteImport } from './routes/playground'
 import { Route as NodesRouteImport } from './routes/nodes'
+import { Route as EcosystemRouteImport } from './routes/ecosystem'
 import { Route as ApiDocsRouteImport } from './routes/api-docs'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -32,6 +33,7 @@ import { Route as TxsTxIdRouteImport } from './routes/txs/$txId'
 import { Route as TxTxIdRouteImport } from './routes/tx/$txId'
 import { Route as TransactionsTxIdRouteImport } from './routes/transactions/$txId'
 import { Route as TokensTokenRouteImport } from './routes/tokens/$token'
+import { Route as ScheduledIdRouteImport } from './routes/scheduled/$id'
 import { Route as NftsNftTypeRouteImport } from './routes/nfts/$nftType'
 import { Route as KeyPublicKeyRouteImport } from './routes/key/$publicKey'
 import { Route as DeveloperWalletRouteImport } from './routes/developer/wallet'
@@ -67,6 +69,11 @@ const PlaygroundRoute = PlaygroundRouteImport.update({
 const NodesRoute = NodesRouteImport.update({
   id: '/nodes',
   path: '/nodes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EcosystemRoute = EcosystemRouteImport.update({
+  id: '/ecosystem',
+  path: '/ecosystem',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDocsRoute = ApiDocsRouteImport.update({
@@ -167,6 +174,11 @@ const TransactionsTxIdRoute = TransactionsTxIdRouteImport.update({
 const TokensTokenRoute = TokensTokenRouteImport.update({
   id: '/tokens/$token',
   path: '/tokens/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScheduledIdRoute = ScheduledIdRouteImport.update({
+  id: '/scheduled/$id',
+  path: '/scheduled/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NftsNftTypeRoute = NftsNftTypeRouteImport.update({
@@ -283,6 +295,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/api-docs': typeof ApiDocsRoute
+  '/ecosystem': typeof EcosystemRoute
   '/nodes': typeof NodesRoute
   '/playground': typeof PlaygroundRoute
   '/stats': typeof StatsRoute
@@ -302,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/developer/wallet': typeof DeveloperWalletRoute
   '/key/$publicKey': typeof KeyPublicKeyRoute
   '/nfts/$nftType': typeof NftsNftTypeRouteWithChildren
+  '/scheduled/$id': typeof ScheduledIdRoute
   '/tokens/$token': typeof TokensTokenRoute
   '/transactions/$txId': typeof TransactionsTxIdRoute
   '/tx/$txId': typeof TxTxIdRoute
@@ -329,6 +343,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/api-docs': typeof ApiDocsRoute
+  '/ecosystem': typeof EcosystemRoute
   '/nodes': typeof NodesRoute
   '/playground': typeof PlaygroundRoute
   '/stats': typeof StatsRoute
@@ -346,6 +361,7 @@ export interface FileRoutesByTo {
   '/developer/studio': typeof DeveloperStudioRoute
   '/developer/wallet': typeof DeveloperWalletRoute
   '/key/$publicKey': typeof KeyPublicKeyRoute
+  '/scheduled/$id': typeof ScheduledIdRoute
   '/tokens/$token': typeof TokensTokenRoute
   '/transactions/$txId': typeof TransactionsTxIdRoute
   '/tx/$txId': typeof TxTxIdRoute
@@ -374,6 +390,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/api-docs': typeof ApiDocsRoute
+  '/ecosystem': typeof EcosystemRoute
   '/nodes': typeof NodesRoute
   '/playground': typeof PlaygroundRoute
   '/stats': typeof StatsRoute
@@ -393,6 +410,7 @@ export interface FileRoutesById {
   '/developer/wallet': typeof DeveloperWalletRoute
   '/key/$publicKey': typeof KeyPublicKeyRoute
   '/nfts/$nftType': typeof NftsNftTypeRouteWithChildren
+  '/scheduled/$id': typeof ScheduledIdRoute
   '/tokens/$token': typeof TokensTokenRoute
   '/transactions/$txId': typeof TransactionsTxIdRoute
   '/tx/$txId': typeof TxTxIdRoute
@@ -422,6 +440,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/api-docs'
+    | '/ecosystem'
     | '/nodes'
     | '/playground'
     | '/stats'
@@ -441,6 +460,7 @@ export interface FileRouteTypes {
     | '/developer/wallet'
     | '/key/$publicKey'
     | '/nfts/$nftType'
+    | '/scheduled/$id'
     | '/tokens/$token'
     | '/transactions/$txId'
     | '/tx/$txId'
@@ -468,6 +488,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/api-docs'
+    | '/ecosystem'
     | '/nodes'
     | '/playground'
     | '/stats'
@@ -485,6 +506,7 @@ export interface FileRouteTypes {
     | '/developer/studio'
     | '/developer/wallet'
     | '/key/$publicKey'
+    | '/scheduled/$id'
     | '/tokens/$token'
     | '/transactions/$txId'
     | '/tx/$txId'
@@ -512,6 +534,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/analytics'
     | '/api-docs'
+    | '/ecosystem'
     | '/nodes'
     | '/playground'
     | '/stats'
@@ -531,6 +554,7 @@ export interface FileRouteTypes {
     | '/developer/wallet'
     | '/key/$publicKey'
     | '/nfts/$nftType'
+    | '/scheduled/$id'
     | '/tokens/$token'
     | '/transactions/$txId'
     | '/tx/$txId'
@@ -559,6 +583,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ApiDocsRoute: typeof ApiDocsRoute
+  EcosystemRoute: typeof EcosystemRoute
   NodesRoute: typeof NodesRoute
   PlaygroundRoute: typeof PlaygroundRoute
   StatsRoute: typeof StatsRoute
@@ -578,6 +603,7 @@ export interface RootRouteChildren {
   DeveloperWalletRoute: typeof DeveloperWalletRoute
   KeyPublicKeyRoute: typeof KeyPublicKeyRoute
   NftsNftTypeRoute: typeof NftsNftTypeRouteWithChildren
+  ScheduledIdRoute: typeof ScheduledIdRoute
   TokensTokenRoute: typeof TokensTokenRoute
   TransactionsTxIdRoute: typeof TransactionsTxIdRoute
   TxTxIdRoute: typeof TxTxIdRoute
@@ -617,6 +643,13 @@ declare module '@tanstack/react-router' {
       path: '/nodes'
       fullPath: '/nodes'
       preLoaderRoute: typeof NodesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ecosystem': {
+      id: '/ecosystem'
+      path: '/ecosystem'
+      fullPath: '/ecosystem'
+      preLoaderRoute: typeof EcosystemRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api-docs': {
@@ -757,6 +790,13 @@ declare module '@tanstack/react-router' {
       path: '/tokens/$token'
       fullPath: '/tokens/$token'
       preLoaderRoute: typeof TokensTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scheduled/$id': {
+      id: '/scheduled/$id'
+      path: '/scheduled/$id'
+      fullPath: '/scheduled/$id'
+      preLoaderRoute: typeof ScheduledIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nfts/$nftType': {
@@ -945,6 +985,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AnalyticsRoute: AnalyticsRoute,
   ApiDocsRoute: ApiDocsRoute,
+  EcosystemRoute: EcosystemRoute,
   NodesRoute: NodesRoute,
   PlaygroundRoute: PlaygroundRoute,
   StatsRoute: StatsRoute,
@@ -964,6 +1005,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeveloperWalletRoute: DeveloperWalletRoute,
   KeyPublicKeyRoute: KeyPublicKeyRoute,
   NftsNftTypeRoute: NftsNftTypeRouteWithChildren,
+  ScheduledIdRoute: ScheduledIdRoute,
   TokensTokenRoute: TokensTokenRoute,
   TransactionsTxIdRoute: TransactionsTxIdRoute,
   TxTxIdRoute: TxTxIdRoute,

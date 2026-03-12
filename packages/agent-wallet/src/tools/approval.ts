@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerContext } from '../server/server.js';
 import { getPendingTx, removePendingTx, listPendingTxs } from '../approval/manager.js';
+import { executeCadenceTransaction } from '../cadence/transaction.js';
 import { executeTransaction } from './templates.js';
 import { getTemplate } from '../templates/registry.js';
 
@@ -57,16 +58,37 @@ export function registerApprovalTools(server: McpServer, ctx: ServerContext): vo
         // Remove from the queue before executing so it cannot be double-confirmed
         removePendingTx(tx_id);
 
-        // Re-resolve the template to get the correct arg ordering
-        const template = getTemplate(pending.template_name);
-        if (!template) {
-          return jsonContent({ error: `Template "${pending.template_name}" no longer found` }, true);
-        }
-        const orderedArgs = template.args.map((a) => pending.args[a.name]);
+        let result;
 
-        // Execute via codegen service (handles FCL arg typing automatically)
-        const result = await executeTransaction(ctx.cadenceService, pending.template_name, orderedArgs);
-        return jsonContent(result);
+        if (pending.kind === 'template') {
+          // Re-resolve the template to get the correct arg ordering
+          const template = getTemplate(pending.template_name);
+          if (!template) {
+            return jsonContent({ error: `Template "${pending.template_name}" no longer found` }, true);
+          }
+          const orderedArgs = template.args.map((a) => pending.args[a.name]);
+          result = await executeTransaction(ctx.cadenceService, pending.template_name, orderedArgs);
+        } else {
+          result = await executeCadenceTransaction(
+            pending.cadence,
+            pending.arguments,
+            ctx.signer,
+            ctx.config.network,
+          );
+        }
+
+        return jsonContent({
+          ...result,
+          ...(pending.preflightSimulation
+            ? { preflight_simulation: pending.preflightSimulation }
+            : {}),
+          ...(pending.preflightSimulationSkippedReason
+            ? { preflight_simulation_skipped_reason: pending.preflightSimulationSkippedReason }
+            : {}),
+          ...(pending.preflightSimulationError
+            ? { preflight_simulation_error: pending.preflightSimulationError }
+            : {}),
+        });
       } catch (error) {
         return jsonContent({ error: String(error) }, true);
       }

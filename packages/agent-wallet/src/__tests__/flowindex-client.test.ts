@@ -74,6 +74,27 @@ describe('FlowIndexClient', () => {
     expect(mockFetch).toHaveBeenCalledWith('https://test.api/flow/transaction/abc123');
   });
 
+  it('simulateTransaction posts to simulator URL', async () => {
+    client = new FlowIndexClient('https://test.api', 'https://simulate.test/api');
+    mockOk({ success: true, summary: 'ok', balanceChanges: [], computationUsed: 0, tags: [], events: [] });
+    await client.simulateTransaction({
+      cadence: 'transaction() {}',
+      arguments: [],
+      authorizers: ['0x1234'],
+      payer: '0x1234',
+    });
+    expect(mockFetch).toHaveBeenCalledWith('https://simulate.test/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cadence: 'transaction() {}',
+        arguments: [],
+        authorizers: ['0x1234'],
+        payer: '0x1234',
+      }),
+    });
+  });
+
   it('throws on HTTP error with status and body', async () => {
     mockError(404, 'Not Found');
     await expect(client.getAccount('bad')).rejects.toThrow('FlowIndex API error 404: Not Found');

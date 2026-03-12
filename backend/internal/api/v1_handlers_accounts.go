@@ -677,40 +677,119 @@ func (s *Server) handleFlowAccountFTTokenTransfers(w http.ResponseWriter, r *htt
 func (s *Server) handleFlowAccountScheduledTransactions(w http.ResponseWriter, r *http.Request) {
 	address := normalizeAddr(mux.Vars(r)["address"])
 	limit, offset := parseLimitOffset(r)
-	txs, err := s.repo.GetScheduledTransactionsByAddress(r.Context(), address, limit, offset)
+	items, total, err := s.repo.GetScheduledTransactionsByOwner(r.Context(), address, limit, offset)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	txIDs := collectTxIDs(txs)
-	tags, _ := s.repo.GetTxTagsByTransactionIDs(r.Context(), txIDs)
-	feesByTx, _ := s.repo.GetTransactionFeesByIDs(r.Context(), txIDs)
-	contracts, _ := s.repo.GetTxContractsByTransactionIDs(r.Context(), txIDs)
-
-	out := make([]map[string]interface{}, 0, len(txs))
-	for _, t := range txs {
-		out = append(out, toFlowTransactionOutput(t, nil, contracts[t.ID], tags[t.ID], feesByTx[t.ID]))
+	out := make([]map[string]interface{}, 0, len(items))
+	for _, st := range items {
+		out = append(out, toScheduledTransactionOutput(st))
 	}
-	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": len(out)}, nil)
+	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": len(out), "total": total}, nil)
 }
 
 func (s *Server) handleFlowScheduledTransactions(w http.ResponseWriter, r *http.Request) {
 	limit, offset := parseLimitOffset(r)
-	txs, err := s.repo.GetScheduledTransactions(r.Context(), limit, offset)
+	statusFilter := r.URL.Query().Get("status")
+	items, total, err := s.repo.GetScheduledTransactionsPage(r.Context(), limit, offset, statusFilter)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	txIDs := collectTxIDs(txs)
-	tags, _ := s.repo.GetTxTagsByTransactionIDs(r.Context(), txIDs)
-	feesByTx, _ := s.repo.GetTransactionFeesByIDs(r.Context(), txIDs)
-	contracts, _ := s.repo.GetTxContractsByTransactionIDs(r.Context(), txIDs)
-
-	out := make([]map[string]interface{}, 0, len(txs))
-	for _, t := range txs {
-		out = append(out, toFlowTransactionOutput(t, nil, contracts[t.ID], tags[t.ID], feesByTx[t.ID]))
+	out := make([]map[string]interface{}, 0, len(items))
+	for _, st := range items {
+		out = append(out, toScheduledTransactionOutput(st))
 	}
-	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": len(out)}, nil)
+	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": len(out), "total": total}, nil)
+}
+
+func (s *Server) handleFlowScheduledTransactionByID(w http.ResponseWriter, r *http.Request) {
+	idStr := mux.Vars(r)["id"]
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, "invalid scheduled transaction id")
+		return
+	}
+	st, err := s.repo.GetScheduledTransactionByID(r.Context(), id)
+	if err != nil {
+		writeAPIError(w, http.StatusNotFound, "scheduled transaction not found")
+		return
+	}
+	out := toScheduledTransactionOutput(*st)
+
+	// Include handler stats (total executions by status for this owner)
+	if stats, err := s.repo.GetScheduledHandlerStats(r.Context(), st.HandlerOwner); err == nil {
+		out["handler_stats"] = stats
+	}
+
+	writeAPIResponse(w, out, nil, nil)
+}
+
+func toScheduledTransactionOutput(st models.ScheduledTransaction) map[string]interface{} {
+	out := map[string]interface{}{
+		"scheduled_id":             st.ScheduledID,
+		"priority":                 st.Priority,
+		"priority_label":           scheduledPriorityLabel(st.Priority),
+		"expected_at":              st.ExpectedTimestamp.Format(time.RFC3339),
+		"execution_effort":         st.ExecutionEffort,
+		"fees":                     st.Fees,
+		"handler_owner":            formatAddressV1(st.HandlerOwner),
+		"handler_type":             st.HandlerType,
+		"handler_contract":         parseScheduledContractName(st.HandlerType),
+		"handler_contract_address": parseScheduledContractAddress(st.HandlerType),
+		"handler_uuid":             st.HandlerUUID,
+		"handler_public_path":      st.HandlerPublicPath,
+		"scheduled_block":          st.ScheduledBlock,
+		"scheduled_tx_id":          "0x" + st.ScheduledTxID,
+		"scheduled_at":             st.ScheduledAt.Format(time.RFC3339),
+		"status":                   st.Status,
+		"executed_block":           st.ExecutedBlock,
+		"executed_tx_id":           nil,
+		"executed_at":              nil,
+		"fees_returned":            st.FeesReturned,
+		"fees_deducted":            st.FeesDeducted,
+	}
+	if st.ExecutedTxID != nil && *st.ExecutedTxID != "" {
+		out["executed_tx_id"] = "0x" + *st.ExecutedTxID
+	}
+	if st.ExecutedAt != nil {
+		out["executed_at"] = st.ExecutedAt.Format(time.RFC3339)
+	}
+	return out
+}
+
+func scheduledPriorityLabel(p int) string {
+	switch p {
+	case 0:
+		return "High"
+	case 1:
+		return "Medium"
+	case 2:
+		return "Low"
+	default:
+		return "Unknown"
+	}
+}
+
+// parseScheduledContractName extracts the contract name from a type identifier
+// like "A.b13b21a06b75536d.SwapKeepAliveHandler.Handler" -> "SwapKeepAliveHandler"
+func parseScheduledContractName(typeID string) string {
+	parts := strings.Split(typeID, ".")
+	if len(parts) >= 3 {
+		return parts[2]
+	}
+	return typeID
+}
+
+// parseScheduledContractAddress extracts the contract address from a type identifier
+// like "A.b13b21a06b75536d.SwapKeepAliveHandler.Handler" -> "0xb13b21a06b75536d"
+func parseScheduledContractAddress(typeID string) string {
+	parts := strings.Split(typeID, ".")
+	if len(parts) >= 2 {
+		return "0x" + parts[1]
+	}
+	return ""
 }
 
 func (s *Server) handleFlowAccountNFTByCollection(w http.ResponseWriter, r *http.Request) {

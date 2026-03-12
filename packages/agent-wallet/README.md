@@ -93,11 +93,14 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `EVM_PRIVATE_KEY` | -- | Separate EVM key (derives from Flow key if unset) |
 | `EVM_ACCOUNT_INDEX` | `0` | BIP-44 account index for EVM key derivation |
 | `FLOWINDEX_TOKEN` | -- | FlowIndex API token for cloud wallet |
-| `FLOWINDEX_URL` | `https://flowindex.io` | FlowIndex API base URL |
+| `FLOWINDEX_URL` | `https://flowindex.io/api` | FlowIndex API base URL |
+| `FLOW_SIMULATOR_ENABLED` | `true` | Enable or disable mainnet preflight simulation calls |
+| `FLOW_SIMULATOR_URL` | `https://simulator.flowindex.io/api` | FlowIndex simulator base URL for preflight transaction simulation |
+| `ALLOW_RAW_CADENCE_SIGNING` | `false` | Allow headless raw Cadence transactions to skip the approval queue |
 | `APPROVAL_REQUIRED` | `true` | Require confirmation before signing transactions |
 | `ETHERSCAN_API_KEY` | -- | For EVM contract ABI lookup |
 
-## Available Tools (23)
+## Available Tools (27)
 
 ### Wallet (3)
 
@@ -107,13 +110,17 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `wallet_login` | Start cloud wallet login (returns URL for user to open) |
 | `wallet_login_status` | Check if cloud wallet login completed |
 
-### Templates (4)
+### Templates (8)
 
 | Tool | Description |
 |---|---|
 | `list_templates` | List available Cadence templates by category |
 | `get_template` | Read a template's Cadence source code |
 | `execute_script` | Run a read-only Cadence script (no signing) |
+| `execute_cadence_script` | Run a read-only Cadence script from raw source code |
+| `simulate_cadence_transaction` | Simulate a raw Cadence transaction with typed arguments |
+| `simulate_template` | Run a mainnet preflight simulation for a transaction template without signing or submitting |
+| `execute_cadence_transaction` | Submit a raw Cadence transaction, with approval required by default for headless signers |
 | `execute_template` | Execute a transaction template (requires signing) |
 
 ### Approval (3)
@@ -147,6 +154,18 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `evm_write_contract` | Call a state-changing EVM contract function |
 | `evm_get_transaction` | Get EVM transaction receipt |
 
+## Recommended Setup Modes
+
+You do not need multiple MCP servers just to let an agent sign transactions.
+
+| Mode | Install | Best For |
+|---|---|---|
+| Wallet Mode | `@flowindex/agent-wallet` only | Most users who want signing, approval, templates, and simulation |
+| Cadence Developer Mode | `@flowindex/agent-wallet` + Cadence MCP | Agents that need to research, execute scripts, simulate, check, and repair custom Cadence |
+| Hybrid Mode | `@flowindex/agent-wallet` + Cadence MCP + Flow EVM MCP | Projects that span Cadence and Flow EVM |
+
+The Cadence skill is optional. It improves coding-agent output, but signing and approval should not depend on a skill being installed.
+
 ## Signing Modes
 
 | Mode | Config | Headless | Description |
@@ -160,10 +179,27 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 
 When `APPROVAL_REQUIRED=true` (the default), transactions follow a two-step flow:
 
-1. **Agent calls `execute_template`** -- the transaction is queued as "pending" and returns a `pendingId`
+1. **Agent calls `execute_template`** -- on mainnet, the wallet first runs a preflight simulation, then queues the transaction as "pending" and returns a `pendingId` plus the simulation result when available
 2. **Agent calls `confirm_transaction`** with the `pendingId` -- the transaction is signed, sent, and the result returned
 
 The agent can also call `cancel_transaction` to reject, or `list_pending` to see all queued transactions. Set `APPROVAL_REQUIRED=false` for fully autonomous headless operation.
+
+### Preflight Simulation
+
+- `simulate_template` is a read-only tool that lets the agent preview a transaction before signing.
+- `simulate_cadence_transaction` does the same for raw Cadence transactions with typed arguments.
+- `execute_template` also attaches a preflight simulation result automatically on mainnet whenever the simulator is available.
+- Set `FLOW_SIMULATOR_ENABLED=false` to disable all simulator calls without changing the rest of the wallet flow.
+- Simulation currently uses the public FlowIndex mainnet-fork simulator, so it is **mainnet-only**. On testnet, simulation is skipped with an explicit reason.
+- Advanced scheduled transaction replay is available through `simulate_template.scheduled`.
+  `advance_seconds` is capped at `5` and `advance_blocks` is capped at `20`.
+
+### Freeform Cadence
+
+- `execute_cadence_script` lets the agent run raw read-only Cadence without registering a template first.
+- `simulate_cadence_transaction` lets the agent preview a raw transaction with the configured wallet address as both authorizer and payer.
+- `execute_cadence_transaction` lets the agent submit raw transactions too, but headless signing is approval-gated by default.
+- Set `ALLOW_RAW_CADENCE_SIGNING=true` only if you explicitly want headless raw Cadence transactions to bypass that extra gate.
 
 ### Passkey Approval (cloud wallet with passkey signing)
 

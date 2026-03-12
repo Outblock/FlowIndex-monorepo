@@ -442,6 +442,28 @@ type StakingNode struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 }
 
+// ScheduledTransaction represents a scheduled transaction from app.scheduled_transactions.
+type ScheduledTransaction struct {
+	ScheduledID       int64      `json:"scheduled_id"`
+	Priority          int        `json:"priority"`
+	ExpectedTimestamp time.Time  `json:"expected_timestamp"`
+	ExecutionEffort   int64      `json:"execution_effort"`
+	Fees              string     `json:"fees"`
+	HandlerOwner      string     `json:"handler_owner"`
+	HandlerType       string     `json:"handler_type"`
+	HandlerUUID       int64      `json:"handler_uuid"`
+	HandlerPublicPath string     `json:"handler_public_path"`
+	ScheduledBlock    uint64     `json:"scheduled_block"`
+	ScheduledTxID     string     `json:"scheduled_tx_id"`
+	ScheduledAt       time.Time  `json:"scheduled_at"`
+	Status            string     `json:"status"`
+	ExecutedBlock     *uint64    `json:"executed_block,omitempty"`
+	ExecutedTxID      *string    `json:"executed_tx_id,omitempty"`
+	ExecutedAt        *time.Time `json:"executed_at,omitempty"`
+	FeesReturned      *string    `json:"fees_returned,omitempty"`
+	FeesDeducted      *string    `json:"fees_deducted,omitempty"`
+}
+
 // StakingDelegator represents a staking delegator from app.staking_delegators.
 type StakingDelegator struct {
 	DelegatorID     int       `json:"delegator_id"`

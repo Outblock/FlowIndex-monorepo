@@ -1345,6 +1345,8 @@ func (s *Server) handleAdminReprocessWorker(w http.ResponseWriter, r *http.Reque
 		proc = ingester.NewTokenWorker(s.repo)
 	case "evm_worker":
 		proc = ingester.NewEVMWorker(s.repo)
+	case "scheduled_worker":
+		proc = ingester.NewScheduledWorker(s.repo)
 	case "proposer_key_backfill":
 		// Prefer history client (has all spork nodes) over API client (mainnet28 only)
 		flowCli := s.historyClient
@@ -1357,7 +1359,7 @@ func (s *Server) handleAdminReprocessWorker(w http.ResponseWriter, r *http.Reque
 		}
 		proc = ingester.NewProposerKeyBackfillWorker(s.repo, flowCli)
 	default:
-		writeAPIError(w, http.StatusBadRequest, fmt.Sprintf("unsupported worker: %s (supported: token_worker, evm_worker, proposer_key_backfill)", req.Worker))
+		writeAPIError(w, http.StatusBadRequest, fmt.Sprintf("unsupported worker: %s (supported: token_worker, evm_worker, scheduled_worker, proposer_key_backfill)", req.Worker))
 		return
 	}
 

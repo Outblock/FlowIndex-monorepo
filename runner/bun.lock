@@ -8,7 +8,7 @@
         "@ai-sdk/react": "^3.0.103",
         "@monaco-editor/react": "^4.7.0",
         "@onflow/fcl": "^1.21.9",
-        "@outblock/cadence-language-server": "^2.0.0",
+        "@outblock/cadence-language-server": "2.1.2",
         "@outblock/flowtoken": "^1.0.0",
         "@supabase/supabase-js": "^2.98.0",
         "@trustwallet/wallet-core": "^4.6.0",
@@ -245,7 +245,7 @@
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.0", "", {}, "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="],
 
-    "@outblock/cadence-language-server": ["@outblock/cadence-language-server@2.0.0", "", {}, "sha512-UsS9XIrdHr5tArZpbAdTCddXAFygZUUAevyQ//f1AyIe4Lb+nSAyfIHB6u6iRBS/I/hpBKugUzMflW5e+d65+Q=="],
+    "@outblock/cadence-language-server": ["@outblock/cadence-language-server@2.1.2", "", {}, "sha512-iKQ3vjj0df1wBx1xl9V6dw+dHE7IKh6DEmZzILBos7yUZTEkze/5ndEIp399i9Ht7a8neCN3oTrxj7KlXrgyXA=="],
 
     "@outblock/flowtoken": ["@outblock/flowtoken@1.0.0", "", { "dependencies": { "react-markdown": "^9.0.1", "react-syntax-highlighter": "^15.5.0", "rehype-raw": "^7.0.0", "remark-gfm": "^4.0.0" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "sha512-9MMPLuDSIHIXxG/qZDw5zd7prikJLeiqEok6VPJguWCKZs4NqYe+2XPzgig3hgFH4jhzMlI4wr3QazcODe5hfg=="],
 

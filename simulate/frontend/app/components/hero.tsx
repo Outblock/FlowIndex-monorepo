@@ -153,6 +153,7 @@ function Screw({ className }: { className?: string }) {
 /* ── Physical Monitor Housing ── */
 export function Hero() {
   const [phase, setPhase] = useState<Phase>('idle')
+  const [isOn, setIsOn] = useState(true)
   const [bootIdx, setBootIdx] = useState(0)
   const [charIdx, setCharIdx] = useState(0)
   const timerRef = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -171,48 +172,62 @@ export function Hero() {
     timerRef.current.push(setTimeout(fn, ms))
   }
 
+  const startSequence = () => {
+    clearTimers()
+    setPhase('boot')
+    setBootIdx(0)
+    setCharIdx(0)
+
+    // Boot sequence
+    let bIdx = 0
+    const bootInterval = setInterval(() => {
+      bIdx++
+      setBootIdx(bIdx)
+      if (bIdx >= BOOT_LOGS.length) {
+        clearInterval(bootInterval)
+        setTimeout(() => {
+          setPhase('typing')
+          startTyping()
+        }, 400)
+      }
+    }, 150)
+    intervalRef.current = bootInterval
+  }
+
+  const startTyping = () => {
+    let idx = 0
+    const typeInterval = setInterval(() => {
+      idx += 3
+      if (idx >= TOTAL_CHARS) {
+        idx = TOTAL_CHARS
+        setCharIdx(TOTAL_CHARS)
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        intervalRef.current = null
+        return
+      }
+      setCharIdx(idx)
+    }, 8)
+    intervalRef.current = typeInterval
+
+    const typingDuration = Math.ceil(TOTAL_CHARS / 3) * 8
+    schedule(() => setPhase('ready'), typingDuration + 300)
+    schedule(() => setPhase('running'), typingDuration + 800)
+    schedule(() => setPhase('done'), typingDuration + 1600)
+  }
+
   useEffect(() => {
-    const run = () => {
+    if (isOn) {
+      schedule(startSequence, 500)
+    } else {
       clearTimers()
-      setPhase('boot')
-      
-      let bIdx = 0
-      const bootInterval = setInterval(() => {
-        bIdx++
-        setBootIdx(bIdx)
-        if (bIdx >= BOOT_LOGS.length) {
-          clearInterval(bootInterval)
-          setTimeout(() => {
-            setPhase('typing')
-            startTyping()
-          }, 400)
-        }
-      }, 150)
+      setPhase('idle')
     }
-
-    const startTyping = () => {
-      let idx = 0
-      intervalRef.current = setInterval(() => {
-        idx += 3
-        if (idx >= TOTAL_CHARS) {
-          idx = TOTAL_CHARS
-          setCharIdx(TOTAL_CHARS)
-          if (intervalRef.current) clearInterval(intervalRef.current)
-          intervalRef.current = null
-          return
-        }
-        setCharIdx(idx)
-      }, 8)
-
-      const typingDuration = Math.ceil(TOTAL_CHARS / 3) * 8
-      schedule(() => setPhase('ready'), typingDuration + 300)
-      schedule(() => setPhase('running'), typingDuration + 800)
-      schedule(() => setPhase('done'), typingDuration + 1600)
-    }
-
-    schedule(run, 500)
     return clearTimers
-  }, [])
+  }, [isOn])
+
+  const togglePower = () => {
+    setIsOn(!isOn)
+  }
 
   const scrollToPlayground = () => {
     document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth' })
@@ -247,7 +262,13 @@ export function Hero() {
             <div className="relative bg-[#080808] rounded-[1rem] sm:rounded-[1.5rem] p-2 sm:p-6 border-2 sm:border-4 border-black shadow-[inset_0_0_40px_rgba(0,0,0,1)]">
 
               {/* Glass / CRT Layer */}
-              <div className="crt-screen crt-scanlines crt-vignette crt-flicker relative bg-[#010a03] h-[320px] sm:h-[460px] flex flex-col border border-emerald-950/40 rounded-[0.8rem] sm:rounded-[1rem]">
+              <div 
+                className={`crt-screen crt-scanlines crt-vignette crt-flicker relative bg-[#010a03] h-[320px] sm:h-[460px] flex flex-col border border-emerald-950/40 rounded-[0.8rem] sm:rounded-[1rem] transition-all duration-500 ${!isOn ? 'opacity-0 scale-y-[0.001] scale-x-0' : 'opacity-100 scale-100'}`}
+                style={{ 
+                  transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
+                  filter: isOn ? 'none' : 'brightness(2)' 
+                }}
+              >
 
                 {/* Internal Screen Content */}
                 <div className="relative z-[10] p-3 sm:p-6 flex-1 flex flex-col font-mono text-emerald-500 overflow-hidden">
@@ -366,6 +387,11 @@ export function Hero() {
                   )}
                 </div>
               </div>
+
+              {/* Screen Shadow when off */}
+              {!isOn && (
+                <div className="absolute inset-2 sm:inset-6 bg-black rounded-[0.8rem] sm:rounded-[1rem] z-[5]" />
+              )}
             </div>
 
             {/* Control Panel / Branding Strip */}
@@ -397,17 +423,20 @@ export function Hero() {
 
                 <div className="flex flex-col items-center sm:items-end gap-1.5 sm:gap-2.5">
                   <div className="flex gap-2 sm:gap-2.5">
-                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${phase === 'done' ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-emerald-950/20'}`} />
-                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${phase === 'running' ? 'bg-amber-500 shadow-[0_0_12px_#f59e0b]' : 'bg-amber-900/30'}`} />
-                    <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-zinc-900 shadow-inner" />
+                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${phase === 'done' && isOn ? 'bg-emerald-500 shadow-[0_0_12px_#10b981]' : 'bg-emerald-950/20'}`} />
+                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full transition-all duration-500 ${phase === 'running' && isOn ? 'bg-amber-500 shadow-[0_0_12px_#f59e0b]' : 'bg-amber-900/30'}`} />
+                    <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-zinc-900 shadow-inner ${isOn ? 'bg-zinc-800' : 'bg-black'}`} />
                   </div>
                   <span className="text-[6px] sm:text-[7px] tracking-[2px] sm:tracking-[3px] text-zinc-700 uppercase font-bold whitespace-nowrap">System Load</span>
                 </div>
 
                 {/* Large Power Button - Refined */}
-                <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-[#111] border-b-2 sm:border-b-4 border-black shadow-[0_4px_0_#080808,0_6px_10px_rgba(0,0,0,0.8)] flex items-center justify-center cursor-pointer hover:translate-y-[1px] active:translate-y-[3px] transition-all">
-                  <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-red-950 border border-red-900/20 flex items-center justify-center shadow-inner">
-                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-800 shadow-[0_0_5px_rgba(153,27,27,0.8)]" />
+                <div 
+                  onClick={togglePower}
+                  className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-[#111] border-b-2 sm:border-b-4 border-black shadow-[0_4px_0_#080808,0_6px_10px_rgba(0,0,0,0.8)] flex items-center justify-center cursor-pointer hover:translate-y-[1px] active:translate-y-[3px] transition-all group/btn"
+                >
+                  <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border border-red-900/20 flex items-center justify-center shadow-inner transition-colors duration-300 ${isOn ? 'bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)]' : 'bg-red-950'}`}>
+                    <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shadow-[inset_0_0_4px_black] transition-colors ${isOn ? 'bg-red-400' : 'bg-red-900'}`} />
                   </div>
                 </div>
               </div>

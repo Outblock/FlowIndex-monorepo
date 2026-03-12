@@ -228,6 +228,7 @@ func main() {
 	enableDailyStatsWorker := os.Getenv("ENABLE_DAILY_STATS_WORKER") != "false"
 	enableAnalyticsDeriverWorker := os.Getenv("ENABLE_ANALYTICS_DERIVER_WORKER") != "false"
 	enableDefiWorker := os.Getenv("ENABLE_DEFI_WORKER") != "false"
+	enableScheduledWorker := os.Getenv("ENABLE_SCHEDULED_WORKER") != "false"
 	enableNFTItemMetadataWorker := os.Getenv("ENABLE_NFT_ITEM_METADATA_WORKER") != "false"
 	enableNFTReconciler := os.Getenv("ENABLE_NFT_RECONCILER") != "false"
 	enableProposerKeyBackfill := os.Getenv("ENABLE_PROPOSER_KEY_BACKFILL") == "true" // opt-in
@@ -248,6 +249,7 @@ func main() {
 		enableDailyStatsWorker = false
 		enableAnalyticsDeriverWorker = false
 		enableDefiWorker = false
+		enableScheduledWorker = false
 		enableNFTItemMetadataWorker = false
 		enableNFTReconciler = false
 		os.Setenv("ENABLE_LIVE_DERIVERS", "false")
@@ -295,6 +297,9 @@ func main() {
 		}
 		if enableDefiWorker {
 			processors = append(processors, ingester.NewDefiWorker(repo))
+		}
+		if enableScheduledWorker {
+			processors = append(processors, ingester.NewScheduledWorker(repo))
 		}
 		// NOTE: daily_stats_worker and analytics_deriver_worker are intentionally
 		// excluded from live_deriver. They call RefreshDailyStatsRange which does a
@@ -357,6 +362,7 @@ func main() {
 		{"tx_metrics_worker", enableTxMetricsWorker, func() ingester.Processor { return ingester.NewTxMetricsWorker(repo) }},
 		{"staking_worker", enableStakingWorker, func() ingester.Processor { return ingester.NewStakingWorker(repo) }},
 		{"defi_worker", enableDefiWorker, func() ingester.Processor { return ingester.NewDefiWorker(repo) }},
+		{"scheduled_worker", enableScheduledWorker, func() ingester.Processor { return ingester.NewScheduledWorker(repo) }},
 		// NOTE: daily_stats_worker and analytics_deriver_worker are NOT in the deriver.
 		// They do full table scans on raw.transactions per affected date — too heavy for
 		// deriver pipelines. They run as standalone async workers instead.
