@@ -63,4 +63,34 @@ describe('approval/manager', () => {
     const list = listPendingTxs();
     expect(list.find((t) => t.tx_id === 'tx-rm')).toBeUndefined();
   });
+
+  it('listPendingTxs includes preflight simulation summary when present', () => {
+    addAndTrack('tx-preflight', {
+      preflightSimulation: {
+        success: true,
+        summary: 'Transfer 1 FLOW',
+        computationUsed: 123,
+        balanceChanges: [],
+        tags: [],
+        events: [],
+        summaryItems: [],
+        transfers: [],
+        nftTransfers: [],
+        systemEvents: [],
+        evmExecutions: [],
+        evmLogTransfers: [],
+        defiEvents: [],
+        stakingEvents: [],
+        fee: 0,
+      },
+    });
+
+    const list = listPendingTxs();
+    const pending = list.find((t) => t.tx_id === 'tx-preflight');
+    expect(pending?.preflight_simulation).toEqual({
+      success: true,
+      summary: 'Transfer 1 FLOW',
+      error: null,
+    });
+  });
 });

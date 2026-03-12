@@ -1,97 +1,15 @@
 ---
 title: Getting Started
-description: Set up the Flow Agent Wallet MCP server for AI agents
+description: Configure the Flow Agent Wallet MCP server for Claude Desktop and other MCP hosts
 ---
 
 # Getting Started
 
-This guide walks through setting up `@flowindex/agent-wallet` with different signer configurations.
+This guide assumes you want to run `@flowindex/agent-wallet` as an MCP server.
 
-## Installation
+## 1. Add the MCP Server
 
-```bash
-bun add @flowindex/agent-wallet
-```
-
-Or install globally for CLI use:
-
-```bash
-npm install -g @flowindex/agent-wallet
-```
-
-## Configuration
-
-All configuration is done through environment variables. The server auto-detects the signer type based on which variables are set.
-
-### Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `FLOW_NETWORK` | No | `mainnet` | Flow network (`mainnet` or `testnet`) |
-| `FLOW_MNEMONIC` | No | -- | BIP-39 mnemonic phrase (triggers `local-mnemonic` signer) |
-| `FLOW_PRIVATE_KEY` | No | -- | Hex-encoded private key (triggers `local-key` signer) |
-| `FLOW_ADDRESS` | No | -- | Explicit Flow address (auto-discovered if omitted) |
-| `FLOW_KEY_INDEX` | No | `0` | Key index on the Flow account |
-| `FLOW_SIG_ALGO` | No | `ECDSA_secp256k1` | Signature algorithm (`ECDSA_P256` or `ECDSA_secp256k1`) |
-| `FLOW_HASH_ALGO` | No | `SHA2_256` | Hash algorithm (`SHA2_256` or `SHA3_256`) |
-| `EVM_PRIVATE_KEY` | No | -- | Dedicated EVM private key (falls back to Flow key) |
-| `EVM_ACCOUNT_INDEX` | No | `0` | EVM derivation index when using mnemonic |
-| `FLOWINDEX_TOKEN` | No | -- | FlowIndex API JWT token (triggers `cloud` signer) |
-| `FLOWINDEX_URL` | No | `https://flowindex.io` | FlowIndex API base URL |
-| `APPROVAL_REQUIRED` | No | `true` | Require manual approval for transactions |
-
-### Option 1: Local Private Key
-
-The simplest setup. Provide a raw private key and the associated Flow address:
-
-```bash
-export FLOW_PRIVATE_KEY="your-64-char-hex-private-key"
-export FLOW_ADDRESS="0x1234567890abcdef"
-export FLOW_NETWORK="testnet"
-```
-
-If you omit `FLOW_ADDRESS`, the server will attempt to discover accounts associated with the public key using the FlowIndex key indexer.
-
-### Option 2: Mnemonic Phrase
-
-Derive keys from a BIP-39 mnemonic. The Flow key uses path `m/44'/539'/0'/0/0` (secp256k1), and the EVM key uses the standard Ethereum path:
-
-```bash
-export FLOW_MNEMONIC="word1 word2 word3 ... word12"
-export FLOW_NETWORK="mainnet"
-```
-
-### Option 3: Cloud Wallet
-
-Use the FlowIndex custodial wallet API. Requires a JWT token from FlowIndex:
-
-```bash
-export FLOWINDEX_TOKEN="eyJhbG..."
-export FLOW_NETWORK="mainnet"
-```
-
-### Option 4: Interactive Cloud Login
-
-If no credentials are provided, the server starts in interactive mode. The AI agent must call `wallet_login` to initiate authentication, which returns a URL the user opens in a browser.
-
-```bash
-export FLOW_NETWORK="mainnet"
-# No FLOW_MNEMONIC, FLOW_PRIVATE_KEY, or FLOWINDEX_TOKEN
-```
-
-## Running the Server
-
-### Standalone (stdio transport)
-
-```bash
-npx @flowindex/agent-wallet
-```
-
-The server communicates over stdio using the MCP protocol. It logs status information to stderr.
-
-### With Claude Desktop
-
-Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+Claude Desktop example:
 
 ```json
 {
@@ -100,9 +18,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
       "command": "npx",
       "args": ["@flowindex/agent-wallet"],
       "env": {
-        "FLOW_PRIVATE_KEY": "your-private-key",
-        "FLOW_ADDRESS": "0x1234567890abcdef",
-        "FLOW_NETWORK": "testnet",
+        "FLOW_NETWORK": "mainnet",
         "APPROVAL_REQUIRED": "true"
       }
     }
@@ -110,33 +26,151 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 }
 ```
 
-### Inspecting Tools
+If you are using another MCP host, the same environment variables apply. Only the place where you register the command changes.
 
-Use the MCP inspector to browse available tools interactively:
+## 2. Pick a Signer Mode
+
+The server auto-detects the signer type from the environment:
+
+| Signer Type | Trigger | Use Case |
+|---|---|---|
+| `cloud-interactive` | No key env vars and no `FLOWINDEX_TOKEN` | Best default for interactive use with a real user in the loop |
+| `cloud` | `FLOWINDEX_TOKEN` is set | Headless cloud wallet access |
+| `local-mnemonic` | `FLOW_MNEMONIC` is set | Local signing with an HD wallet |
+| `local-key` | `FLOW_PRIVATE_KEY` is set | Local signing with a raw private key |
+
+### Local Private Key
+
+```bash
+export FLOW_PRIVATE_KEY="your-64-char-hex-private-key"
+export FLOW_ADDRESS="0x1234567890abcdef"
+export FLOW_NETWORK="mainnet"
+```
+
+If you omit `FLOW_ADDRESS`, the server will try to discover accounts associated with the public key through FlowIndex.
+
+### Mnemonic Phrase
+
+```bash
+export FLOW_MNEMONIC="word1 word2 word3 ... word12"
+export FLOW_NETWORK="mainnet"
+```
+
+### Cloud Wallet
+
+```bash
+export FLOWINDEX_TOKEN="eyJhbG..."
+export FLOW_NETWORK="mainnet"
+```
+
+### Interactive Cloud Login
+
+```bash
+export FLOW_NETWORK="mainnet"
+```
+
+With no local keys and no `FLOWINDEX_TOKEN`, the server starts in interactive mode. The AI agent calls `wallet_login`, gets a browser URL, and the user authenticates there.
+
+## 3. Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `FLOW_NETWORK` | No | `mainnet` | Flow network: `mainnet` or `testnet` |
+| `FLOW_MNEMONIC` | No | -- | BIP-39 mnemonic phrase for local signing |
+| `FLOW_PRIVATE_KEY` | No | -- | Hex-encoded private key for local signing |
+| `FLOW_ADDRESS` | No | -- | Explicit Flow address; otherwise the server attempts discovery |
+| `FLOW_KEY_INDEX` | No | `0` | Key index on the Flow account |
+| `FLOW_SIG_ALGO` | No | `ECDSA_secp256k1` | `ECDSA_P256` or `ECDSA_secp256k1` |
+| `FLOW_HASH_ALGO` | No | `SHA2_256` | `SHA2_256` or `SHA3_256` |
+| `EVM_PRIVATE_KEY` | No | -- | Dedicated EVM private key; falls back to Flow key material when unset |
+| `EVM_ACCOUNT_INDEX` | No | `0` | EVM derivation index when using a mnemonic |
+| `FLOWINDEX_TOKEN` | No | -- | FlowIndex wallet token for cloud signing |
+| `FLOWINDEX_URL` | No | `https://flowindex.io/api` | FlowIndex API base URL |
+| `FLOW_SIMULATOR_ENABLED` | No | `true` | Enable mainnet preflight simulation calls |
+| `FLOW_SIMULATOR_URL` | No | `https://simulator.flowindex.io/api` | Simulator base URL |
+| `APPROVAL_REQUIRED` | No | `true` | Require manual confirmation before signing Cadence transactions |
+| `ETHERSCAN_API_KEY` | No | -- | Optional Etherscan key for EVM ABI lookup |
+
+## 4. Preflight Simulation
+
+Mainnet transaction templates can be simulated before signing.
+
+- `simulate_template` is the explicit read-only MCP tool
+- `execute_template` also attempts a preflight simulation on mainnet
+- if the simulator call fails, transaction execution still proceeds
+- set `FLOW_SIMULATOR_ENABLED=false` to skip simulator calls entirely
+
+The public FlowIndex simulator is a mainnet fork, so testnet requests are skipped with an explicit reason instead of failing the wallet flow.
+
+## 5. Optional Cadence Authoring Add-On
+
+If you want the agent to write and repair custom Cadence instead of only using wallet templates, add the Cadence MCP server alongside `agent-wallet`.
+
+Claude Desktop example:
+
+```json
+{
+  "mcpServers": {
+    "flow-wallet": {
+      "command": "npx",
+      "args": ["@flowindex/agent-wallet"]
+    },
+    "cadence": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://cadence-mcp.up.railway.app/mcp"]
+    }
+  }
+}
+```
+
+That gives the agent:
+
+- Flow wallet signing and approval through `agent-wallet`
+- documentation lookup through Cadence MCP
+- Cadence checking, symbol lookup, and security scanning through Cadence MCP
+
+If you are using a coding-focused agent such as Codex or Claude Code, you can also add the Cadence skill:
+
+```bash
+npx skills add outblock/cadence-lang.org
+```
+
+The skill is optional. It improves long-lived context and language recall, but the signing path should still work with `agent-wallet` alone.
+
+## 6. Approval Flow
+
+`APPROVAL_REQUIRED=true` is the default.
+
+- `execute_template` proposes a transaction
+- if approval is required, the server returns a pending transaction ID
+- `confirm_transaction` signs and submits it later
+- `cancel_transaction` discards it
+- `list_pending` shows everything still waiting
+
+This keeps the MCP tool interface safe by default while still allowing fully headless mode when you set `APPROVAL_REQUIRED=false`.
+
+## 7. Local Runtime And Inspector
+
+If you want to run the server directly outside an MCP host:
+
+```bash
+npx @flowindex/agent-wallet
+```
+
+To inspect the MCP tool surface locally:
 
 ```bash
 npx @modelcontextprotocol/inspector node node_modules/@flowindex/agent-wallet/dist/index.js
 ```
 
-## Transaction Approval
+## 8. Cadence Templates
 
-By default, `APPROVAL_REQUIRED=true`. When enabled, transaction templates executed via `execute_template` are queued instead of submitted immediately. The AI agent receives a pending transaction ID and must call `confirm_transaction` to actually submit it.
+The server ships with built-in Cadence templates across several categories:
 
-This provides a human-in-the-loop safety mechanism -- the agent can propose transactions, but a human (or secondary check) must approve them.
-
-To disable and allow immediate execution:
-
-```bash
-export APPROVAL_REQUIRED=false
-```
-
-## Cadence Templates
-
-The server ships with a built-in library of Cadence templates organized by category:
-
-- **token** -- Fungible token transfers, vault setup
-- **collection** -- NFT transfers (single and batch)
-- **evm** -- COA creation, EVM contract calls, cross-VM transfers
-- **bridge** -- FlowEVMBridge token bridging operations
+- `token`: fungible token transfers and vault setup
+- `collection`: NFT transfers, setup, and collection reads
+- `evm`: COA creation, EVM calls, and cross-VM operations
+- `bridge`: FlowEVMBridge token bridging
+- `base`, `hybrid-custody`, and `lost-and-found` utilities
 
 Use `list_templates` to browse available templates and `get_template` to inspect a specific template's source code and argument schema.

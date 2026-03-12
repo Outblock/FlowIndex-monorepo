@@ -10,6 +10,8 @@ import type { ServerContext } from '../server/server.js';
 import { getTemplate, listTemplates } from '../templates/registry.js';
 import { addPendingTx } from '../approval/manager.js';
 import type { CadenceService } from '../templates/cadence.gen.js';
+import type { SimulateTransactionResponse } from '../flowindex/client.js';
+import { maybeSimulateTemplate } from '../simulate/template.js';
 import * as fcl from '@onflow/fcl';
 
 // ---------------------------------------------------------------------------
@@ -20,6 +22,49 @@ function jsonContent(data: unknown, isError = false) {
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
     ...(isError ? { isError: true } : {}),
+  };
+}
+
+function summarizeTemplateInvocation(
+  templateName: string,
+  args: Record<string, unknown>,
+  orderedArgNames: string[],
+): string {
+  return `${templateName}(${orderedArgNames.map((name) => `${name}=${JSON.stringify(args[name])}`).join(', ')})`;
+}
+
+function buildOrderedArgs(
+  args: Record<string, unknown> | undefined,
+  orderedArgNames: string[],
+): unknown[] {
+  return orderedArgNames.map((name) => {
+    const val = args?.[name];
+    if (val === undefined) {
+      throw new Error(`Missing required argument: ${name}`);
+    }
+    return val;
+  });
+}
+
+function withPreflightSimulation<T extends object>(
+  payload: T,
+  preflight: {
+    simulation?: SimulateTransactionResponse;
+    skippedReason?: string;
+    error?: string;
+  },
+): T & {
+  preflight_simulation?: SimulateTransactionResponse;
+  preflight_simulation_skipped_reason?: string;
+  preflight_simulation_error?: string;
+} {
+  return {
+    ...payload,
+    ...(preflight.simulation ? { preflight_simulation: preflight.simulation } : {}),
+    ...(preflight.skippedReason
+      ? { preflight_simulation_skipped_reason: preflight.skippedReason }
+      : {}),
+    ...(preflight.error ? { preflight_simulation_error: preflight.error } : {}),
   };
 }
 
@@ -196,6 +241,79 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
   );
 
   // -------------------------------------------------------------------------
+  // simulate_template
+  // -------------------------------------------------------------------------
+  server.registerTool(
+    'simulate_template',
+    {
+      title: 'Simulate Cadence Transaction Template',
+      description:
+        'Run a preflight simulation for a Cadence transaction template on the public FlowIndex simulator. This is mainnet-only and does not sign or submit anything.',
+      inputSchema: {
+        template_name: z.string().describe('Name of the transaction template to simulate'),
+        args: z.record(z.any()).describe('Named arguments matching the template arg schema'),
+        scheduled: z
+          .object({
+            advance_seconds: z.number().min(0).max(5).optional(),
+            advance_blocks: z.number().int().min(0).max(20).optional(),
+          })
+          .optional()
+          .describe('Optional scheduled-transaction replay controls for mainnet simulation.'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({
+      template_name,
+      args,
+      scheduled,
+    }: {
+      template_name: string;
+      args: Record<string, unknown>;
+      scheduled?: { advance_seconds?: number; advance_blocks?: number };
+    }) => {
+      try {
+        const template = getTemplate(template_name);
+        if (!template) {
+          return jsonContent({ error: `Template "${template_name}" not found` }, true);
+        }
+        if (template.type !== 'transaction') {
+          return jsonContent({ error: `Template "${template_name}" is a script, use execute_script instead` }, true);
+        }
+
+        const preflight = await maybeSimulateTemplate(
+          ctx.config,
+          ctx.signer,
+          template,
+          args,
+          scheduled,
+        );
+
+        if (preflight.simulation) {
+          return jsonContent({
+            template_name,
+            summary: summarizeTemplateInvocation(
+              template_name,
+              args,
+              template.args.map((arg) => arg.name),
+            ),
+            simulation: preflight.simulation,
+          });
+        }
+
+        const message = preflight.skippedReason ?? preflight.error ?? 'Simulation unavailable';
+        return jsonContent({ error: message }, true);
+      } catch (error) {
+        return jsonContent({ error: String(error) }, true);
+      }
+    },
+  );
+
+  // -------------------------------------------------------------------------
   // execute_template
   // -------------------------------------------------------------------------
   server.registerTool(
@@ -225,37 +343,45 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
           return jsonContent({ error: `Template "${template_name}" is a script, use execute_script instead` }, true);
         }
 
-        // Extract raw values in template-defined order
-        const orderedArgs = template.args.map((argDef) => {
-          const val = args[argDef.name];
-          if (val === undefined) {
-            throw new Error(`Missing required argument: ${argDef.name}`);
-          }
-          return val;
-        });
+        const orderedArgNames = template.args.map((argDef) => argDef.name);
+        const orderedArgs = buildOrderedArgs(args, orderedArgNames);
+        const summary = summarizeTemplateInvocation(template_name, args, orderedArgNames);
+        const preflight = await maybeSimulateTemplate(
+          ctx.config,
+          ctx.signer,
+          template,
+          args,
+        );
 
         // Check if approval is needed
         if (ctx.config.approvalRequired && ctx.signer.isHeadless()) {
           const txId = randomUUID();
-          const summary = `${template_name}(${template.args.map((a) => `${a.name}=${JSON.stringify(args[a.name])}`).join(', ')})`;
           addPendingTx(txId, {
             template_name,
             cadence: template.cadence,
             args,
             summary,
             createdAt: Date.now(),
+            preflightSimulation: preflight.simulation,
+            preflightSimulationSkippedReason: preflight.skippedReason,
+            preflightSimulationError: preflight.error,
           });
-          return jsonContent({
-            status: 'pending_approval',
-            tx_id: txId,
-            summary,
-            message: 'Transaction queued for approval. Use the approve_transaction tool to sign and submit.',
-          });
+          return jsonContent(
+            withPreflightSimulation(
+              {
+                status: 'pending_approval',
+                tx_id: txId,
+                summary,
+                message: 'Transaction queued for approval. Use the confirm_transaction tool to sign and submit.',
+              },
+              preflight,
+            ),
+          );
         }
 
         // Execute immediately via codegen service
         const result = await executeTransaction(ctx.cadenceService, template_name, orderedArgs);
-        return jsonContent(result);
+        return jsonContent(withPreflightSimulation(result, preflight));
       } catch (error) {
         return jsonContent({ error: String(error) }, true);
       }

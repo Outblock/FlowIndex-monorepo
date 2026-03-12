@@ -12,6 +12,8 @@ export interface AgentWalletConfig {
   evmAccountIndex: number;
   flowindexToken?: string;
   flowindexUrl: string;
+  flowSimulatorEnabled: boolean;
+  flowSimulatorUrl?: string;
   approvalRequired: boolean;
   etherscanApiKey?: string;
   signerType: SignerType;
@@ -20,6 +22,16 @@ export interface AgentWalletConfig {
 const VALID_NETWORKS = ['mainnet', 'testnet'] as const;
 const VALID_SIG_ALGOS = ['ECDSA_P256', 'ECDSA_secp256k1'] as const;
 const VALID_HASH_ALGOS = ['SHA2_256', 'SHA3_256'] as const;
+
+function parseOptionalBoolean(raw: string | undefined, defaultValue: boolean): boolean {
+  if (raw === undefined) return defaultValue;
+
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+
+  return defaultValue;
+}
 
 export function loadConfig(): AgentWalletConfig {
   const mnemonic = process.env.FLOW_MNEMONIC?.trim();
@@ -66,7 +78,9 @@ export function loadConfig(): AgentWalletConfig {
     evmAccountIndex: parseInt(process.env.EVM_ACCOUNT_INDEX || '0', 10),
     flowindexToken,
     flowindexUrl: process.env.FLOWINDEX_URL || 'https://flowindex.io/api',
-    approvalRequired: process.env.APPROVAL_REQUIRED !== 'false',
+    flowSimulatorEnabled: parseOptionalBoolean(process.env.FLOW_SIMULATOR_ENABLED, true),
+    flowSimulatorUrl: process.env.FLOW_SIMULATOR_URL || 'https://simulator.flowindex.io/api',
+    approvalRequired: parseOptionalBoolean(process.env.APPROVAL_REQUIRED, true),
     etherscanApiKey: process.env.ETHERSCAN_API_KEY?.trim(),
     signerType,
   };

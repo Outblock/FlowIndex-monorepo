@@ -66,7 +66,18 @@ export function registerApprovalTools(server: McpServer, ctx: ServerContext): vo
 
         // Execute via codegen service (handles FCL arg typing automatically)
         const result = await executeTransaction(ctx.cadenceService, pending.template_name, orderedArgs);
-        return jsonContent(result);
+        return jsonContent({
+          ...result,
+          ...(pending.preflightSimulation
+            ? { preflight_simulation: pending.preflightSimulation }
+            : {}),
+          ...(pending.preflightSimulationSkippedReason
+            ? { preflight_simulation_skipped_reason: pending.preflightSimulationSkippedReason }
+            : {}),
+          ...(pending.preflightSimulationError
+            ? { preflight_simulation_error: pending.preflightSimulationError }
+            : {}),
+        });
       } catch (error) {
         return jsonContent({ error: String(error) }, true);
       }
