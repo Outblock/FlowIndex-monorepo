@@ -28,7 +28,7 @@ export interface SimulateResponse {
     tx_id: string
     success: boolean
     error?: string | null
-    events: Array<{ type: string; payload: unknown }>
+    events?: Array<{ type: string; payload: unknown }>
     computation_used: number
   }>
   // Decoded fields from event-decoder

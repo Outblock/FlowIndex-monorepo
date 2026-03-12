@@ -194,9 +194,11 @@ export function ResultPanel({ result }: ResultPanelProps) {
                   <div className="mt-1 text-[10px] text-zinc-500 font-mono break-all">
                     {scheduled.tx_id}
                   </div>
-                  <div className="mt-1 text-[10px] text-zinc-400">
-                    {scheduled.events.length} event{scheduled.events.length === 1 ? '' : 's'}
-                  </div>
+                  {(scheduled.events?.length ?? 0) > 0 && (
+                    <div className="mt-1 text-[10px] text-zinc-400">
+                      {scheduled.events!.length} event{scheduled.events!.length === 1 ? '' : 's'}
+                    </div>
+                  )}
                   {scheduled.error && (
                     <pre className="mt-2 text-[10px] text-red-400 whitespace-pre-wrap break-all">{scheduled.error}</pre>
                   )}

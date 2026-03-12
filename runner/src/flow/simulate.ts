@@ -57,7 +57,7 @@ export interface SimulateResponse {
     tx_id: string;
     success: boolean;
     error?: string;
-    events: RawEvent[];
+    events?: RawEvent[];
     computation_used: number;
   }>;
   balanceChanges: BalanceChange[];
