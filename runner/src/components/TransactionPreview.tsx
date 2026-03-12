@@ -1,6 +1,30 @@
 import { useState, useEffect, useRef } from 'react';
 import { Loader2, ChevronDown, ChevronRight, AlertTriangle, CheckCircle2, XCircle, Send, Rocket } from 'lucide-react';
+import Avatar from 'boring-avatars';
 import type { SimulateResponse } from '../flow/simulate';
+
+/** Ensure address has 0x prefix */
+function fmtAddr(addr: string): string {
+  if (!addr) return addr;
+  return addr.startsWith('0x') ? addr : `0x${addr}`;
+}
+
+/** Short address with 0x prefix */
+function shortAddr(addr: string): string {
+  const full = fmtAddr(addr);
+  if (full.length <= 10) return full;
+  return `${full.slice(0, 8)}...${full.slice(-4)}`;
+}
+
+function AddressChip({ address }: { address: string }) {
+  const full = fmtAddr(address);
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Avatar size={14} name={full} variant="beam" colors={['#00ef8b', '#2563eb', '#7c3aed', '#f59e0b', '#ef4444']} />
+      <span className="text-[11px] text-zinc-300 font-mono">{shortAddr(address)}</span>
+    </span>
+  );
+}
 
 interface TransactionPreviewProps {
   /** 'transaction' or 'contract' */
@@ -105,11 +129,18 @@ export default function TransactionPreview({
                         {simResult.success ? 'Simulation Passed' : 'Simulation Failed'}
                       </span>
                     </div>
-                    {simResult.computationUsed > 0 && (
-                      <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
-                        {simResult.computationUsed.toLocaleString()} computation
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {simResult.fee > 0 && (
+                        <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+                          {simResult.fee.toFixed(8)} FLOW
+                        </span>
+                      )}
+                      {simResult.computationUsed > 0 && (
+                        <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700">
+                          {simResult.computationUsed.toLocaleString()} comp
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Error message */}
@@ -122,40 +153,10 @@ export default function TransactionPreview({
                     </div>
                   )}
 
-                  {/* Balance changes */}
-                  {simResult.balanceChanges.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
-                        Balance Changes
-                      </div>
-                      <div className="space-y-1">
-                        {simResult.balanceChanges.map((change, i) => {
-                          const isNegative = change.delta.startsWith('-');
-                          return (
-                            <div
-                              key={i}
-                              className="flex items-center justify-between bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-xs text-zinc-400 font-mono truncate">{change.address}</span>
-                                <span className="text-[10px] text-zinc-500">{change.token}</span>
-                              </div>
-                              <div className="flex flex-col items-end shrink-0 ml-2">
-                                <span className={`text-xs font-mono font-medium ${
-                                  isNegative ? 'text-red-400' : 'text-emerald-400'
-                                }`}>
-                                  {isNegative ? change.delta : `+${change.delta}`}
-                                </span>
-                                {change.before && change.after && (
-                                  <span className="text-[10px] text-zinc-500 font-mono">
-                                    {change.before} {'->'} {change.after}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                  {/* Summary */}
+                  {simResult.summary && (
+                    <div className="bg-emerald-900/15 border border-emerald-800/40 rounded px-3 py-2">
+                      <span className="text-xs text-emerald-300">{simResult.summary}</span>
                     </div>
                   )}
 
@@ -189,15 +190,17 @@ export default function TransactionPreview({
                           const typeLabel = ft.transfer_type === 'mint' ? 'Mint' : ft.transfer_type === 'burn' ? 'Burn' : 'Transfer';
                           const typeColor = ft.transfer_type === 'mint' ? 'text-emerald-400' : ft.transfer_type === 'burn' ? 'text-red-400' : 'text-zinc-400';
                           return (
-                            <div key={i} className="flex items-center justify-between bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={`text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
-                                <span className="text-xs text-zinc-200 font-mono">{amount} {tokenName}</span>
+                            <div key={i} className="bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
+                                  <span className="text-xs text-zinc-200 font-mono">{amount} {tokenName}</span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono truncate ml-2">
-                                {ft.from_address && <span>{ft.from_address.slice(0, 8)}...</span>}
-                                {ft.from_address && ft.to_address && <span>&rarr;</span>}
-                                {ft.to_address && <span>{ft.to_address.slice(0, 8)}...</span>}
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {ft.from_address && <AddressChip address={ft.from_address} />}
+                                {ft.from_address && ft.to_address && <span className="text-zinc-500 text-[10px]">&rarr;</span>}
+                                {ft.to_address && <AddressChip address={ft.to_address} />}
                               </div>
                             </div>
                           );
@@ -218,15 +221,52 @@ export default function TransactionPreview({
                           const typeLabel = nft.transfer_type === 'mint' ? 'Mint' : nft.transfer_type === 'burn' ? 'Burn' : 'Transfer';
                           const typeColor = nft.transfer_type === 'mint' ? 'text-emerald-400' : nft.transfer_type === 'burn' ? 'text-red-400' : 'text-zinc-400';
                           return (
-                            <div key={i} className="flex items-center justify-between bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5">
-                              <div className="flex items-center gap-2 min-w-0">
+                            <div key={i} className="bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5">
+                              <div className="flex items-center gap-2">
                                 <span className={`text-[10px] font-medium ${typeColor}`}>{typeLabel}</span>
                                 <span className="text-xs text-zinc-200 font-mono">{collectionName} #{nft.token_id}</span>
                               </div>
-                              <div className="flex items-center gap-1 text-[10px] text-zinc-500 font-mono truncate ml-2">
-                                {nft.from_address && <span>{nft.from_address.slice(0, 8)}...</span>}
-                                {nft.from_address && nft.to_address && <span>&rarr;</span>}
-                                {nft.to_address && <span>{nft.to_address.slice(0, 8)}...</span>}
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {nft.from_address && <AddressChip address={nft.from_address} />}
+                                {nft.from_address && nft.to_address && <span className="text-zinc-500 text-[10px]">&rarr;</span>}
+                                {nft.to_address && <AddressChip address={nft.to_address} />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Balance changes */}
+                  {simResult.balanceChanges.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
+                        Balance Changes
+                      </div>
+                      <div className="space-y-1">
+                        {simResult.balanceChanges.map((change, i) => {
+                          const isNegative = change.delta.startsWith('-');
+                          return (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between bg-zinc-800/50 border border-zinc-700 rounded px-3 py-1.5"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <AddressChip address={change.address} />
+                                <span className="text-[10px] text-zinc-500">{change.token}</span>
+                              </div>
+                              <div className="flex flex-col items-end shrink-0 ml-2">
+                                <span className={`text-xs font-mono font-medium ${
+                                  isNegative ? 'text-red-400' : 'text-emerald-400'
+                                }`}>
+                                  {isNegative ? change.delta : `+${change.delta}`}
+                                </span>
+                                {change.before && change.after && (
+                                  <span className="text-[10px] text-zinc-500 font-mono">
+                                    {change.before} {'->'} {change.after}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );
@@ -249,6 +289,17 @@ export default function TransactionPreview({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Tags */}
+                  {simResult.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {simResult.tags.map((tag, i) => (
+                        <span key={i} className="text-[9px] bg-zinc-800/60 border border-zinc-700/40 text-zinc-400 px-1.5 py-0.5 rounded">
+                          {tag}
+                        </span>
+                      ))}
                     </div>
                   )}
 

@@ -67,11 +67,14 @@ export interface SimulateResponse {
   transfers: FTTransfer[];
   nftTransfers: NFTTransfer[];
   systemEvents: SystemEvent[];
+  fee: number;
   tags: string[];
 }
 
+const SIMULATE_URL = import.meta.env.VITE_SIMULATE_URL || 'https://simulator.flowindex.io';
+
 export async function simulateTransaction(req: SimulateRequest): Promise<SimulateResponse> {
-  const resp = await fetch('/api/flow/v1/simulate', {
+  const resp = await fetch(`${SIMULATE_URL}/api/simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -91,11 +94,13 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
       transfers: [],
       nftTransfers: [],
       systemEvents: [],
+      fee: 0,
       tags: [],
     };
   }
 
-  // Simulator frontend returns decoded payloads; keep a few snake_case fallbacks for older responses.
+  // The simulate frontend already decodes events server-side,
+  // so we just normalize the response shape (snake_case fallbacks).
   const raw = await resp.json();
   return {
     success: raw.success,
@@ -109,6 +114,7 @@ export async function simulateTransaction(req: SimulateRequest): Promise<Simulat
     transfers: raw.transfers ?? [],
     nftTransfers: raw.nftTransfers ?? [],
     systemEvents: raw.systemEvents ?? [],
+    fee: raw.fee ?? 0,
     tags: raw.tags ?? [],
   };
 }
