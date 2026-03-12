@@ -194,7 +194,8 @@ export const SearchDropdown = forwardRef<SearchDropdownHandle, SearchDropdownPro
           setActiveIndex((prev) => (prev >= flatItems.length - 1 ? 0 : prev + 1));
         },
         selectActive() {
-          const item = flatItems[activeIndex];
+          const idx = activeIndex >= 0 ? activeIndex : 0;
+          const item = flatItems[idx];
           if (item) goTo(item.route);
         },
         totalItems() {

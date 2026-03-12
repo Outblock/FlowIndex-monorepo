@@ -15,19 +15,19 @@ type SearchContractResult struct {
 
 // SearchTokenResult represents a fungible token match from unified search.
 type SearchTokenResult struct {
-	ContractAddress string `json:"contract_address"`
-	ContractName    string `json:"contract_name"`
-	Name            string `json:"name"`
-	Symbol          string `json:"symbol"`
-	MarketSymbol    string `json:"market_symbol"`
+	Address      string `json:"address"`
+	ContractName string `json:"contract_name"`
+	Name         string `json:"name"`
+	Symbol       string `json:"symbol"`
+	MarketSymbol string `json:"market_symbol,omitempty"`
 }
 
 // SearchNFTCollectionResult represents an NFT collection match from unified search.
 type SearchNFTCollectionResult struct {
-	ContractAddress string `json:"contract_address"`
-	ContractName    string `json:"contract_name"`
-	Name            string `json:"name"`
-	NFTCount        int64  `json:"nft_count"`
+	Address      string `json:"address"`
+	ContractName string `json:"contract_name"`
+	Name         string `json:"name"`
+	ItemCount    int64  `json:"item_count"`
 }
 
 // SearchAllResult aggregates results from all search categories.
@@ -103,7 +103,7 @@ func (r *Repository) SearchAll(ctx context.Context, query string, limit int) (*S
 		defer rows.Close()
 		for rows.Next() {
 			var t SearchTokenResult
-			if err := rows.Scan(&t.ContractAddress, &t.ContractName, &t.Name, &t.Symbol, &t.MarketSymbol); err != nil {
+			if err := rows.Scan(&t.Address, &t.ContractName, &t.Name, &t.Symbol, &t.MarketSymbol); err != nil {
 				errTokens = err
 				return
 			}
@@ -131,7 +131,7 @@ func (r *Repository) SearchAll(ctx context.Context, query string, limit int) (*S
 		defer rows.Close()
 		for rows.Next() {
 			var n SearchNFTCollectionResult
-			if err := rows.Scan(&n.ContractAddress, &n.ContractName, &n.Name, &n.NFTCount); err != nil {
+			if err := rows.Scan(&n.Address, &n.ContractName, &n.Name, &n.ItemCount); err != nil {
 				errCollections = err
 				return
 			}

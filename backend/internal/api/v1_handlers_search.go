@@ -31,7 +31,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.repo.SearchAll(r.Context(), q, limit)
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, err.Error())
+		writeAPIError(w, http.StatusInternalServerError, "search failed")
 		return
 	}
 
