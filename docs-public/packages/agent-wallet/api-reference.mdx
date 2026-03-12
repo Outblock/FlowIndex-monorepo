@@ -182,6 +182,43 @@ Runs a read-only preflight simulation for a transaction template on the FlowInde
 }
 ```
 
+### `execute_cadence_transaction`
+
+Submits a raw Cadence transaction with typed arguments. On mainnet, the server first attempts a non-blocking preflight simulation. Headless raw Cadence signing is approval-gated by default unless `ALLOW_RAW_CADENCE_SIGNING=true`.
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `cadence` | string | Yes | Raw Cadence transaction source code |
+| `arguments` | array | No | Ordered typed arguments in `{ type, value }` form |
+| `scheduled` | object | No | Optional scheduled replay controls for the preflight simulation |
+
+**Returns (immediate execution):**
+```json
+{
+  "status": "sealed",
+  "tx_id": "abc123...",
+  "block_height": 12345678,
+  "events": [],
+  "preflight_simulation": {
+    "success": true,
+    "summary": "FLOW transfer",
+    "error": null
+  }
+}
+```
+
+**Returns (approval required):**
+```json
+{
+  "status": "pending_approval",
+  "tx_id": "uuid",
+  "summary": "transaction(amount: UFix64, to: Address) [arg_count=2]",
+  "message": "Raw Cadence headless signing is disabled by default. Transaction queued for approval."
+}
+```
+
 ### `execute_template`
 
 Executes a Cadence transaction template. On mainnet, the server first attempts a non-blocking preflight simulation when simulator calls are enabled. If approval is required and the signer is headless, the transaction is queued for manual approval.
@@ -261,6 +298,7 @@ Lists all transactions currently queued and awaiting approval.
   "transactions": [
     {
       "tx_id": "uuid",
+      "kind": "template",
       "summary": "transfer_tokens_v3(...)",
       "created_at": 1700000000000,
       "preflight_simulation": {

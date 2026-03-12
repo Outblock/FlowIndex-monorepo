@@ -5,12 +5,12 @@
  * an approve/reject tool call resolves them.
  */
 
+import type { CadenceArgument } from '../cadence/arguments.js';
 import type { SimulateTransactionResponse } from '../flowindex/client.js';
 
-export interface PendingTx {
-  template_name: string;
+interface PendingTxBase {
+  kind: 'template' | 'raw_cadence';
   cadence: string;
-  args: Record<string, unknown>;
   summary: string;
   createdAt: number;
   preflightSimulation?: SimulateTransactionResponse;
@@ -18,10 +18,24 @@ export interface PendingTx {
   preflightSimulationError?: string;
 }
 
+export interface PendingTemplateTx extends PendingTxBase {
+  kind: 'template';
+  template_name: string;
+  args: Record<string, unknown>;
+}
+
+export interface PendingRawCadenceTx extends PendingTxBase {
+  kind: 'raw_cadence';
+  arguments: CadenceArgument[];
+}
+
+export type PendingTx = PendingTemplateTx | PendingRawCadenceTx;
+
 const pendingTxs = new Map<string, PendingTx>();
 
 export interface PendingTxSummary {
   tx_id: string;
+  kind: PendingTx['kind'];
   summary: string;
   created_at: number;
   preflight_simulation?: {
@@ -48,6 +62,7 @@ export function removePendingTx(txId: string): boolean {
 export function listPendingTxs(): PendingTxSummary[] {
   return Array.from(pendingTxs.entries()).map(([id, tx]) => ({
     tx_id: id,
+    kind: tx.kind,
     summary: tx.summary,
     created_at: tx.createdAt,
     ...(tx.preflightSimulation

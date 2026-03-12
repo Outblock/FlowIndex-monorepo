@@ -96,10 +96,11 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `FLOWINDEX_URL` | `https://flowindex.io/api` | FlowIndex API base URL |
 | `FLOW_SIMULATOR_ENABLED` | `true` | Enable or disable mainnet preflight simulation calls |
 | `FLOW_SIMULATOR_URL` | `https://simulator.flowindex.io/api` | FlowIndex simulator base URL for preflight transaction simulation |
+| `ALLOW_RAW_CADENCE_SIGNING` | `false` | Allow headless raw Cadence transactions to skip the approval queue |
 | `APPROVAL_REQUIRED` | `true` | Require confirmation before signing transactions |
 | `ETHERSCAN_API_KEY` | -- | For EVM contract ABI lookup |
 
-## Available Tools (26)
+## Available Tools (27)
 
 ### Wallet (3)
 
@@ -109,7 +110,7 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `wallet_login` | Start cloud wallet login (returns URL for user to open) |
 | `wallet_login_status` | Check if cloud wallet login completed |
 
-### Templates (7)
+### Templates (8)
 
 | Tool | Description |
 |---|---|
@@ -119,6 +120,7 @@ Generate a wallet API key at [flowindex.io/developer/wallet](https://flowindex.i
 | `execute_cadence_script` | Run a read-only Cadence script from raw source code |
 | `simulate_cadence_transaction` | Simulate a raw Cadence transaction with typed arguments |
 | `simulate_template` | Run a mainnet preflight simulation for a transaction template without signing or submitting |
+| `execute_cadence_transaction` | Submit a raw Cadence transaction, with approval required by default for headless signers |
 | `execute_template` | Execute a transaction template (requires signing) |
 
 ### Approval (3)
@@ -196,7 +198,8 @@ The agent can also call `cancel_transaction` to reject, or `list_pending` to see
 
 - `execute_cadence_script` lets the agent run raw read-only Cadence without registering a template first.
 - `simulate_cadence_transaction` lets the agent preview a raw transaction with the configured wallet address as both authorizer and payer.
-- Raw Cadence transaction submission is intentionally not exposed yet. The current signing flow still routes real on-chain writes through templates and approvals.
+- `execute_cadence_transaction` lets the agent submit raw transactions too, but headless signing is approval-gated by default.
+- Set `ALLOW_RAW_CADENCE_SIGNING=true` only if you explicitly want headless raw Cadence transactions to bypass that extra gate.
 
 ### Passkey Approval (cloud wallet with passkey signing)
 

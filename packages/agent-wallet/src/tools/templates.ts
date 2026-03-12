@@ -9,6 +9,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerContext } from '../server/server.js';
 import { getTemplate, listTemplates } from '../templates/registry.js';
 import { addPendingTx } from '../approval/manager.js';
+import { executeCadenceTransaction } from '../cadence/transaction.js';
 import type { CadenceService } from '../templates/cadence.gen.js';
 import type { SimulateTransactionResponse } from '../flowindex/client.js';
 import { executeCadenceScript } from '../cadence/script.js';
@@ -37,6 +38,19 @@ function summarizeTemplateInvocation(
   orderedArgNames: string[],
 ): string {
   return `${templateName}(${orderedArgNames.map((name) => `${name}=${JSON.stringify(args[name])}`).join(', ')})`;
+}
+
+function summarizeRawCadenceTransaction(
+  cadence: string,
+  argCount: number,
+): string {
+  const signatureLine = cadence
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line && !line.startsWith('//') && !line.startsWith('import ') && line.includes('transaction'));
+
+  const preview = signatureLine ?? 'raw_cadence_transaction';
+  return `${preview}${signatureLine ? '' : ''} [arg_count=${argCount}]`;
 }
 
 function buildOrderedArgs(
@@ -72,6 +86,18 @@ function withPreflightSimulation<T extends object>(
       : {}),
     ...(preflight.error ? { preflight_simulation_error: preflight.error } : {}),
   };
+}
+
+function shouldQueueRawCadenceTransaction(ctx: ServerContext): boolean {
+  if (!ctx.signer.isHeadless()) {
+    return false;
+  }
+
+  if (!ctx.config.allowRawCadenceSigning) {
+    return true;
+  }
+
+  return ctx.config.approvalRequired;
 }
 
 /**
@@ -284,6 +310,96 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
   );
 
   // -------------------------------------------------------------------------
+  // execute_cadence_transaction
+  // -------------------------------------------------------------------------
+  server.registerTool(
+    'execute_cadence_transaction',
+    {
+      title: 'Execute Raw Cadence Transaction',
+      description:
+        'Execute a raw Cadence transaction with typed arguments. On mainnet the wallet will attempt a non-blocking preflight simulation first. Headless raw Cadence signing is disabled by default and will queue for approval unless ALLOW_RAW_CADENCE_SIGNING=true.',
+      inputSchema: {
+        cadence: z.string().describe('Raw Cadence transaction source code'),
+        arguments: z.array(cadenceArgumentSchema).optional().describe('Ordered typed arguments for the transaction'),
+        scheduled: z
+          .object({
+            advance_seconds: z.number().min(0).max(5).optional(),
+            advance_blocks: z.number().int().min(0).max(20).optional(),
+          })
+          .optional()
+          .describe('Optional scheduled-transaction replay controls for the preflight simulation.'),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({
+      cadence,
+      arguments: argumentsList = [],
+      scheduled,
+    }: {
+      cadence: string;
+      arguments?: Array<{ type: string; value?: unknown }>;
+      scheduled?: { advance_seconds?: number; advance_blocks?: number };
+    }) => {
+      try {
+        const normalizedArguments = argumentsList.map(({ type, value }) => ({ type, value }));
+        const summary = summarizeRawCadenceTransaction(cadence, normalizedArguments.length);
+        const preflight = await maybeSimulateCadenceTransaction(
+          ctx.config,
+          ctx.signer,
+          cadence,
+          normalizedArguments,
+          scheduled,
+        );
+
+        if (shouldQueueRawCadenceTransaction(ctx)) {
+          const txId = randomUUID();
+          addPendingTx(txId, {
+            kind: 'raw_cadence',
+            cadence,
+            arguments: normalizedArguments,
+            summary,
+            createdAt: Date.now(),
+            preflightSimulation: preflight.simulation,
+            preflightSimulationSkippedReason: preflight.skippedReason,
+            preflightSimulationError: preflight.error,
+          });
+
+          const message = ctx.config.allowRawCadenceSigning
+            ? 'Raw Cadence transaction queued for approval.'
+            : 'Raw Cadence headless signing is disabled by default. Transaction queued for approval.';
+
+          return jsonContent(
+            withPreflightSimulation(
+              {
+                status: 'pending_approval',
+                tx_id: txId,
+                summary,
+                message,
+              },
+              preflight,
+            ),
+          );
+        }
+
+        const result = await executeCadenceTransaction(
+          cadence,
+          normalizedArguments,
+          ctx.signer,
+          ctx.config.network,
+        );
+        return jsonContent(withPreflightSimulation(result, preflight));
+      } catch (error) {
+        return jsonContent({ error: String(error) }, true);
+      }
+    },
+  );
+
+  // -------------------------------------------------------------------------
   // simulate_cadence_transaction
   // -------------------------------------------------------------------------
   server.registerTool(
@@ -460,6 +576,7 @@ export function registerTemplateTools(server: McpServer, ctx: ServerContext): vo
         if (ctx.config.approvalRequired && ctx.signer.isHeadless()) {
           const txId = randomUUID();
           addPendingTx(txId, {
+            kind: 'template',
             template_name,
             cadence: template.cadence,
             args,

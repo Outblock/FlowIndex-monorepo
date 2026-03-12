@@ -88,6 +88,7 @@ With no local keys and no `FLOWINDEX_TOKEN`, the server starts in interactive mo
 | `FLOWINDEX_URL` | No | `https://flowindex.io/api` | FlowIndex API base URL |
 | `FLOW_SIMULATOR_ENABLED` | No | `true` | Enable mainnet preflight simulation calls |
 | `FLOW_SIMULATOR_URL` | No | `https://simulator.flowindex.io/api` | Simulator base URL |
+| `ALLOW_RAW_CADENCE_SIGNING` | No | `false` | Allow headless raw Cadence transactions to execute without the extra approval gate |
 | `APPROVAL_REQUIRED` | No | `true` | Require manual confirmation before signing Cadence transactions |
 | `ETHERSCAN_API_KEY` | No | -- | Optional Etherscan key for EVM ABI lookup |
 
@@ -143,7 +144,8 @@ Today the advanced freeform path is:
 
 - run raw scripts with `execute_cadence_script`
 - preview raw transactions with `simulate_cadence_transaction`
-- use template execution for actual transaction signing and submission
+- submit raw transactions with `execute_cadence_transaction`
+- keep in mind that headless raw Cadence signing stays approval-gated unless `ALLOW_RAW_CADENCE_SIGNING=true`
 
 ## 6. Approval Flow
 

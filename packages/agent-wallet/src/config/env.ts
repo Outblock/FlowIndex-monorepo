@@ -14,6 +14,7 @@ export interface AgentWalletConfig {
   flowindexUrl: string;
   flowSimulatorEnabled: boolean;
   flowSimulatorUrl?: string;
+  allowRawCadenceSigning: boolean;
   approvalRequired: boolean;
   etherscanApiKey?: string;
   signerType: SignerType;
@@ -80,6 +81,7 @@ export function loadConfig(): AgentWalletConfig {
     flowindexUrl: process.env.FLOWINDEX_URL || 'https://flowindex.io/api',
     flowSimulatorEnabled: parseOptionalBoolean(process.env.FLOW_SIMULATOR_ENABLED, true),
     flowSimulatorUrl: process.env.FLOW_SIMULATOR_URL || 'https://simulator.flowindex.io/api',
+    allowRawCadenceSigning: parseOptionalBoolean(process.env.ALLOW_RAW_CADENCE_SIGNING, false),
     approvalRequired: parseOptionalBoolean(process.env.APPROVAL_REQUIRED, true),
     etherscanApiKey: process.env.ETHERSCAN_API_KEY?.trim(),
     signerType,

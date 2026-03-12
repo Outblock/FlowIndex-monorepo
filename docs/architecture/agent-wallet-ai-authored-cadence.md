@@ -124,13 +124,16 @@ In other words, users should never feel that "Flow wallet support" requires inst
 
 ## Raw Cadence Execution
 
-To remove the template ceiling, `agent-wallet` should eventually expose raw Cadence tools in addition to template tools.
+`agent-wallet` now exposes raw Cadence tools in addition to template tools:
 
-Recommended new tools:
+Current tools:
 
 - `simulate_cadence_transaction`
 - `execute_cadence_transaction`
 - `execute_cadence_script`
+
+Still-not-implemented future work:
+
 - optional `deploy_cadence_contract`
 
 These tools should accept raw source plus explicit argument metadata rather than forcing the model through a pre-registered template.
@@ -251,10 +254,18 @@ This loop is the real mechanism behind self-correction. Skills improve the draft
 - add raw Cadence simulation and read-only script execution to `agent-wallet`
 - keep approval mandatory for raw Cadence submission
 
+Status:
+
+- completed
+
 ### Phase 3
 
 - add raw Cadence transaction submission
 - gate autonomous signing behind explicit env flags
+
+Status:
+
+- completed with `ALLOW_RAW_CADENCE_SIGNING=false` as the default
 
 ### Phase 4
 

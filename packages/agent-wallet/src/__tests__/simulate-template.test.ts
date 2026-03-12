@@ -131,6 +131,7 @@ describe('simulate/template helpers', () => {
       flowindexUrl: 'https://flowindex.io/api',
       flowSimulatorEnabled: true,
       flowSimulatorUrl: 'https://simulator.flowindex.io/api',
+      allowRawCadenceSigning: false,
       approvalRequired: true,
       signerType: 'local-key',
     };
@@ -161,6 +162,7 @@ describe('simulate/template helpers', () => {
       flowindexUrl: 'https://flowindex.io/api',
       flowSimulatorEnabled: false,
       flowSimulatorUrl: 'https://simulator.flowindex.io/api',
+      allowRawCadenceSigning: false,
       approvalRequired: true,
       signerType: 'local-key',
     };

@@ -41,6 +41,7 @@ function createMockContext(overrides?: Partial<ServerContext>): ServerContext {
       flowindexUrl: 'https://test.api',
       flowSimulatorEnabled: true,
       flowSimulatorUrl: 'https://simulator.flowindex.io/api',
+      allowRawCadenceSigning: false,
       approvalRequired: true,
       signerType: 'local-key',
     },
