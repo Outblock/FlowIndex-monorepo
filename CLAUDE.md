@@ -35,6 +35,8 @@ After making changes, always run the build/lint check before committing. Fix any
 
 When pushing to main, always pull/rebase first to avoid non-fast-forward errors. Use `git pull --rebase origin main` before pushing.
 
+**Branch hygiene:** After a feature branch is merged to main, delete it (`git push origin --delete <branch>`). Never re-merge an already-merged branch — this overwrites fixes that landed after the original merge. Before merging any branch, run `git log origin/main --oneline -- <changed-files>` to check if main already has newer changes to those files.
+
 ## Project Overview
 
 FlowIndex is a high-performance blockchain explorer and indexer for the Flow blockchain with Flow-EVM support. It features a Go backend with concurrent block ingestion and a TanStack Start SSR frontend.
