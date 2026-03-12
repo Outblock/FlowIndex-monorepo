@@ -1053,4 +1053,32 @@ UPDATE app.ft_tokens SET market_symbol = 'ceBUSD', coingecko_id = NULL          
 UPDATE app.account_keys SET signing_algorithm = 3 WHERE signing_algorithm = 2;
 UPDATE app.account_keys SET signing_algorithm = 2 WHERE signing_algorithm = 1;
 
+-- ============================================================
+-- Scheduled Transactions (FlowTransactionScheduler events)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS app.scheduled_transactions (
+    scheduled_id         BIGINT NOT NULL,
+    priority             SMALLINT NOT NULL,       -- 0=High, 1=Medium, 2=Low
+    expected_timestamp   TIMESTAMPTZ NOT NULL,
+    execution_effort     BIGINT NOT NULL,
+    fees                 NUMERIC(18,8) NOT NULL,
+    handler_owner        BYTEA NOT NULL,
+    handler_type         TEXT NOT NULL,
+    handler_uuid         BIGINT,
+    handler_public_path  TEXT,
+    scheduled_block      BIGINT NOT NULL,
+    scheduled_tx_id      BYTEA NOT NULL,
+    scheduled_at         TIMESTAMPTZ NOT NULL,
+    status               TEXT NOT NULL DEFAULT 'SCHEDULED',
+    executed_block       BIGINT,
+    executed_tx_id       BYTEA,
+    executed_at          TIMESTAMPTZ,
+    fees_returned        NUMERIC(18,8),
+    fees_deducted        NUMERIC(18,8),
+    PRIMARY KEY (scheduled_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sched_tx_owner ON app.scheduled_transactions (handler_owner, scheduled_id DESC);
+CREATE INDEX IF NOT EXISTS idx_sched_tx_status ON app.scheduled_transactions (status, scheduled_id DESC);
+CREATE INDEX IF NOT EXISTS idx_sched_tx_block ON app.scheduled_transactions (scheduled_block DESC);
+
 COMMIT;

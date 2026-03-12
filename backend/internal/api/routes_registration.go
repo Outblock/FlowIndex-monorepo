@@ -186,6 +186,7 @@ func registerFlowRoutes(r *mux.Router, s *Server) {
 	r.HandleFunc("/flow/node/{node_id}", s.handleGetNode).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/node/{node_id}/reward/delegation", s.handleNotImplemented).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/scheduled-transaction", s.handleFlowScheduledTransactions).Methods("GET", "OPTIONS")
+	r.HandleFunc("/flow/scheduled-transaction/{id}", s.handleFlowScheduledTransactionByID).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/account/{address}/scheduled-transaction", s.handleFlowAccountScheduledTransactions).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/account/{address}/balance/history", s.handleFlowAccountBalanceHistory).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/account/{address}/tax-report", s.handleTaxReport).Methods("GET", "OPTIONS")
