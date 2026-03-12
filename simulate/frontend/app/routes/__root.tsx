@@ -23,7 +23,7 @@ function RootLayout() {
     <html lang="en" className="dark">
       <head>
         <HeadContent />
-        <script defer src="https://cloud.umami.is/script.js" data-website-id="bf956be7-611d-4c66-867c-c481209cc99c" />
+        <script defer src="https://cloud.umami.is/script.js" data-website-id="bf956be7-611d-4c66-867c-c481209cc99c"></script>
       </head>
       <body>
         <Navbar />
