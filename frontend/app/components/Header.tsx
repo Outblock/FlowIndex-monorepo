@@ -5,6 +5,8 @@ import { useWebSocketStatus } from '../hooks/useWebSocket';
 import { useMobileMenu } from '../contexts/MobileMenuContext';
 import { resolveApiBaseUrl } from '../api';
 import { network } from '../fclConfig';
+import { useSearch } from '../hooks/useSearch';
+import { SearchDropdown, type SearchDropdownHandle } from './SearchDropdown';
 
 const NETWORKS = [
   {
@@ -126,9 +128,30 @@ function Header() {
   const isNavigating = useRouterState({ select: (s) => s.status === 'pending' });
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const { isOpen: isMobileOpen, toggle: toggleMobileMenu } = useMobileMenu();
+  const searchState = useSearch();
+  const dropdownRef = useRef<SearchDropdownHandle>(null);
+  const searchWrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        searchState.reset();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [searchState.reset]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (searchState.mode !== 'idle' && (dropdownRef.current?.totalItems() ?? 0) > 0) {
+      dropdownRef.current?.selectActive();
+      setSearchQuery('');
+      searchState.reset();
+      return;
+    }
+
     const query = searchQuery.trim();
     if (!query) return;
 
@@ -137,6 +160,7 @@ function Header() {
       const key = query.replace(/^0x/i, '');
       navigate({ to: '/key/$publicKey', params: { publicKey: key } });
       setSearchQuery('');
+      searchState.reset();
       return;
     }
 
@@ -189,6 +213,7 @@ function Header() {
       navigate({ to: '/txs/$txId', params: { txId: query }, search: { tab: undefined } });
     }
     setSearchQuery('');
+    searchState.reset();
   };
 
   return (
@@ -212,12 +237,32 @@ function Header() {
           onSubmit={handleSearch}
           className="flex-1 md:max-w-xl relative"
         >
-          <div className="relative group">
+          <div className="relative group" ref={searchWrapRef}>
             <input
               type="text"
-              placeholder="Search by block / tx / address / public key"
+              placeholder="Search by block / tx / address / contract name"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                searchState.search(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (searchState.mode === 'idle') return;
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  dropdownRef.current?.moveDown();
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  dropdownRef.current?.moveUp();
+                } else if (e.key === 'Enter' && (dropdownRef.current?.totalItems() ?? 0) > 0) {
+                  e.preventDefault();
+                  dropdownRef.current?.selectActive();
+                  setSearchQuery('');
+                  searchState.reset();
+                } else if (e.key === 'Escape') {
+                  searchState.reset();
+                }
+              }}
               className="w-full px-5 py-3 bg-zinc-200 dark:bg-white/5 border border-zinc-300 dark:border-white/10 text-zinc-900 dark:text-white text-sm placeholder-zinc-500 focus:border-nothing-green/50 focus:bg-white dark:focus:bg-black/50 focus:outline-none rounded-sm transition-all"
             />
             <button
@@ -227,6 +272,12 @@ function Header() {
             >
               <Search className="w-4 h-4" />
             </button>
+            <SearchDropdown
+              ref={dropdownRef}
+              state={searchState}
+              onClose={() => { setSearchQuery(''); searchState.reset(); }}
+              highlightQuery={searchQuery.trim()}
+            />
           </div>
         </form>
 
