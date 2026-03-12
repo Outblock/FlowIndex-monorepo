@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -524,12 +525,13 @@ func (c *Client) WaitForBlockReady(ctx context.Context) error {
 // CreateSnapshot creates a named snapshot of the emulator state.
 // Returns the snapshot block height or an error.
 func (c *Client) CreateSnapshot(ctx context.Context, name string) (string, error) {
-	body, _ := json.Marshal(map[string]string{"name": name})
-	req, err := http.NewRequestWithContext(ctx, "POST", c.adminURL+"/emulator/snapshots", bytes.NewReader(body))
+	form := url.Values{}
+	form.Set("name", name)
+	req, err := http.NewRequestWithContext(ctx, "POST", c.adminURL+"/emulator/snapshots", strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", fmt.Errorf("building snapshot request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

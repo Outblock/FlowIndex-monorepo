@@ -118,6 +118,39 @@ func (h *Handler) HealthStatus() HealthSnapshot {
 	}
 }
 
+func (h *Handler) triggerRecovery(reason string, err error) {
+	if err != nil {
+		log.Printf("[recovery] %s: %v", reason, err)
+	} else {
+		log.Printf("[recovery] %s", reason)
+	}
+	if !h.recovering.CompareAndSwap(false, true) {
+		return
+	}
+	go h.recoverEmulator()
+}
+
+func (h *Handler) createStateSnapshot(ctx context.Context, prefix string) (string, error) {
+	snapName := fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
+	if _, err := h.client.CreateSnapshot(ctx, snapName); err != nil {
+		h.triggerRecovery("snapshot creation failed", err)
+		return "", fmt.Errorf("creating state snapshot: %w", err)
+	}
+	return snapName, nil
+}
+
+func (h *Handler) revertStateSnapshot(ctx context.Context, snapName string) error {
+	if err := h.client.RevertSnapshot(ctx, snapName); err != nil {
+		h.triggerRecovery("snapshot revert failed", err)
+		return fmt.Errorf("reverting state snapshot: %w", err)
+	}
+	if err := h.client.WaitForBlockReady(ctx); err != nil {
+		h.triggerRecovery("post-revert readiness check failed", err)
+		return fmt.Errorf("waiting for emulator after revert: %w", err)
+	}
+	return nil
+}
+
 // watchdog monitors the emulator for stuck blocks and auto-recovers by
 // restarting the emulator container when no progress is detected.
 func (h *Handler) watchdog() {
@@ -142,7 +175,7 @@ func (h *Handler) watchdog() {
 			if time.Since(stuckSince) > h.stuckTimeout {
 				log.Printf("[watchdog] emulator stuck for %s (timeout=%s), recovering...",
 					time.Since(stuckSince).Round(time.Second), h.stuckTimeout)
-				h.recoverEmulator()
+				h.triggerRecovery("watchdog detected stalled emulator", nil)
 			}
 			continue
 		}
@@ -158,9 +191,6 @@ func (h *Handler) watchdog() {
 
 // recoverEmulator restarts the emulator container and re-runs warmup.
 func (h *Handler) recoverEmulator() {
-	if !h.recovering.CompareAndSwap(false, true) {
-		return // already recovering
-	}
 	defer h.recovering.Store(false)
 
 	log.Printf("[recovery] restarting emulator container %q...", h.emulatorContainer)
@@ -387,20 +417,47 @@ func (h *Handler) runWarmupTx(_ context.Context, name string, cadence string, ar
 	defer txCancel()
 
 	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	// Ensure emulator is ready before sending
-	h.client.WaitForBlockReady(txCtx)
+	if err := h.client.WaitForBlockReady(txCtx); err != nil {
+		log.Printf("[simulator] warmup [%s]: emulator not ready: %v", name, err)
+		return
+	}
+
+	snapName, err := h.createStateSnapshot(txCtx, "warmup")
+	if err != nil {
+		log.Printf("[simulator] warmup [%s]: snapshot unavailable, skipping: %v", name, err)
+		return
+	}
 
 	start := time.Now()
 	result, err := h.client.SendTransaction(txCtx, txReq)
 	elapsed := time.Since(start)
 
-	// Wait for block to commit before releasing mutex
-	h.client.WaitForBlockReady(txCtx)
-	h.mu.Unlock()
+	// Wait for block to commit before reverting the warmup state.
+	waitErr := h.client.WaitForBlockReady(txCtx)
+	revertErr := h.revertStateSnapshot(txCtx, snapName)
 
 	if err != nil {
+		if waitErr != nil {
+			log.Printf("[simulator] warmup [%s]: failed after %s: %v (wait error: %v)", name, elapsed, err, waitErr)
+			return
+		}
+		if revertErr != nil {
+			log.Printf("[simulator] warmup [%s]: failed after %s: %v (revert error: %v)", name, elapsed, err, revertErr)
+			return
+		}
 		log.Printf("[simulator] warmup [%s]: failed after %s: %v", name, elapsed, err)
+		return
+	}
+
+	if waitErr != nil {
+		log.Printf("[simulator] warmup [%s]: block did not settle after %s: %v", name, elapsed, waitErr)
+		return
+	}
+	if revertErr != nil {
+		log.Printf("[simulator] warmup [%s]: revert failed after %s: %v", name, elapsed, revertErr)
 		return
 	}
 
@@ -442,23 +499,49 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 	// Using the service account avoids slow state fetches for arbitrary payer addresses.
 	const serviceAccount = "e467b9dd11fa00df"
 
+	if h.recovering.Load() {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   "simulator is recovering, please retry shortly",
+		})
+		return
+	}
+
 	// Serialize: emulator can only execute one block at a time
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	// Ensure emulator has no pending block before starting
-	h.client.WaitForBlockReady(r.Context())
-
-	// Try snapshot/revert for state isolation (may not work in fork mode)
-	snapName := fmt.Sprintf("sim-%d", time.Now().UnixNano())
-	snapOK := false
-	if _, err := h.client.CreateSnapshot(r.Context(), snapName); err == nil {
-		snapOK = true
-		defer func() {
-			h.client.RevertSnapshot(r.Context(), snapName)
-		}()
+	if h.recovering.Load() {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   "simulator is recovering, please retry shortly",
+		})
+		return
 	}
-	_ = snapOK
+
+	// Ensure emulator has no pending block before starting
+	if err := h.client.WaitForBlockReady(r.Context()); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   "emulator is not ready: " + err.Error(),
+		})
+		return
+	}
+
+	// Simulations must run against an isolated snapshot so transaction side
+	// effects never leak into the next request.
+	snapName, err := h.createStateSnapshot(r.Context(), "sim")
+	if err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   "simulation state isolation unavailable: " + err.Error(),
+		})
+		return
+	}
 
 	// Build and send the transaction
 	txReq := &TxRequest{
@@ -470,19 +553,39 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.client.SendTransaction(r.Context(), txReq)
 	if err != nil {
-		// Still wait for block to settle before releasing mutex
-		h.client.WaitForBlockReady(r.Context())
+		// Still wait for block to settle and revert before releasing mutex.
+		waitErr := h.client.WaitForBlockReady(r.Context())
+		revertErr := h.revertStateSnapshot(r.Context(), snapName)
+		msg := "simulation failed: " + err.Error()
+		if waitErr != nil {
+			msg += "; emulator did not settle cleanly: " + waitErr.Error()
+		}
+		if revertErr != nil {
+			msg += "; failed to restore emulator state: " + revertErr.Error()
+		}
 		w.WriteHeader(http.StatusBadGateway)
 		json.NewEncoder(w).Encode(SimulateResponse{
 			Success: false,
-			Error:   "simulation failed: " + err.Error(),
+			Error:   msg,
 		})
 		return
 	}
 
 	// Wait for emulator to finish committing the block before releasing mutex.
 	// Without this, the next queued request may hit "pending block" errors.
-	h.client.WaitForBlockReady(r.Context())
+	if err := h.client.WaitForBlockReady(r.Context()); err != nil {
+		revertErr := h.revertStateSnapshot(r.Context(), snapName)
+		msg := "emulator did not settle after simulation: " + err.Error()
+		if revertErr != nil {
+			msg += "; failed to restore emulator state: " + revertErr.Error()
+		}
+		w.WriteHeader(http.StatusBadGateway)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   msg,
+		})
+		return
+	}
 
 	resp := SimulateResponse{
 		Success:         result.Success,
@@ -498,6 +601,15 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[simulator] warning: failed to enrich balances with before/after: %v", err)
 		}
 		resp.BalanceChanges = buildBalanceChanges(parsedBalanceChanges, postBalances)
+	}
+
+	if err := h.revertStateSnapshot(r.Context(), snapName); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   "simulation completed but state restore failed: " + err.Error(),
+		})
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
