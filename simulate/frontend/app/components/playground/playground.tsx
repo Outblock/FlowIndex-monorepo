@@ -56,6 +56,8 @@ export function Playground() {
     return parseParamsFromCode(urlParams!.code!)
   })
   const [payer, setPayer] = useState(urlParams?.payer || templates[0].defaultPayer || '0x1654653399040a61')
+  const [scheduledAdvanceSeconds, setScheduledAdvanceSeconds] = useState('0')
+  const [scheduledAdvanceBlocks, setScheduledAdvanceBlocks] = useState('0')
   const [argValues, setArgValues] = useState<Record<string, string>>(() => {
     if (isCustom) {
       const parsed = parseParamsFromCode(urlParams!.code!)
@@ -146,6 +148,16 @@ export function Playground() {
     setResult(null)
 
     const args = active.args.map((a) => toCadenceArg(a.type, argValues[a.name] ?? a.defaultValue))
+    const advanceSeconds = Number(scheduledAdvanceSeconds)
+    const advanceBlocks = Number.parseInt(scheduledAdvanceBlocks, 10)
+    const scheduled =
+      (Number.isFinite(advanceSeconds) && advanceSeconds > 0) ||
+      (Number.isFinite(advanceBlocks) && advanceBlocks > 0)
+        ? {
+            ...(Number.isFinite(advanceSeconds) && advanceSeconds > 0 ? { advance_seconds: advanceSeconds } : {}),
+            ...(Number.isFinite(advanceBlocks) && advanceBlocks > 0 ? { advance_blocks: advanceBlocks } : {}),
+          }
+        : undefined
 
     try {
       const res = await simulateTransaction({
@@ -153,6 +165,7 @@ export function Playground() {
         arguments: args,
         authorizers: [payer],
         payer,
+        scheduled,
       })
       setResult(res)
     } catch (err) {
@@ -177,7 +190,7 @@ export function Playground() {
     } finally {
       setLoading(false)
     }
-  }, [activeId, code, argValues, customArgs, payer])
+  }, [activeId, code, argValues, customArgs, payer, scheduledAdvanceBlocks, scheduledAdvanceSeconds])
 
   const currentArgs = activeId === CUSTOM_ID
     ? customArgs
@@ -215,9 +228,13 @@ export function Playground() {
                     currentArgs={currentArgs}
                     isCustom={activeId === CUSTOM_ID}
                     payer={payer}
+                    scheduledAdvanceSeconds={scheduledAdvanceSeconds}
+                    scheduledAdvanceBlocks={scheduledAdvanceBlocks}
                     onSelectTemplate={handleSelectTemplate}
                     onArgChange={handleArgChange}
                     onPayerChange={setPayer}
+                    onScheduledAdvanceSecondsChange={setScheduledAdvanceSeconds}
+                    onScheduledAdvanceBlocksChange={setScheduledAdvanceBlocks}
                   />
                   <EditorPanel
                     code={code}

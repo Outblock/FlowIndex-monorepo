@@ -12802,6 +12802,13 @@
           "payer": {
             "type": "string",
             "description": "Payer address (with 0x prefix). Use 0xe467b9dd11fa00df for the emulator service account."
+          },
+          "verbose": {
+            "type": "boolean",
+            "description": "When true, include verbose simulator diagnostics when available."
+          },
+          "scheduled": {
+            "$ref": "#/components/schemas/simulate.ScheduledOptions"
           }
         }
       },
@@ -12847,6 +12854,13 @@
             "description": "Net balance changes per address/token",
             "items": {
               "$ref": "#/components/schemas/simulate.BalanceChange"
+            }
+          },
+          "scheduledResults": {
+            "type": "array",
+            "description": "Per-transaction results for scheduled callbacks executed after advancing additional block(s) inside the same simulation snapshot.",
+            "items": {
+              "$ref": "#/components/schemas/simulate.ScheduledResult"
             }
           },
           "systemEvents": {
@@ -12918,6 +12932,53 @@
             "items": {
               "$ref": "#/components/schemas/simulate.BalanceChange"
             }
+          },
+          "scheduledResults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/simulate.ScheduledResult"
+            }
+          }
+        }
+      },
+      "simulate.ScheduledOptions": {
+        "type": "object",
+        "properties": {
+          "advance_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 30,
+            "description": "How long to wait before advancing additional blocks, allowing time-based scheduled transactions to become due. Current server-side maximum is 30 seconds."
+          },
+          "advance_blocks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20,
+            "description": "How many extra blocks to commit after the primary transaction so scheduled callbacks can execute within the simulation snapshot. Current server-side maximum is 20."
+          }
+        }
+      },
+      "simulate.ScheduledResult": {
+        "type": "object",
+        "properties": {
+          "tx_id": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string",
+            "nullable": true
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/simulate.RawEvent"
+            }
+          },
+          "computation_used": {
+            "type": "integer"
           }
         }
       },

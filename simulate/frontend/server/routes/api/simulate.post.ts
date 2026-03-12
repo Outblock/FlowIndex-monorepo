@@ -34,6 +34,7 @@ export default defineEventHandler(async (event) => {
   const success = (data.success ?? false) as boolean
   const error = (data.error ?? (data.message as string) ?? null) as string | null
   const rawEvents = ((data.events as unknown[]) ?? []) as RawEvent[]
+  const scheduledResults = ((data.scheduled_results ?? data.scheduledResults) as unknown[]) ?? []
   const balanceChanges = (data.balance_changes ?? data.balanceChanges ?? []) as unknown[]
   const computationUsed = (data.computation_used ?? data.computationUsed ?? 0) as number
 
@@ -48,6 +49,7 @@ export default defineEventHandler(async (event) => {
     error,
     computationUsed,
     balanceChanges,
+    scheduledResults,
     // Decoded output
     summary,
     summaryItems,

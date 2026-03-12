@@ -21,6 +21,14 @@ type SimulateRequest struct {
 	Authorizers []string          `json:"authorizers,omitempty"`
 	Payer       string            `json:"payer,omitempty"`
 	Verbose     bool              `json:"verbose,omitempty"`
+	Scheduled   *ScheduledOptions `json:"scheduled,omitempty"`
+}
+
+// ScheduledOptions controls optional post-transaction block advancement so
+// scheduled transactions can execute inside the same simulation snapshot.
+type ScheduledOptions struct {
+	AdvanceSeconds float64 `json:"advance_seconds,omitempty"`
+	AdvanceBlocks  int     `json:"advance_blocks,omitempty"`
 }
 
 // BalanceChange describes a token balance delta for a single address.
@@ -34,12 +42,18 @@ type BalanceChange struct {
 
 // SimulateResponse is the JSON response from the simulate endpoint.
 type SimulateResponse struct {
-	Success         bool            `json:"success"`
-	Error           string          `json:"error,omitempty"`
-	Events          []TxEvent       `json:"events,omitempty"`
-	BalanceChanges  []BalanceChange `json:"balance_changes,omitempty"`
-	ComputationUsed int64           `json:"computation_used"`
+	Success          bool            `json:"success"`
+	Error            string          `json:"error,omitempty"`
+	Events           []TxEvent       `json:"events,omitempty"`
+	ScheduledResults []TxResult      `json:"scheduled_results,omitempty"`
+	BalanceChanges   []BalanceChange `json:"balance_changes,omitempty"`
+	ComputationUsed  int64           `json:"computation_used"`
 }
+
+const (
+	maxScheduledAdvanceSeconds = 30.0
+	maxScheduledAdvanceBlocks  = 20
+)
 
 // Handler serves the /api/simulate endpoint.
 // Requests are serialized via a mutex because the Flow Emulator
@@ -149,6 +163,90 @@ func (h *Handler) revertStateSnapshot(ctx context.Context, snapName string) erro
 		return fmt.Errorf("waiting for emulator after revert: %w", err)
 	}
 	return nil
+}
+
+func normalizeScheduledOptions(opts *ScheduledOptions) (blocks int, wait time.Duration, err error) {
+	if opts == nil {
+		return 0, 0, nil
+	}
+	if opts.AdvanceBlocks < 0 {
+		return 0, 0, fmt.Errorf("scheduled.advance_blocks must be >= 0")
+	}
+	if opts.AdvanceBlocks > maxScheduledAdvanceBlocks {
+		return 0, 0, fmt.Errorf("scheduled.advance_blocks must be <= %d", maxScheduledAdvanceBlocks)
+	}
+	if opts.AdvanceSeconds < 0 {
+		return 0, 0, fmt.Errorf("scheduled.advance_seconds must be >= 0")
+	}
+	if opts.AdvanceSeconds > maxScheduledAdvanceSeconds {
+		return 0, 0, fmt.Errorf("scheduled.advance_seconds must be <= %.0f", maxScheduledAdvanceSeconds)
+	}
+
+	blocks = opts.AdvanceBlocks
+	if blocks == 0 && opts.AdvanceSeconds > 0 {
+		blocks = 1
+	}
+
+	wait = time.Duration(opts.AdvanceSeconds * float64(time.Second))
+	return blocks, wait, nil
+}
+
+func (h *Handler) executeScheduledBlocks(ctx context.Context, opts *ScheduledOptions) ([]TxResult, error) {
+	blocks, wait, err := normalizeScheduledOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+	if blocks == 0 {
+		return nil, nil
+	}
+
+	if wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
+
+	scheduledResults := make([]TxResult, 0)
+	for i := 0; i < blocks; i++ {
+		block, err := h.client.CommitBlock(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		blockResults, err := h.client.GetTransactionResultsByBlockID(ctx, block.ID, true)
+		if err != nil {
+			return nil, err
+		}
+		scheduledResults = append(scheduledResults, blockResults...)
+	}
+
+	return scheduledResults, nil
+}
+
+func mergeSimulationResults(primary *TxResult, scheduled []TxResult) (success bool, errMsg string, events []TxEvent, computationUsed int64) {
+	success = primary.Success
+	errMsg = primary.Error
+	events = append(events, primary.Events...)
+	computationUsed = primary.ComputationUsed
+
+	for _, result := range scheduled {
+		events = append(events, result.Events...)
+		computationUsed += result.ComputationUsed
+		if !result.Success {
+			success = false
+			if errMsg == "" {
+				errMsg = fmt.Sprintf("scheduled tx %s failed: %s", result.TxID, result.Error)
+			} else {
+				errMsg += "; " + fmt.Sprintf("scheduled tx %s failed: %s", result.TxID, result.Error)
+			}
+		}
+	}
+
+	return success, errMsg, events, computationUsed
 }
 
 // watchdog monitors the emulator for stuck blocks and auto-recovers by
@@ -489,6 +587,15 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, _, err := normalizeScheduledOptions(req.Scheduled); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
+
 	// Normalize addresses: strip 0x prefix, lowercase
 	for i, a := range req.Authorizers {
 		req.Authorizers[i] = normalizeAddress(a)
@@ -587,14 +694,35 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := SimulateResponse{
-		Success:         result.Success,
-		Error:           result.Error,
-		Events:          result.Events,
-		ComputationUsed: result.ComputationUsed,
+	var scheduledResults []TxResult
+	if result.Success && req.Scheduled != nil {
+		scheduledResults, err = h.executeScheduledBlocks(r.Context(), req.Scheduled)
+		if err != nil {
+			revertErr := h.revertStateSnapshot(r.Context(), snapName)
+			msg := "scheduled transaction execution failed: " + err.Error()
+			if revertErr != nil {
+				msg += "; failed to restore emulator state: " + revertErr.Error()
+			}
+			w.WriteHeader(http.StatusBadGateway)
+			json.NewEncoder(w).Encode(SimulateResponse{
+				Success: false,
+				Error:   msg,
+			})
+			return
+		}
 	}
 
-	parsedBalanceChanges := parseBalanceChanges(result.Events)
+	success, errMsg, allEvents, computationUsed := mergeSimulationResults(result, scheduledResults)
+
+	resp := SimulateResponse{
+		Success:          success,
+		Error:            errMsg,
+		Events:           allEvents,
+		ScheduledResults: scheduledResults,
+		ComputationUsed:  computationUsed,
+	}
+
+	parsedBalanceChanges := parseBalanceChanges(allEvents)
 	if len(parsedBalanceChanges) > 0 {
 		postBalances, err := h.fetchPostBalances(r.Context(), parsedBalanceChanges)
 		if err != nil {

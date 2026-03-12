@@ -5,6 +5,10 @@ export interface SimulateRequest {
   arguments: Array<Record<string, unknown>>
   authorizers: string[]
   payer: string
+  scheduled?: {
+    advance_seconds?: number
+    advance_blocks?: number
+  }
 }
 
 export interface BalanceChange {
@@ -20,6 +24,13 @@ export interface SimulateResponse {
   error?: string | null
   computationUsed: number
   balanceChanges: BalanceChange[]
+  scheduledResults?: Array<{
+    tx_id: string
+    success: boolean
+    error?: string | null
+    events: Array<{ type: string; payload: unknown }>
+    computation_used: number
+  }>
   // Decoded fields from event-decoder
   summary: string
   summaryItems: DecodedSummaryItem[]

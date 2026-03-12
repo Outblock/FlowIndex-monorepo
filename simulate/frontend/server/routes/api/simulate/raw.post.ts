@@ -32,6 +32,7 @@ export default defineEventHandler(async (event) => {
     success: data.success ?? false,
     error: data.error ?? (data.message as string) ?? null,
     events: (data.events as unknown[]) ?? [],
+    scheduledResults: ((data.scheduled_results ?? data.scheduledResults) as unknown[]) ?? [],
     balanceChanges: (data.balance_changes ?? data.balanceChanges ?? []) as unknown[],
     computationUsed: (data.computation_used ?? data.computationUsed ?? 0) as number,
   }

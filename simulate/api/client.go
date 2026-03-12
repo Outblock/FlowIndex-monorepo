@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 	"time"
 
 	flowaccess "github.com/onflow/flow/protobuf/go/flow/access"
+	flowentities "github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -290,6 +292,89 @@ func (c *Client) getLatestBlockHeight(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return b.Height, nil
+}
+
+// CommitBlock seals the current pending block, creating an empty block when no
+// user transactions are pending. This is used to advance scheduled
+// transactions after the initial simulation transaction has committed.
+func (c *Client) CommitBlock(ctx context.Context) (*blockInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", c.adminURL+"/emulator/newBlock", nil)
+	if err != nil {
+		return nil, fmt.Errorf("building commit block request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("committing empty block: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("newBlock returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var block struct {
+		Height  int    `json:"height"`
+		BlockID string `json:"blockId"`
+	}
+	if err := json.Unmarshal(body, &block); err != nil {
+		return nil, fmt.Errorf("parsing newBlock response: %w", err)
+	}
+
+	return &blockInfo{
+		ID:     block.BlockID,
+		Height: int64(block.Height),
+	}, nil
+}
+
+// GetTransactionResultsByBlockID fetches all transaction results for a block
+// using JSON-CDC event encoding. Blocks committed via the admin newBlock route
+// contain only system transactions, with the final result always being the
+// system chunk transaction. Setting excludeSystemChunk drops that last entry.
+func (c *Client) GetTransactionResultsByBlockID(ctx context.Context, blockID string, excludeSystemChunk bool) ([]TxResult, error) {
+	accessClient, err := c.accessClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rawBlockID, err := hex.DecodeString(strings.TrimPrefix(blockID, "0x"))
+	if err != nil {
+		return nil, fmt.Errorf("decoding block id %q: %w", blockID, err)
+	}
+
+	resp, err := accessClient.GetTransactionResultsByBlockID(ctx, &flowaccess.GetTransactionsByBlockIDRequest{
+		BlockId:              rawBlockID,
+		EventEncodingVersion: flowentities.EventEncodingVersion_JSON_CDC_V0,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("fetching transaction results for block %s: %w", blockID, err)
+	}
+
+	results := resp.GetTransactionResults()
+	if excludeSystemChunk && len(results) > 0 {
+		results = results[:len(results)-1]
+	}
+
+	converted := make([]TxResult, 0, len(results))
+	for _, result := range results {
+		txID := hex.EncodeToString(result.GetTransactionId())
+		txResult := TxResult{
+			TxID:            txID,
+			Success:         result.GetErrorMessage() == "",
+			Error:           result.GetErrorMessage(),
+			ComputationUsed: int64(result.GetComputationUsage()),
+		}
+		for _, ev := range result.GetEvents() {
+			txResult.Events = append(txResult.Events, TxEvent{
+				Type:    ev.GetType(),
+				Payload: json.RawMessage(ev.GetPayload()),
+			})
+		}
+		converted = append(converted, txResult)
+	}
+
+	return converted, nil
 }
 
 // SendTransaction submits a transaction to the emulator and waits for the result.
