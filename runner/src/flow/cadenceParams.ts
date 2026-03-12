@@ -3,6 +3,49 @@ export interface CadenceParam {
   type: string;
 }
 
+export interface CadenceParamValidationError {
+  index: number;
+  name: string;
+  message: string;
+}
+
+const ADDRESS_RE = /^(?:0x)?[0-9a-fA-F]{16}$/;
+const UNSIGNED_INT_RE = /^\d+$/;
+const SIGNED_INT_RE = /^-?\d+$/;
+const UFIX64_RE = /^\d+(?:\.\d+)?$/;
+const FIX64_RE = /^-?\d+(?:\.\d+)?$/;
+const PATH_RE = /^(storage|public|private)\/[A-Za-z_][A-Za-z0-9_]*$/;
+
+const SIGNED_INT_TYPES = new Set([
+  'Int',
+  'Int8',
+  'Int16',
+  'Int32',
+  'Int64',
+  'Int128',
+  'Int256',
+  'Fix64',
+  'Fix128',
+]);
+
+const UNSIGNED_INT_TYPES = new Set([
+  'UInt',
+  'UInt8',
+  'UInt16',
+  'UInt32',
+  'UInt64',
+  'UInt128',
+  'UInt256',
+  'Word8',
+  'Word16',
+  'Word32',
+  'Word64',
+  'UFix64',
+  'UFix128',
+]);
+
+const PATH_TYPES = new Set(['Path', 'PublicPath', 'PrivatePath', 'StoragePath', 'CapabilityPath']);
+
 export function parseMainParams(code: string): CadenceParam[] {
   // Match `fun main(...)` for scripts, or `transaction(...)` for transactions
   const match =
@@ -54,6 +97,129 @@ function resolvePrimitiveType(t: any, typeName: string): any {
     Path: t.Path,
   };
   return map[typeName] || t.String;
+}
+
+function normalizeAddressLiteral(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^[0-9a-fA-F]{16}$/.test(trimmed)) return `0x${trimmed}`;
+  return trimmed;
+}
+
+function stringifyScalar(raw: unknown): string {
+  if (raw === null || raw === undefined) return '';
+  if (typeof raw === 'string') return raw.trim();
+  if (typeof raw === 'number' || typeof raw === 'boolean') return String(raw);
+  return JSON.stringify(raw);
+}
+
+function validateValue(raw: unknown, cadenceType: string): string | null {
+  const t = cadenceType.trim();
+
+  if (t.endsWith('?')) {
+    if (stringifyScalar(raw) === '') return null;
+    return validateValue(raw, t.slice(0, -1));
+  }
+
+  if (t.startsWith('[') && t.endsWith(']')) {
+    const innerType = t.slice(1, -1).trim();
+    let items: unknown[];
+
+    if (Array.isArray(raw)) {
+      items = raw;
+    } else {
+      const text = stringifyScalar(raw);
+      if (text === '') return 'Array value is required';
+      if (text.startsWith('[')) {
+        try {
+          const parsed = JSON.parse(text);
+          if (!Array.isArray(parsed)) return 'Must be a valid JSON array';
+          items = parsed;
+        } catch {
+          return 'Must be a valid JSON array';
+        }
+      } else {
+        items = text.split(',').map((part) => part.trim()).filter(Boolean);
+      }
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const itemErr = validateValue(items[i], innerType);
+      if (itemErr) return `Invalid array item ${i + 1}: ${itemErr}`;
+    }
+    return null;
+  }
+
+  if (t.startsWith('{') && t.endsWith('}')) {
+    const inner = t.slice(1, -1);
+    const colonIdx = inner.indexOf(':');
+    if (colonIdx === -1) return null;
+
+    const keyType = inner.slice(0, colonIdx).trim();
+    const valueType = inner.slice(colonIdx + 1).trim();
+    let entries: Array<[string, unknown]>;
+
+    if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+      entries = Object.entries(raw as Record<string, unknown>);
+    } else {
+      const text = stringifyScalar(raw);
+      if (text === '') return 'Dictionary value is required';
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          return 'Must be a valid JSON object';
+        }
+        entries = Object.entries(parsed as Record<string, unknown>);
+      } catch {
+        return 'Must be a valid JSON object';
+      }
+    }
+
+    for (const [key, value] of entries) {
+      const keyErr = validateValue(key, keyType);
+      if (keyErr) return `Invalid dictionary key "${key}": ${keyErr}`;
+      const valueErr = validateValue(value, valueType);
+      if (valueErr) return `Invalid dictionary value for "${key}": ${valueErr}`;
+    }
+    return null;
+  }
+
+  const text = stringifyScalar(raw);
+
+  if (t === 'String') return null;
+  if (t === 'Character') {
+    if (text === '') return 'Character value is required';
+    return [...text].length === 1 ? null : 'Character must contain exactly one character';
+  }
+  if (t === 'Bool') {
+    if (text === '') return 'Bool value is required';
+    return text === 'true' || text === 'false' ? null : 'Bool must be true or false';
+  }
+  if (t === 'Address') {
+    if (text === '') return 'Address value is required';
+    return ADDRESS_RE.test(text) ? null : 'Address must be 16 hex chars, with optional 0x prefix';
+  }
+  if (t === 'UFix64' || t === 'UFix128') {
+    if (text === '') return `${t} value is required`;
+    return UFIX64_RE.test(text) ? null : `${t} must look like 1 or 1.0`;
+  }
+  if (t === 'Fix64' || t === 'Fix128') {
+    if (text === '') return `${t} value is required`;
+    return FIX64_RE.test(text) ? null : `${t} must look like -1 or -1.0`;
+  }
+  if (SIGNED_INT_TYPES.has(t)) {
+    if (text === '') return `${t} value is required`;
+    return SIGNED_INT_RE.test(text) ? null : `${t} must be an integer`;
+  }
+  if (UNSIGNED_INT_TYPES.has(t)) {
+    if (text === '') return `${t} value is required`;
+    return UNSIGNED_INT_RE.test(text) ? null : `${t} must be an unsigned integer`;
+  }
+  if (PATH_TYPES.has(t)) {
+    if (text === '') return `${t} value is required`;
+    return PATH_RE.test(text) ? null : `${t} must look like storage/foo or public/foo`;
+  }
+
+  return null;
 }
 
 /**
@@ -110,6 +276,7 @@ export function coerceValue(raw: string, cadenceType: string): any {
       return raw.split(',').map((s) => s.trim());
     }
   }
+  if (t === 'Address') return normalizeAddressLiteral(raw);
   return raw;
 }
 
@@ -172,13 +339,24 @@ export function toCadenceJsonCdc(raw: string, cadenceType: string): Record<strin
   }
 
   // Address
-  if (t === 'Address') return { type: 'Address', value: raw };
+  if (t === 'Address') return { type: 'Address', value: normalizeAddressLiteral(raw) };
 
   // Path types
   if (t === 'Path') return { type: 'Path', value: { domain: 'storage', identifier: raw } };
 
   // All integer types + String + Character
   return { type: t, value: raw };
+}
+
+export function validateCadenceParams(
+  params: CadenceParam[],
+  values: Record<string, string>,
+): CadenceParamValidationError[] {
+  return params.flatMap((param, index) => {
+    const message = validateValue(values[param.name] ?? '', param.type);
+    if (!message) return [];
+    return [{ index, name: param.name, message }];
+  });
 }
 
 export function buildFclArgs(

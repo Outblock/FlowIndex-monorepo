@@ -8,10 +8,13 @@ import (
 	"math/big"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 )
 
 // SimulateRequest is the incoming JSON body for the simulate endpoint.
@@ -53,6 +56,10 @@ type SimulateResponse struct {
 const (
 	maxScheduledAdvanceSeconds = 5.0
 	maxScheduledAdvanceBlocks  = 20
+)
+
+var (
+	cadenceAddressRe = regexp.MustCompile(`^(?:0x)?[0-9a-fA-F]{16}$`)
 )
 
 // Handler serves the /api/simulate endpoint.
@@ -600,6 +607,14 @@ func (h *Handler) HandleSimulate(w http.ResponseWriter, r *http.Request) {
 	for i, a := range req.Authorizers {
 		req.Authorizers[i] = normalizeAddress(a)
 	}
+	if err := validateSimulateRequest(req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(SimulateResponse{
+			Success: false,
+			Error:   err.Error(),
+		})
+		return
+	}
 
 	// Always use the emulator service account as payer.
 	// In simulation, the payer only pays gas fees which don't matter.
@@ -957,6 +972,25 @@ func extractAddress(raw json.RawMessage) string {
 	}
 
 	return ""
+}
+
+func validateSimulateRequest(req SimulateRequest) error {
+	for i, auth := range req.Authorizers {
+		if auth == "" {
+			return fmt.Errorf("invalid authorizer at index %d: address is required", i)
+		}
+		if !cadenceAddressRe.MatchString(auth) {
+			return fmt.Errorf("invalid authorizer at index %d: address must be 16 hex chars, with optional 0x prefix", i)
+		}
+	}
+
+	for i, arg := range req.Arguments {
+		if _, err := jsoncdc.Decode(nil, arg); err != nil {
+			return fmt.Errorf("invalid argument at index %d: %w", i, err)
+		}
+	}
+
+	return nil
 }
 
 // normalizeAddress strips 0x prefix and lowercases.

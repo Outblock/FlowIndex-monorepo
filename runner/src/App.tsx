@@ -11,7 +11,7 @@ import WalletButton from './components/WalletButton';
 import FileExplorer from './components/FileExplorer';
 import TabBar from './components/TabBar';
 import { configureFcl } from './flow/fclConfig';
-import { parseMainParams, toCadenceJsonCdc } from './flow/cadenceParams';
+import { parseMainParams, toCadenceJsonCdc, validateCadenceParams } from './flow/cadenceParams';
 import { detectCodeType, executeScript, executeTransaction, executeCustodialTransaction, deployContract } from './flow/execute';
 import type { ExecutionResult } from './flow/execute';
 import { simulateTransaction } from './flow/simulate';
@@ -764,6 +764,20 @@ export default function App() {
   const { notifyChange, goToDefinition, loadingDeps, activeMode, lspError, wasmProgress } = useLsp(monacoInstance, project, network, lspMode, handleDependency);
 
   const scriptParams = useMemo(() => parseMainParams(activeCode), [activeCode]);
+  const validateCurrentParams = useCallback(() => {
+    const errors = validateCadenceParams(scriptParams, paramValues);
+    if (errors.length === 0) {
+      setArgErrors([]);
+      return true;
+    }
+
+    setArgErrors(errors.map(({ index, message }) => ({ index, message })));
+    setResults([{
+      type: 'error',
+      data: `Invalid parameter input:\n${errors.map((err) => `- ${err.name}: ${err.message}`).join('\n')}`,
+    }]);
+    return false;
+  }, [scriptParams, paramValues]);
   const codeType = useMemo(() => detectCodeType(activeCode), [activeCode]);
 
   // Apply args from URL (?args= or ?tx= fetch) once params are available
@@ -812,6 +826,8 @@ export default function App() {
 
   /** Execute the transaction/script directly (no simulation gate). */
   const handleRunDirect = useCallback(async () => {
+    if (!validateCurrentParams()) return;
+
     // Clear previous error decorations
     errorDecoCleanupRef.current?.();
     errorDecoCleanupRef.current = null;
@@ -879,10 +895,11 @@ export default function App() {
     }
 
     setLoading(false);
-  }, [activeCode, codeType, paramValues, selectedSigner, signWithLocalKey, promptForPassword, passkeySign, network]);
+  }, [activeCode, codeType, paramValues, selectedSigner, signWithLocalKey, promptForPassword, passkeySign, network, validateCurrentParams]);
 
   const handleRun = useCallback(async () => {
     if (loading) return;
+    if (!validateCurrentParams()) return;
 
     // If no signer and this requires signing, open connect modal (skip for emulator)
     if (selectedSigner.type === 'none' && codeType !== 'script' && network !== 'emulator') {
@@ -940,7 +957,7 @@ export default function App() {
     }
 
     handleRunDirect();
-  }, [activeCode, codeType, paramValues, loading, selectedSigner, autoSign, network, simulateBeforeSend, handleRunDirect, scriptParams]);
+  }, [activeCode, codeType, paramValues, loading, selectedSigner, autoSign, network, simulateBeforeSend, handleRunDirect, scriptParams, validateCurrentParams]);
 
   // Auto-retry run after connecting wallet from the modal
   useEffect(() => {

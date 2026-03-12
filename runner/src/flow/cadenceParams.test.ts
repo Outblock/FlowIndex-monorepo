@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMainParams, buildFclArgs } from './cadenceParams';
+import { parseMainParams, buildFclArgs, toCadenceJsonCdc, validateCadenceParams } from './cadenceParams';
 
 // Mock FCL type constructors — record calls to verify correct type resolution
 function createMockTypes() {
@@ -230,5 +230,31 @@ describe('buildFclArgs — value coercion', () => {
     });
     expect(result[0].value).toBe('hello');
     expect(result[1].value).toBe('42');
+  });
+});
+
+describe('Cadence parameter validation', () => {
+  it('flags malformed UFix64 literals before simulate/execute', () => {
+    const params = parseMainParams('transaction(amount: UFix64, recipient: Address) {}');
+    expect(validateCadenceParams(params, { amount: '.0', recipient: '' })).toEqual([
+      { index: 0, name: 'amount', message: 'UFix64 must look like 1 or 1.0' },
+      { index: 1, name: 'recipient', message: 'Address value is required' },
+    ]);
+  });
+
+  it('accepts integer UFix64 input and normalizes bare addresses in JSON-CDC output', () => {
+    const params = parseMainParams('transaction(amount: UFix64, recipient: Address) {}');
+    expect(validateCadenceParams(params, { amount: '5', recipient: '1654653399040a61' })).toEqual([]);
+    expect(toCadenceJsonCdc('1654653399040a61', 'Address')).toEqual({
+      type: 'Address',
+      value: '0x1654653399040a61',
+    });
+  });
+
+  it('validates nested array items', () => {
+    const params = parseMainParams('access(all) fun main(addrs: [Address])');
+    expect(validateCadenceParams(params, { addrs: '["0x1654653399040a61", "bad"]' })).toEqual([
+      { index: 0, name: 'addrs', message: 'Invalid array item 2: Address must be 16 hex chars, with optional 0x prefix' },
+    ]);
   });
 });
