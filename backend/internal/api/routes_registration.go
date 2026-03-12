@@ -193,6 +193,7 @@ func registerFlowRoutes(r *mux.Router, s *Server) {
 	r.HandleFunc("/flow/key/{publicKey}", s.handleFlowSearchByPublicKey).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/coa/{address}", s.handleGetCOAMapping).Methods("GET", "OPTIONS")
 	r.HandleFunc("/flow/account/{address}/labels", s.handleFlowAccountLabels).Methods("GET", "OPTIONS")
+	r.HandleFunc("/flow/search", cachedHandler(30*time.Second, s.handleSearch)).Methods("GET", "OPTIONS")
 }
 
 func registerAccountingRoutes(r *mux.Router, s *Server) {
