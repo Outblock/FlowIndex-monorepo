@@ -5,7 +5,7 @@
 // Google Docs-style comment sidebar + highlighted code lines
 // ---------------------------------------------------------------------------
 
-import { useState, useMemo, useCallback, useRef, memo } from 'react';
+import { useState, useMemo, useCallback, useRef, memo, useEffect, useLayoutEffect } from 'react';
 import {
   Shield,
   ShieldAlert,
@@ -26,23 +26,17 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useShikiHighlighter, highlightCode } from '../hooks/useShiki';
 import { AnimatedMarkdown } from '@outblock/flowtoken';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export type Severity = 'high' | 'medium' | 'low' | 'info' | 'error' | 'warning';
-
-export interface AuditFinding {
-  id: string;
-  severity: Severity;
-  line: number;
-  column?: number;
-  rule?: string;
-  message: string;
-  suggestion?: string;
-  source: 'security' | 'typecheck' | 'best-practice' | 'ai-review';
-}
+import {
+  compareFindingSeverity,
+  formatFindingLineRange,
+  normalizeAuditResult,
+  type AuditFinding,
+  type AuditFindingSource,
+  type AuditScore,
+  type Severity,
+} from './auditFindings';
+import { computeSidebarLayout } from './auditSidebarLayout';
+import { extractShikiLines } from './shikiLines';
 
 interface Props {
   code: string;
@@ -51,12 +45,6 @@ interface Props {
 }
 
 type AuditStatus = 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
-
-interface ToolCallInfo {
-  name: string;
-  done: boolean;
-  output?: string;
-}
 
 // Ordered stream parts — rendered sequentially as they arrive
 type StreamPart =
@@ -133,7 +121,7 @@ const SEVERITY_CONFIG: Record<Severity, {
   },
 };
 
-const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
+const SOURCE_LABELS: Record<AuditFindingSource, { label: string; className: string }> = {
   security: { label: 'Security Scan', className: 'bg-purple-500/10 text-purple-400' },
   typecheck: { label: 'Type Check', className: 'bg-blue-500/10 text-blue-400' },
   'best-practice': { label: 'Best Practice', className: 'bg-teal-500/10 text-teal-400' },
@@ -199,33 +187,15 @@ const auditAnimatedComponents: Record<string, any> = {
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ---------------------------------------------------------------------------
-// Parse structured JSON from AI response text
+// Parse legacy JSON from AI response text (fallback for old streams)
 // ---------------------------------------------------------------------------
 
-function parseAuditResponse(text: string): { findings: AuditFinding[]; summary?: string; score?: string } | null {
+function parseAuditResponse(text: string): { findings: AuditFinding[]; summary: string; score?: AuditScore } | null {
   const jsonMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*"findings"[\s\S]*\})/);
   if (!jsonMatch) return null;
 
   try {
-    const parsed = JSON.parse(jsonMatch[1].trim());
-    if (!parsed.findings || !Array.isArray(parsed.findings)) return null;
-
-    const validSeverities = new Set(['high', 'medium', 'low', 'info', 'error', 'warning']);
-    const findings: AuditFinding[] = parsed.findings
-      .filter((f: any) => f.line && f.message)
-      .map((f: any, i: number) => ({
-        id: `finding-${i}`,
-        severity: validSeverities.has(f.severity) ? f.severity : 'info',
-        line: f.line,
-        column: f.column || undefined,
-        rule: f.rule || undefined,
-        message: f.message,
-        suggestion: f.suggestion || undefined,
-        source: f.source || 'ai-review',
-      }));
-
-    findings.sort((a, b) => a.line - b.line);
-    return { findings, summary: parsed.summary, score: parsed.score };
+    return normalizeAuditResult(JSON.parse(jsonMatch[1].trim()));
   } catch {
     return null;
   }
@@ -255,10 +225,6 @@ function formatToolName(name: string): string {
   return labels[name] || name;
 }
 
-function stripLineWrapper(html: string): string {
-  return html.replace(/^<span class="line">/, '').replace(/<\/span>$/, '');
-}
-
 // ---------------------------------------------------------------------------
 // CodePanel — clean code with syntax highlighting, line numbers, gutter marks
 // No inline annotations — findings are shown in the positioned sidebar
@@ -284,9 +250,11 @@ const CodePanel = memo(function CodePanel({
   const lineFindings = useMemo(() => {
     const map = new Map<number, AuditFinding[]>();
     for (const f of findings) {
-      const arr = map.get(f.line) || [];
-      arr.push(f);
-      map.set(f.line, arr);
+      for (let line = f.startLine; line <= f.endLine; line++) {
+        const arr = map.get(line) || [];
+        arr.push(f);
+        map.set(line, arr);
+      }
     }
     return map;
   }, [findings]);
@@ -295,11 +263,10 @@ const CodePanel = memo(function CodePanel({
     <div className="font-mono text-xs">
       {codeLines.map((line, i) => {
         const lineNum = i + 1;
-        const lf = lineFindings.get(lineNum);
+        const lf = lineFindings.get(lineNum)?.slice().sort(compareFindingSeverity);
         const has = !!lf;
         const isSel = lf?.some(f => f.id === selectedId);
-        const sevOrder: Severity[] = ['high', 'error', 'medium', 'warning', 'low', 'info'];
-        const topSev = lf ? sevOrder.find(s => lf.some(f => f.severity === s)) || 'info' : null;
+        const topSev = lf?.[0]?.severity || null;
         const cfg = topSev ? SEVERITY_CONFIG[topSev] : null;
 
         return (
@@ -319,7 +286,7 @@ const CodePanel = memo(function CodePanel({
             }`}>{lineNum}</span>
             <span className="flex-1 whitespace-pre pl-1 pr-4 overflow-hidden text-ellipsis">
               {highlightedLines?.[i]
-                ? <span dangerouslySetInnerHTML={{ __html: stripLineWrapper(highlightedLines[i]) }} />
+                ? <span dangerouslySetInnerHTML={{ __html: highlightedLines[i] }} />
                 : <span className="text-zinc-300">{line}</span>}
             </span>
           </div>
@@ -340,9 +307,10 @@ export default function AuditTab({ code, contractName, network }: Props) {
   const [status, setStatus] = useState<AuditStatus>('idle');
   const [findings, setFindings] = useState<AuditFinding[]>([]);
   const [summary, setSummary] = useState('');
-  const [score, setScore] = useState('');
+  const [score, setScore] = useState<AuditScore | ''>('');
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [cardHeights, setCardHeights] = useState<Record<string, number>>({});
 
   // Ordered stream parts — rendered sequentially as they arrive
   const [streamParts, setStreamParts] = useState<StreamPart[]>([]);
@@ -350,12 +318,22 @@ export default function AuditTab({ code, contractName, network }: Props) {
   // Refs for accumulation (avoid re-render per delta)
   const partsRef = useRef<StreamPart[]>([]);
   const fullTextRef = useRef(''); // accumulates all text-delta for JSON parsing
+  const structuredResultRef = useRef<ReturnType<typeof normalizeAuditResult>>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   // Rule filter: users can hide specific rule types (e.g., unsafe-force-unwrap)
   const [hiddenRules, setHiddenRules] = useState<Set<string>>(new Set());
+
+  const applyAuditResult = useCallback((result: ReturnType<typeof normalizeAuditResult>) => {
+    if (!result) return;
+    structuredResultRef.current = result;
+    setFindings(result.findings);
+    setSummary(result.summary || '');
+    setScore(result.score || '');
+  }, []);
 
   // Helper: get or create the last part of a given kind
   const getOrCreatePart = (kind: 'thinking' | 'text'): { kind: 'thinking' | 'text'; text: string } => {
@@ -377,9 +355,11 @@ export default function AuditTab({ code, contractName, network }: Props) {
     setScore('');
     setSelectedId(null);
     setThinkingExpanded(false);
+    setCardHeights({});
     setStreamParts([]);
     partsRef.current = [];
     fullTextRef.current = '';
+    structuredResultRef.current = null;
 
     // Abort previous request
     abortRef.current?.abort();
@@ -463,11 +443,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
               }
 
               case 'text-delta': {
-                const delta = evt.delta || '';
-                fullTextRef.current += delta;
-                const part = getOrCreatePart('text');
-                part.text += delta;
-                scheduleUpdate();
+                fullTextRef.current += evt.delta || '';
                 break;
               }
 
@@ -555,6 +531,11 @@ export default function AuditTab({ code, contractName, network }: Props) {
                 setStreamParts([...partsRef.current]);
                 break;
               }
+
+              case 'data-audit-result': {
+                applyAuditResult(normalizeAuditResult(evt.data));
+                break;
+              }
             }
           } catch (parseErr) {
             console.warn('[audit] JSON parse error:', parseErr, 'data:', data.slice(0, 200));
@@ -567,11 +548,9 @@ export default function AuditTab({ code, contractName, network }: Props) {
       setStreamParts([...partsRef.current]);
 
       // Parse findings from the complete response text
-      const result = parseAuditResponse(fullTextRef.current);
+      const result = structuredResultRef.current || parseAuditResponse(fullTextRef.current);
       if (result) {
-        setFindings(result.findings);
-        setSummary(result.summary || '');
-        setScore(result.score || '');
+        applyAuditResult(result);
       }
 
       setStatus('done');
@@ -580,7 +559,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
       console.error('[audit] Stream error:', err);
       setStatus('error');
     }
-  }, [code, contractName, network]);
+  }, [applyAuditResult, code, contractName, network]);
 
   const isStreaming = status === 'streaming' || status === 'connecting';
   const hasStarted = status !== 'idle';
@@ -594,6 +573,7 @@ export default function AuditTab({ code, contractName, network }: Props) {
     () => streamParts.filter(p => p.kind === 'thinking').map(p => p.text).join(''),
     [streamParts],
   );
+  const codeHeight = useMemo(() => code.split('\n').length * LINE_HEIGHT, [code]);
 
   // Group findings by rule for the filter bar
   const ruleGroups = useMemo(() => {
@@ -618,33 +598,58 @@ export default function AuditTab({ code, contractName, network }: Props) {
     [findings, hiddenRules],
   );
 
-  // Position findings in sidebar — stack overlapping ones
-  const positionedFindings = useMemo(() => {
-    if (filteredFindings.length === 0) return [];
-    const CARD_HEIGHT = 72; // approximate card height in px
-    const GAP = 4;
-    const result: { finding: AuditFinding; top: number }[] = [];
-    let lastBottom = -Infinity;
-    for (const f of filteredFindings) {
-      const idealTop = (f.line - 1) * LINE_HEIGHT;
-      const top = Math.max(idealTop, lastBottom + GAP);
-      result.push({ finding: f, top });
-      lastBottom = top + CARD_HEIGHT;
+  useEffect(() => {
+    if (!selectedId) return;
+    if (filteredFindings.some((finding) => finding.id === selectedId)) return;
+    setSelectedId(null);
+  }, [filteredFindings, selectedId]);
+
+  useLayoutEffect(() => {
+    const sidebar = sidebarRef.current;
+    if (!sidebar || filteredFindings.length === 0) return;
+
+    const measure = () => {
+      const nextHeights: Record<string, number> = {};
+      sidebar.querySelectorAll<HTMLElement>('[data-finding-card-id]').forEach((card) => {
+        const id = card.dataset.findingCardId;
+        if (id) nextHeights[id] = card.offsetHeight;
+      });
+      setCardHeights((prev) => {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(nextHeights);
+        if (
+          prevKeys.length === nextKeys.length &&
+          prevKeys.every((key) => prev[key] === nextHeights[key])
+        ) {
+          return prev;
+        }
+        return nextHeights;
+      });
+    };
+
+    const frame = requestAnimationFrame(measure);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (observer) {
+      sidebar.querySelectorAll<HTMLElement>('[data-finding-card-id]').forEach((card) => observer.observe(card));
     }
-    return result;
-  }, [filteredFindings]);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [filteredFindings, selectedId]);
+
+  const sidebarLayout = useMemo(
+    () => computeSidebarLayout(filteredFindings, cardHeights, LINE_HEIGHT),
+    [cardHeights, filteredFindings],
+  );
+  const sidebarHeight = Math.max(codeHeight, sidebarLayout.contentHeight + 12);
 
   // Per-line Shiki HTML (expensive — only depends on code)
   const highlightedLines = useMemo(() => {
     if (!highlighter || !code) return null;
     const html = highlightCode(highlighter, code, 'cadence', 'cadence-editor');
-    const lineMatches = html.match(/<span class="line">[^]*?<\/span>(?=<span class="line">|<\/code>)/g);
-    if (!lineMatches) {
-      const codeContent = html.match(/<code[^>]*>([\s\S]*?)<\/code>/);
-      if (codeContent) return codeContent[1].split('\n');
-      return null;
-    }
-    return lineMatches;
+    return extractShikiLines(html);
   }, [highlighter, code]);
 
   // Scroll to line in code panel when clicking a finding
@@ -661,6 +666,27 @@ export default function AuditTab({ code, contractName, network }: Props) {
   const selectFinding = useCallback((findingId: string) => {
     setSelectedId(findingId);
   }, []);
+
+  const selectedFindingIndex = useMemo(
+    () => filteredFindings.findIndex((finding) => finding.id === selectedId),
+    [filteredFindings, selectedId],
+  );
+
+  const jumpToFinding = useCallback((finding: AuditFinding | undefined) => {
+    if (!finding) return;
+    scrollToLine(finding.startLine, finding.id);
+  }, [scrollToLine]);
+
+  const jumpToFirstFinding = useCallback(() => {
+    jumpToFinding(filteredFindings[0]);
+  }, [filteredFindings, jumpToFinding]);
+
+  const jumpToRelativeFinding = useCallback((direction: -1 | 1) => {
+    if (filteredFindings.length === 0) return;
+    const baseIndex = selectedFindingIndex >= 0 ? selectedFindingIndex : (direction > 0 ? -1 : 0);
+    const nextIndex = Math.min(filteredFindings.length - 1, Math.max(0, baseIndex + direction));
+    jumpToFinding(filteredFindings[nextIndex]);
+  }, [filteredFindings, jumpToFinding, selectedFindingIndex]);
 
   // Stats
   const stats = useMemo(() => {
@@ -999,9 +1025,11 @@ export default function AuditTab({ code, contractName, network }: Props) {
           )}
 
           {/* ── Rule Filter Bar ── */}
-          {ruleGroups.length > 1 && (
+          {(ruleGroups.length > 1 || filteredFindings.length > 0) && (
             <div className="px-4 py-2 border-b border-zinc-800/50 flex items-center gap-1.5 flex-wrap">
-              <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-medium mr-1">Rules:</span>
+              <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-medium mr-1">
+                {ruleGroups.length > 0 ? 'Rules:' : 'Findings:'}
+              </span>
               {ruleGroups.map(rg => {
                 const isHidden = hiddenRules.has(rg.rule);
                 const cfg = SEVERITY_CONFIG[rg.severity];
@@ -1025,6 +1053,28 @@ export default function AuditTab({ code, contractName, network }: Props) {
                   </button>
                 );
               })}
+              {filteredFindings.length > 0 && (
+                <div className="ml-auto flex items-center gap-1">
+                  <button
+                    onClick={() => jumpToFirstFinding()}
+                    className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    First
+                  </button>
+                  <button
+                    onClick={() => jumpToRelativeFinding(-1)}
+                    className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => jumpToRelativeFinding(1)}
+                    className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-medium hover:bg-zinc-700 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1042,8 +1092,11 @@ export default function AuditTab({ code, contractName, network }: Props) {
             </div>
 
             {/* Positioned comment sidebar — findings aligned to their code lines */}
-            <div className="w-80 shrink-0 border-l border-zinc-800 bg-zinc-950/30 relative"
-                 style={{ minHeight: code.split('\n').length * LINE_HEIGHT }}>
+            <div
+              ref={sidebarRef}
+              className="w-80 shrink-0 border-l border-zinc-800 bg-zinc-950/30 relative"
+              style={{ minHeight: sidebarHeight }}
+            >
               {filteredFindings.length === 0 && status === 'done' && (
                 <div className="flex flex-col items-center justify-center py-12 gap-2 text-zinc-500 sticky top-1/3">
                   <ShieldCheck className="w-6 h-6 text-emerald-500/50" />
@@ -1051,16 +1104,17 @@ export default function AuditTab({ code, contractName, network }: Props) {
                 </div>
               )}
 
-              {positionedFindings.map(({ finding: f, top }) => {
+              {sidebarLayout.items.map(({ finding: f, top }) => {
                 const fc = SEVERITY_CONFIG[f.severity];
                 const Icon = fc.icon;
                 const isSel = f.id === selectedId;
-                const src = SOURCE_LABELS[f.source] || SOURCE_LABELS['ai-review'];
+                const lineLabel = formatFindingLineRange(f);
 
                 return (
                   <div
                     key={f.id}
-                    onClick={() => scrollToLine(f.line, f.id)}
+                    data-finding-card-id={f.id}
+                    onClick={() => scrollToLine(f.startLine, f.id)}
                     style={{ position: 'absolute', top, left: 0, right: 0 }}
                     className={`mx-2 px-2.5 py-2 rounded-md cursor-pointer transition-all border ${
                       isSel
@@ -1073,10 +1127,17 @@ export default function AuditTab({ code, contractName, network }: Props) {
                         <Icon className={`w-3 h-3 ${fc.color}`} />
                         <span className={`text-[9px] font-semibold uppercase ${fc.color}`}>{fc.label}</span>
                       </div>
-                      <span className="text-[9px] text-zinc-600 font-mono">L{f.line}</span>
+                      <div className="flex items-center gap-1">
+                        {typeof f.confidence === 'number' && (
+                          <span className="text-[8px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+                            {Math.round(f.confidence * 100)}%
+                          </span>
+                        )}
+                        <span className="text-[9px] text-zinc-600 font-mono">{lineLabel}</span>
+                      </div>
                     </div>
 
-                    <p className="text-[10px] text-zinc-300 leading-snug line-clamp-2">{f.message}</p>
+                    <p className={`text-[10px] text-zinc-300 leading-snug ${isSel ? '' : 'line-clamp-2'}`}>{f.message}</p>
 
                     {f.suggestion && isSel && (
                       <p className="text-[9px] text-emerald-400/70 leading-snug mt-1 pl-1.5 border-l border-emerald-500/20">
@@ -1088,7 +1149,19 @@ export default function AuditTab({ code, contractName, network }: Props) {
                       {f.rule && (
                         <span className="text-[8px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-500 font-mono">{f.rule}</span>
                       )}
-                      <span className={`text-[8px] px-1 py-0.5 rounded font-medium ${src.className}`}>{src.label}</span>
+                      {f.sources.map((source) => {
+                        const src = SOURCE_LABELS[source];
+                        return (
+                          <span key={`${f.id}-${source}`} className={`text-[8px] px-1 py-0.5 rounded font-medium ${src.className}`}>
+                            {src.label}
+                          </span>
+                        );
+                      })}
+                      {f.evidenceCount > 1 && (
+                        <span className="text-[8px] px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium">
+                          {f.evidenceCount} signals
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
