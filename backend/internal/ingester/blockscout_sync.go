@@ -163,7 +163,7 @@ func (s *BlockscoutSync) syncVerifiedContracts(ctx context.Context) {
 // backfillContractDetails fetches ABI + source code for contracts that were
 // synced without them (e.g. from a previous version that only used the list endpoint).
 func (s *BlockscoutSync) backfillContractDetails(ctx context.Context) {
-	addrs, err := s.repo.GetEVMContractsMissingABI(ctx, 200)
+	addrs, err := s.repo.GetEVMContractsMissingABI(ctx, 1000)
 	if err != nil {
 		log.Printf("[blockscout_sync] get contracts missing ABI error: %v", err)
 		return
@@ -174,7 +174,7 @@ func (s *BlockscoutSync) backfillContractDetails(ctx context.Context) {
 
 	log.Printf("[blockscout_sync] backfill: %d contracts missing ABI", len(addrs))
 
-	const concurrency = 5
+	const concurrency = 20
 	sem := make(chan struct{}, concurrency)
 	var mu sync.Mutex
 	var rows []repository.EVMContractRow
