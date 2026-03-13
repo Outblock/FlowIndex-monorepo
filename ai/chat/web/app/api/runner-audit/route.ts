@@ -1,5 +1,5 @@
 import { createMCPClient } from "@ai-sdk/mcp";
-import { anthropic } from "@ai-sdk/anthropic";
+import { anthropic, type AnthropicLanguageModelOptions } from "@ai-sdk/anthropic";
 import { streamText, stepCountIs, convertToModelMessages, type UIMessage } from "ai";
 
 const CADENCE_MCP_URL =
@@ -159,8 +159,19 @@ ${diagnostics}`;
     model: anthropic("claude-opus-4-6"),
     providerOptions: {
       anthropic: {
+        contextManagement: {
+          edits: [
+            {
+              type: "compact_20260112" as const,
+              trigger: { type: "input_tokens" as const, value: 150_000 },
+              instructions:
+                "Summarize the audit conversation. Preserve: security findings, " +
+                "severity levels, and remediation suggestions.",
+            },
+          ],
+        },
         thinking: { type: "enabled", budgetTokens: 16000 },
-      },
+      } satisfies AnthropicLanguageModelOptions,
     },
     system: systemWithContext,
     messages: await convertToModelMessages(messages),

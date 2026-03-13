@@ -1,5 +1,5 @@
 import { createMCPClient } from "@ai-sdk/mcp";
-import { anthropic } from "@ai-sdk/anthropic";
+import { anthropic, type AnthropicLanguageModelOptions } from "@ai-sdk/anthropic";
 import {
   streamText,
   tool,
@@ -316,13 +316,25 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: anthropic(cfg.model),
-    ...(cfg.thinking && {
-      providerOptions: {
-        anthropic: {
-          thinking: { type: "enabled", budgetTokens: 10000 },
+    providerOptions: {
+      anthropic: {
+        contextManagement: {
+          edits: [
+            {
+              type: "compact_20260112" as const,
+              trigger: { type: "input_tokens" as const, value: 150_000 },
+              instructions:
+                "Summarize the conversation concisely. Preserve: code changes made, " +
+                "file paths modified, Cadence errors encountered, and user requirements. " +
+                "Drop verbose tool outputs and file contents already applied.",
+            },
+          ],
         },
-      },
-    }),
+        ...(cfg.thinking && {
+          thinking: { type: "enabled", budgetTokens: 10000 },
+        }),
+      } satisfies AnthropicLanguageModelOptions,
+    },
     system: systemWithContext,
     messages: await convertToModelMessages(messages),
     tools: allTools,

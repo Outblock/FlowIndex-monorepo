@@ -1,5 +1,5 @@
 import { createMCPClient } from "@ai-sdk/mcp";
-import { anthropic } from "@ai-sdk/anthropic";
+import { anthropic, type AnthropicLanguageModelOptions } from "@ai-sdk/anthropic";
 import {
   streamText,
   tool,
@@ -57,6 +57,34 @@ const MODE_CONFIG = {
 } as const;
 
 type ChatMode = keyof typeof MODE_CONFIG;
+
+// ---------------------------------------------------------------------------
+// Pre-processing: strip failed tool results to reduce token waste
+// ---------------------------------------------------------------------------
+
+/**
+ * Strip failed/errored tool invocations from message parts — they add no
+ * value to the conversation and waste tokens. Compaction handles the rest.
+ */
+function stripFailedToolCalls(m: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(m.parts)) return m;
+  const parts = (m.parts as any[]).filter((part: any) => {
+    if (
+      part.type === "tool-invocation" &&
+      (part.state === "output-error" || part.state === "error")
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  // If all parts were stripped, keep a minimal text part so the message isn't empty
+  if (parts.length === 0) {
+    return { ...m, parts: [{ type: "text", text: "(tool calls failed)" }] };
+  }
+
+  return { ...m, parts };
+}
 
 // Try to connect to an MCP server and fetch its tools. Returns empty on failure.
 async function safeMcpTools(
@@ -129,17 +157,34 @@ export async function POST(req: Request) {
     safeMcpTools(EVM_MCP_URL),
   ]);
 
+  // Strip failed tool calls before sending to the API
+  const cleanedMessages = messages.map(stripFailedToolCalls) as UIMessage[];
+
   const result = streamText({
     model: anthropic(cfg.model),
-    ...(cfg.thinking && {
-      providerOptions: {
-        anthropic: {
-          thinking: { type: "enabled", budgetTokens: 10000 },
+    providerOptions: {
+      anthropic: {
+        // Enable native compaction: when input exceeds the trigger threshold,
+        // Claude automatically summarises older context instead of failing.
+        contextManagement: {
+          edits: [
+            {
+              type: "compact_20260112" as const,
+              trigger: { type: "input_tokens" as const, value: 150_000 },
+              instructions:
+                "Summarize the conversation concisely. Preserve: key questions asked, " +
+                "SQL queries and their results, important data points, decisions made, " +
+                "and any error context. Drop verbose tool outputs.",
+            },
+          ],
         },
-      },
-    }),
+        ...(cfg.thinking && {
+          thinking: { type: "enabled", budgetTokens: 10000 },
+        }),
+      } satisfies AnthropicLanguageModelOptions,
+    },
     system: getSystemPrompt() + buildSkillsPrompt(),
-    messages: await convertToModelMessages(messages),
+    messages: await convertToModelMessages(cleanedMessages),
     tools: {
       ...mcp.tools,
       ...cadenceMcp.tools,
