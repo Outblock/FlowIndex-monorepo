@@ -696,6 +696,23 @@ jobs:
           cache-from: type=gha,scope=ai-chat
           cache-to: type=gha,scope=ai-chat,mode=max
 
+      - name: Generate Supabase service role key
+        id: supabase-keys
+        env:
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+        run: |
+          python3 -c "
+          import json,hmac,hashlib,base64,os
+          def b(d): return base64.urlsafe_b64encode(d).rstrip(b'=').decode()
+          s=os.environ['SUPABASE_JWT_SECRET']
+          h=b(json.dumps({'alg':'HS256','typ':'JWT'}).encode())
+          p=b(json.dumps({'role':'service_role','iss':'supabase','iat':1672531200,'exp':1988150400}).encode())
+          sig=b(hmac.new(s.encode(),(h+'.'+p).encode(),hashlib.sha256).digest())
+          token=h+'.'+p+'.'+sig
+          print(f'::add-mask::{token}')
+          print(f'service_key={token}',file=open(os.environ['GITHUB_OUTPUT'],'a'))
+          "
+
       - name: Deploy ai-chat (pull & restart on GCE)
         run: |
           gcloud compute ssh flowindex-backend --zone=us-central1-a --command='
@@ -710,6 +727,7 @@ jobs:
               -e MCP_AUTH_ENABLED=true \
               -e MCP_RATE_LIMIT=60 \
               -e BACKEND_URL=http://localhost:8080 \
+              -e SUPABASE_SERVICE_ROLE_KEY=${{ steps.supabase-keys.outputs.service_key }} \
               ${{ env.REGISTRY }}/ai-chat:${{ github.sha }}
           '
 
