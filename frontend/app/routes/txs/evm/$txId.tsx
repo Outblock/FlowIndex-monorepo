@@ -13,13 +13,13 @@ export const Route = createFileRoute('/txs/evm/$txId')({
                 const json = await res.json();
                 const rawTx: any = json?.data?.[0] ?? json;
                 if (rawTx?.id && rawTx.id !== evmHash) {
-                    throw redirect({ to: '/txs/$txId', params: { txId: rawTx.id }, search: {} });
+                    throw redirect({ to: '/txs/$txId', params: { txId: rawTx.id }, search: { tab: undefined } });
                 }
             }
         } catch (e) {
             if ((e as any)?.isRedirect || (e as any)?.to) throw e;
         }
         // Redirect to main tx page — it will fetch from Blockscout proxy as fallback
-        throw redirect({ to: '/txs/$txId', params: { txId: evmHash }, search: {} });
+        throw redirect({ to: '/txs/$txId', params: { txId: evmHash }, search: { tab: undefined } });
     },
 })

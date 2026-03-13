@@ -863,7 +863,7 @@ function TransactionDetail() {
         const argStr = typeof transaction.arguments === 'string' ? transaction.arguments : JSON.stringify(transaction.arguments);
         const matches = argStr.match(CONTRACT_ID_RE);
         if (!matches || matches.length === 0) return;
-        const unique = [...new Set(matches)];
+        const unique = [...new Set(matches)] as string[];
         // Fetch FT token list to resolve metadata
         resolveApiBaseUrl().then(base =>
             fetch(`${base}/flow/v1/ft?limit=500`).then(r => r.ok ? r.json() : null).then(json => {
@@ -1307,7 +1307,7 @@ function TransactionDetail() {
                                                                 <span className="text-zinc-400 dark:text-zinc-600">→</span>
                                                                 <Link
                                                                     to={`/contracts/${contractId}` as any}
-                                                                    search={{ line: entry.line, col: entry.col }}
+                                                                    search={{ line: entry.line, col: entry.col } as any}
                                                                     className="text-nothing-green-dark dark:text-nothing-green hover:underline"
                                                                 >
                                                                     {fullText}
@@ -1572,34 +1572,34 @@ function TransactionDetail() {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <span className="text-xs font-mono font-medium text-zinc-900 dark:text-white">
-                                                                {row.amount != null ? Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—'}
+                                                    {/* Left: amount + symbol + badges */}
+                                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                                        <span className="text-xs font-mono font-medium text-zinc-900 dark:text-white">
+                                                            {row.amount != null ? Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—'}
+                                                        </span>
+                                                        <span className="text-[10px] text-zinc-500 font-medium uppercase">{row.symbol}</span>
+                                                        {row.usdValue > 0 && <UsdValue value={row.usdValue} className="text-[10px]" />}
+                                                        {row.transferType === 'mint' && (
+                                                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Mint</span>
+                                                        )}
+                                                        {row.transferType === 'burn' && (
+                                                            <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Burn</span>
+                                                        )}
+                                                        {row.badge}
+                                                    </div>
+                                                    {/* Right: From → To */}
+                                                    <div className="ml-auto flex items-center gap-1.5 text-[11px] text-zinc-500 flex-shrink-0">
+                                                        {row.from && (
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <span className="text-zinc-400 dark:text-zinc-600">From</span> <AddressLink address={row.from} prefixLen={8} suffixLen={4} size={12} className="text-[11px]" />
                                                             </span>
-                                                            <span className="text-[10px] text-zinc-500 font-medium uppercase">{row.symbol}</span>
-                                                            {row.usdValue > 0 && <UsdValue value={row.usdValue} className="text-[10px]" />}
-                                                            {row.transferType === 'mint' && (
-                                                                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Mint</span>
-                                                            )}
-                                                            {row.transferType === 'burn' && (
-                                                                <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Burn</span>
-                                                            )}
-                                                            {row.badge}
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 mt-0.5 flex-wrap">
-                                                            {row.from && (
-                                                                <span className="inline-flex items-center gap-1">
-                                                                    From <AddressLink address={row.from} prefixLen={8} suffixLen={4} size={12} className="text-[10px]" />
-                                                                </span>
-                                                            )}
-                                                            {row.from && row.to && <span className="text-zinc-300 dark:text-zinc-600">→</span>}
-                                                            {row.to && (
-                                                                <span className="inline-flex items-center gap-1">
-                                                                    To <AddressLink address={row.to} prefixLen={8} suffixLen={4} size={12} className="text-[10px]" />
-                                                                </span>
-                                                            )}
-                                                        </div>
+                                                        )}
+                                                        {row.from && row.to && <span className="text-zinc-300 dark:text-zinc-600 mx-1">→</span>}
+                                                        {row.to && (
+                                                            <span className="inline-flex items-center gap-1">
+                                                                <span className="text-zinc-400 dark:text-zinc-600">To</span> <AddressLink address={row.to} prefixLen={8} suffixLen={4} size={12} className="text-[11px]" />
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -1701,7 +1701,7 @@ function TransactionDetail() {
                                                         const contractId = `A.${addr}.${contractName}`;
                                                         const meta = contractMeta.get(contractId) || contractMeta.get(decoded);
                                                         return (
-                                                            <Link to={`/contract/${contractId}`} className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline" title={meta ? `${meta.name}${meta.symbol ? ` (${meta.symbol})` : ''}` : contractName}>
+                                                            <Link to={`/contract/${contractId}` as any} className="inline-flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline" title={meta ? `${meta.name}${meta.symbol ? ` (${meta.symbol})` : ''}` : contractName}>
                                                                 {meta?.logo ? (
                                                                     <img src={meta.logo} alt="" className="w-4 h-4 rounded-full" />
                                                                 ) : (
@@ -1894,7 +1894,7 @@ function TransactionDetail() {
                                         {transaction.script && (
                                             <Link
                                                 to="/playground"
-                                                search={{ tx: transaction.id }}
+                                                search={{ tx: transaction.id } as any}
                                                 target="_blank"
                                                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 transition-colors"
                                             >
