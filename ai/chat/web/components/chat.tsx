@@ -185,6 +185,16 @@ const SUGGESTIONS = [
   },
 ];
 
+type ChatMessageMetadata = {
+  usage?: LanguageModelUsage;
+  model?: string;
+  contextManagement?: {
+    appliedEdits?: Array<{
+      type?: string;
+    }>;
+  };
+};
+
 export function Chat() {
   const { mode, selectMode } = useModelSelector();
   const modeRef = useRef(mode);
@@ -211,15 +221,23 @@ export function Chat() {
 
   // Extract token usage from the last assistant message's metadata
   const CONTEXT_WINDOW = 200_000;
-  const lastUsage = useMemo((): LanguageModelUsage | null => {
+  const lastAssistantMetadata = useMemo((): ChatMessageMetadata | null => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
-      if (msg.role === "assistant" && (msg as any).metadata?.usage) {
-        return (msg as any).metadata.usage as LanguageModelUsage;
+      const metadata = (msg as any).metadata as ChatMessageMetadata | undefined;
+      if (msg.role === "assistant" && metadata?.usage) {
+        return metadata;
       }
     }
     return null;
   }, [messages]);
+  const lastUsage = lastAssistantMetadata?.usage ?? null;
+  const lastModel = lastAssistantMetadata?.model;
+  const didCompactContext = Boolean(
+    lastAssistantMetadata?.contextManagement?.appliedEdits?.some(
+      (edit) => edit?.type === "compact_20260112"
+    )
+  );
 
   const handleSend = useCallback(
     ({ text, files }: PromptInputMessage) => {
@@ -329,10 +347,16 @@ export function Chat() {
               </PromptInputFooter>
             </PromptInput>
 
-            <ComposerToolbar
+            <ContextStatus
               contextWindow={CONTEXT_WINDOW}
-              hideTools={hideTools}
+              didCompactContext={didCompactContext}
+              modelId={lastModel}
               lastUsage={lastUsage}
+              mode={mode}
+            />
+
+            <ComposerToolbar
+              hideTools={hideTools}
               mode={mode}
               selectMode={selectMode}
               setHideTools={setHideTools}
@@ -476,17 +500,56 @@ function PendingPromptAttachments() {
   );
 }
 
-function ComposerToolbar({
+function ContextStatus({
   contextWindow,
-  hideTools,
+  didCompactContext,
   lastUsage,
+  modelId,
+  mode,
+}: {
+  contextWindow: number;
+  didCompactContext: boolean;
+  lastUsage: LanguageModelUsage | null;
+  modelId?: string;
+  mode: ChatMode;
+}) {
+  if (!lastUsage) return null;
+
+  return (
+    <div className="mt-1 flex items-center justify-end gap-2">
+      {didCompactContext && (
+        <span className="rounded-sm border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-400/80">
+          Compacted
+        </span>
+      )}
+      <Context
+        usedTokens={(lastUsage.inputTokens ?? 0) + (lastUsage.outputTokens ?? 0)}
+        maxTokens={contextWindow}
+        usage={lastUsage}
+        modelId={modelId ?? CHAT_MODES.find((m) => m.key === mode)?.model}
+      >
+        <ContextTrigger className="!h-6 !px-1.5 !py-0 !text-[10px] !gap-1 text-zinc-500 hover:text-zinc-300" />
+        <ContextContent side="top" align="end" className="bg-zinc-900 border-white/10">
+          <ContextContentHeader className="text-zinc-300" />
+          <ContextContentBody className="space-y-1">
+            <ContextInputUsage className="text-zinc-400" />
+            <ContextOutputUsage className="text-zinc-400" />
+            <ContextReasoningUsage className="text-zinc-400" />
+            <ContextCacheUsage className="text-zinc-400" />
+          </ContextContentBody>
+        </ContextContent>
+      </Context>
+    </div>
+  );
+}
+
+function ComposerToolbar({
+  hideTools,
   mode,
   selectMode,
   setHideTools,
 }: {
-  contextWindow: number;
   hideTools: boolean;
-  lastUsage: LanguageModelUsage | null;
   mode: ChatMode;
   selectMode: (mode: ChatMode) => void;
   setHideTools: React.Dispatch<React.SetStateAction<boolean>>;
@@ -616,28 +679,6 @@ function ComposerToolbar({
           </div>
         </div>
       </div>
-
-      {lastUsage && (
-        <div className="ml-auto">
-          <Context
-            usedTokens={(lastUsage.inputTokens ?? 0) + (lastUsage.outputTokens ?? 0)}
-            maxTokens={contextWindow}
-            usage={lastUsage}
-            modelId={CHAT_MODES.find((m) => m.key === mode)?.model}
-          >
-            <ContextTrigger className="!h-7 !px-1.5 !py-0 !text-[10px] !gap-1 text-zinc-500 hover:text-zinc-300" />
-            <ContextContent side="top" align="end" className="bg-zinc-900 border-white/10">
-              <ContextContentHeader className="text-zinc-300" />
-              <ContextContentBody className="space-y-1">
-                <ContextInputUsage className="text-zinc-400" />
-                <ContextOutputUsage className="text-zinc-400" />
-                <ContextReasoningUsage className="text-zinc-400" />
-                <ContextCacheUsage className="text-zinc-400" />
-              </ContextContentBody>
-            </ContextContent>
-          </Context>
-        </div>
-      )}
     </div>
   );
 }

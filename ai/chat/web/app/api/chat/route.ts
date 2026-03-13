@@ -631,9 +631,11 @@ export async function POST(req: Request) {
     messageMetadata({ part }) {
       // Send token usage on finish so the client can show context window usage
       if (part.type === "finish") {
+        const anthropicMetadata = (part as any).providerMetadata?.anthropic;
         return {
           usage: (part as any).totalUsage ?? (part as any).usage,
           model: cfg.model,
+          contextManagement: anthropicMetadata?.contextManagement,
         };
       }
       return undefined;
