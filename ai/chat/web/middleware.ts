@@ -6,7 +6,40 @@ import { NextResponse, type NextRequest } from "next/server";
 const SUPABASE_URL_INTERNAL =
   process.env.SUPABASE_URL_INTERNAL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
 
+const ALLOWED_ORIGINS = new Set([
+  "https://flowindex.io",
+  "https://www.flowindex.io",
+]);
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Credentials": "true",
+  };
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
 export async function middleware(request: NextRequest) {
+  // Handle CORS for session and share API routes
+  const isSessionApi = request.nextUrl.pathname.startsWith("/api/sessions") ||
+                       request.nextUrl.pathname.startsWith("/api/share");
+
+  if (isSessionApi) {
+    const origin = request.headers.get("origin");
+    if (request.method === "OPTIONS") {
+      return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
+    }
+    const response = NextResponse.next();
+    for (const [key, value] of Object.entries(corsHeaders(origin))) {
+      response.headers.set(key, value);
+    }
+    return response;
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
