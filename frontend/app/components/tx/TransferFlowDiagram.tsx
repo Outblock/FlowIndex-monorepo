@@ -21,6 +21,7 @@ import { extractLogoUrl } from '../TransactionRow';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ExpandableFlowContainer } from '../ExpandableFlowContainer';
 import { decodeEVMCallData } from '../../lib/deriveFromEvents';
+import { buildTxAddressBook, getTxAddressBookEntry, type TxAddressBook } from '../../lib/txAddressBook';
 
 /* ── Custom edge that reliably renders React element labels ── */
 
@@ -107,7 +108,7 @@ export function buildTokenIconMap(transaction: any): Map<string, string> {
 
 /* ── Layout: assign (x,y) per unique address, left-to-right ── */
 
-export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<string, string>): { nodes: Node[]; edges: Edge[] } {
+export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<string, string>, addressBook?: TxAddressBook): { nodes: Node[]; edges: Edge[] } {
     const seen = new Map<string, { label: string; isSource: boolean; isTarget: boolean }>();
     for (const f of flows) {
         if (!seen.has(f.from)) seen.set(f.from, { label: f.fromLabel || formatShort(f.from, 8, 4), isSource: true, isTarget: false });
@@ -172,6 +173,12 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
             const addrT = addressType(normalized);
             const colors = colorsFromAddress(normalized);
             const tag = TAG_STYLES[addrT];
+            const resolved = getTxAddressBookEntry(addressBook, normalized);
+            const primaryLabel = resolved?.primaryLabel || info.label;
+            const secondaryParts = [];
+            if (resolved?.callLabel) secondaryParts.push(resolved.callLabel);
+            if (primaryLabel !== resolved?.shortAddress && resolved?.shortAddress) secondaryParts.push(resolved.shortAddress);
+            const secondaryLabel = secondaryParts.join(' · ');
             return {
                 id: addr,
                 data: {
@@ -189,10 +196,24 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
                                 variant={avatarVariant(normalized)}
                                 colors={colors}
                             />
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
-                                    {info.label}
+                                    {primaryLabel}
                                 </div>
+                                {secondaryLabel && (
+                                    <div style={{
+                                        fontSize: '9px',
+                                        fontFamily: 'ui-monospace, monospace',
+                                        marginTop: '2px',
+                                        color: isDark ? '#a1a1aa' : '#71717a',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        maxWidth: '160px',
+                                    }}>
+                                        {secondaryLabel}
+                                    </div>
+                                )}
                                 <div style={{ fontSize: '9px', fontFamily: 'ui-monospace, monospace', marginTop: '2px', color: tag?.color || (isDark ? '#71717a' : '#a1a1aa') }}>
                                     {tag?.label || 'Flow'}
                                 </div>
@@ -543,17 +564,18 @@ function transfersToFlows(detail: any): Flow[] {
 
 /* ── Main component ── */
 
-export default function TransferFlowDiagram({ detail }: { detail: any }) {
+export default function TransferFlowDiagram({ detail, addressBook }: { detail: any; addressBook?: TxAddressBook }) {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
 
     const tokenIcons = useMemo(() => buildTokenIconMap(detail), [detail]);
     const flows = useMemo(() => transfersToFlows(detail), [detail]);
+    const resolvedAddressBook = useMemo(() => addressBook || buildTxAddressBook(detail), [addressBook, detail]);
 
     const { nodes, edges } = useMemo(() => {
         if (!flows.length) return { nodes: [] as Node[], edges: [] as Edge[] };
-        return layoutGraph(flows, isDark, tokenIcons);
-    }, [flows, isDark, tokenIcons]);
+        return layoutGraph(flows, isDark, tokenIcons, resolvedAddressBook);
+    }, [flows, isDark, tokenIcons, resolvedAddressBook]);
 
     if (nodes.length === 0) return null;
 

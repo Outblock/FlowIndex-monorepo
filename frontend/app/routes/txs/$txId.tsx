@@ -18,9 +18,11 @@ import { deriveAllActivityBadges, TokenIcon, formatTokenName, buildSummaryLine, 
 import { formatShort } from '../../components/account/accountUtils';
 import AISummary from '../../components/tx/AISummary';
 import TransferFlowDiagram from '../../components/tx/TransferFlowDiagram';
+import TxResolvedAddress from '../../components/tx/TxResolvedAddress';
 import { NotFoundPage } from '../../components/ui/NotFoundPage';
 import { deriveEnrichments, decodeEVMCallData } from '../../lib/deriveFromEvents';
 import { buildTxDetailAssetView, type TxDetailDisplayTransferRow } from '../../lib/txAssetFlow';
+import { buildTxAddressBook, describeEvmExecution, type TxAddressBook } from '../../lib/txAddressBook';
 import { NFTDetailModal } from '../../components/NFTDetailModal';
 import { UsdValue } from '../../components/UsdValue';
 import { parseCadenceError } from '../../lib/parseCadenceError';
@@ -150,15 +152,6 @@ function EVMMetaBadges({ meta }: { meta?: any }) {
             ))}
         </div>
     );
-}
-
-function describeEvmExecution(exec: any): string {
-    const method = exec?.decoded_call?.method;
-    const contract = exec?.to_meta?.label || exec?.decoded_call?.implementation_name || exec?.decoded_call?.contract_name || exec?.to_meta?.contract_name;
-    if (contract && method) return `${contract}.${method}()`;
-    if (method) return `${method}()`;
-    if (contract) return contract;
-    return '';
 }
 
 /** NFT transfer row with lazy-loaded name + thumbnail */
@@ -408,10 +401,10 @@ function TokenBubble({ logo, symbol, size = 32 }: { logo?: string; symbol?: stri
     );
 }
 
-function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, fromTag, toTag, formatAddr: _formatAddr }: {
+function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, addressBook }: {
     from?: string; to?: string; amount?: string | number; symbol?: string; logo?: string; badge?: React.ReactNode;
-    usdPrice?: number; fromTag?: string; toTag?: string;
-    formatAddr: (a: string) => string;
+    usdPrice?: number;
+    addressBook: TxAddressBook;
 }) {
     const formattedAmount = amount != null ? Number(amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—';
     return (
@@ -419,7 +412,7 @@ function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, fromTag, toT
             {/* FROM */}
             <div className="flex items-center gap-1.5 px-3 py-2.5 min-w-0 flex-shrink-0">
                 {from ? (
-                    <AddressLink address={from} prefixLen={8} suffixLen={4} size={14} className="text-[11px]" showTag={!!fromTag} />
+                    <TxResolvedAddress address={from} book={addressBook} prefixLen={8} suffixLen={4} size={14} />
                 ) : (
                     <span className="text-[11px] text-zinc-400 italic">Mint</span>
                 )}
@@ -439,7 +432,7 @@ function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, fromTag, toT
             {/* TO */}
             <div className="flex items-center gap-1.5 px-3 py-2.5 min-w-0 flex-shrink-0">
                 {to ? (
-                    <AddressLink address={to} prefixLen={8} suffixLen={4} size={14} className="text-[11px]" showTag={!!toTag} />
+                    <TxResolvedAddress address={to} book={addressBook} prefixLen={8} suffixLen={4} size={14} />
                 ) : (
                     <span className="text-[11px] text-zinc-400 italic">Burn</span>
                 )}
@@ -482,7 +475,7 @@ function renderTransferRowBadge(row: TxDetailDisplayTransferRow): React.ReactNod
     return <>{badges.map((badge, index) => <span key={index}>{badge}</span>)}</>;
 }
 
-function TransactionSummaryCard({ transaction, assetView, formatAddress: _formatAddress, onNftClick, isAdmin, isRefreshing = false }: { transaction: any; assetView: ReturnType<typeof buildTxDetailAssetView>; formatAddress: (addr: string) => string; onNftClick?: (nt: any) => void; isAdmin?: boolean; isRefreshing?: boolean }) {
+function TransactionSummaryCard({ transaction, assetView, addressBook, formatAddress: _formatAddress, onNftClick, isAdmin, isRefreshing = false }: { transaction: any; assetView: ReturnType<typeof buildTxDetailAssetView>; addressBook: TxAddressBook; formatAddress: (addr: string) => string; onNftClick?: (nt: any) => void; isAdmin?: boolean; isRefreshing?: boolean }) {
     const summaryLine = assetView.summaryLine || buildSummaryLine(assetView.summaryTransaction);
     const hasFT = assetView.transferListRows.length > 0;
     const hasDefi = transaction.defi_events?.length > 0;
@@ -552,7 +545,7 @@ function TransactionSummaryCard({ transaction, assetView, formatAddress: _format
 
             {/* Transfer flow diagram (auto-synthesized) */}
             <div className="mb-4">
-                <TransferFlowDiagram detail={assetView.canonicalTransaction} />
+                <TransferFlowDiagram detail={assetView.canonicalTransaction} addressBook={addressBook} />
             </div>
 
             {hasFT && (
@@ -566,13 +559,11 @@ function TransactionSummaryCard({ transaction, assetView, formatAddress: _format
                             key={`${row.layer}-${row.from}-${row.to}-${row.symbol}-${idx}`}
                             from={row.from}
                             to={row.to}
-                            fromTag={row.layer === 'evm' ? 'COA' : undefined}
-                            toTag={row.layer === 'evm' ? 'EVM' : undefined}
                             amount={row.amount}
                             symbol={row.symbol}
                             logo={row.logo}
                             usdPrice={row.amount > 0 ? row.usdValue / row.amount : 0}
-                            formatAddr={fmtAddr}
+                            addressBook={addressBook}
                             badge={renderTransferRowBadge(row)}
                         />
                     ))}
@@ -919,11 +910,13 @@ function TransactionDetail() {
     }, [enrichments, apiEnrichment, transaction]);
 
     const assetView = useMemo(() => buildTxDetailAssetView(fullTx), [fullTx]);
+    const addressBook = useMemo(() => buildTxAddressBook(fullTx), [fullTx]);
     const [transferDisplayMode, setTransferDisplayMode] = useState<'meaningful' | 'all'>('meaningful');
     const visibleTransferRows = transferDisplayMode === 'all' && assetView.rawTransferListRows.length > 0
         ? assetView.rawTransferListRows
         : assetView.transferListRows;
     const showTransferNoiseToggle = assetView.rawTransferListRows.length > assetView.transferListRows.length;
+    const transferTableColumns = 'minmax(260px,1.15fr) minmax(220px,0.95fr) 36px minmax(220px,0.95fr) auto';
     const detailFlowReady = !transaction?.lite || !!apiEnrichment || fullFetchSettled;
     const hasTransfers = assetView.transferListRows.length > 0 || assetView.rawTransferListRows.length > 0 || fullTx?.nft_transfers?.length > 0 || fullTx?.defi_events?.length > 0;
     const showTransfersTab = hasTransfers;
@@ -1480,7 +1473,7 @@ function TransactionDetail() {
                 })()}
 
                 {/* Transaction Summary Card */}
-                <TransactionSummaryCard transaction={fullTx} assetView={assetView} formatAddress={formatAddress} onNftClick={handleNftClick} isAdmin={isAdmin} isRefreshing={!detailFlowReady} />
+                <TransactionSummaryCard transaction={fullTx} assetView={assetView} addressBook={addressBook} formatAddress={formatAddress} onNftClick={handleNftClick} isAdmin={isAdmin} isRefreshing={!detailFlowReady} />
 
                 {/* Tabs Section */}
                 <div className="mt-12">
@@ -1675,63 +1668,147 @@ function TransactionDetail() {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="divide-y divide-zinc-100 dark:divide-white/5 border border-zinc-200 dark:border-white/5 rounded-sm overflow-hidden">
-                                            {visibleTransferRows.map((row, idx) => (
-                                                <div key={`${row.layer}-${row.eventIndex || 'agg'}-${row.from}-${row.to}-${row.symbol}-${idx}`} className="grid items-center gap-x-3 p-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors" style={{ gridTemplateColumns: 'auto minmax(120px, 1fr) auto auto auto auto' }}>
-                                                    {/* Col 1: Token icon */}
-                                                    <div className="flex-shrink-0">
-                                                        {row.logo ? (
-                                                            <img src={row.logo} alt="" className="w-7 h-7 rounded-full border border-zinc-200 dark:border-white/10" />
-                                                        ) : (
-                                                            <div className="w-7 h-7 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center">
-                                                                <Coins className="w-3.5 h-3.5 text-emerald-500" />
+                                        <div className="border border-zinc-200 dark:border-white/5 rounded-sm overflow-hidden">
+                                            <div
+                                                className="hidden lg:grid items-center gap-x-4 px-4 py-2.5 bg-zinc-100/80 dark:bg-white/[0.03] border-b border-zinc-200 dark:border-white/5 text-[10px] uppercase tracking-[0.2em] text-zinc-500"
+                                                style={{ gridTemplateColumns: transferTableColumns }}
+                                            >
+                                                <span>Asset</span>
+                                                <span className="text-right">From</span>
+                                                <span />
+                                                <span>To</span>
+                                                <span className="text-right">Context</span>
+                                            </div>
+                                            <div className="divide-y divide-zinc-100 dark:divide-white/5">
+                                                {visibleTransferRows.map((row, idx) => (
+                                                    <div
+                                                        key={`${row.layer}-${row.eventIndex || 'agg'}-${row.from}-${row.to}-${row.symbol}-${idx}`}
+                                                        className="grid gap-3 px-4 py-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors lg:items-center"
+                                                        style={{ gridTemplateColumns: '1fr', }}
+                                                    >
+                                                        <div
+                                                            className="hidden lg:grid items-center gap-x-4"
+                                                            style={{ gridTemplateColumns: transferTableColumns }}
+                                                        >
+                                                            <div className="min-w-0 flex items-center gap-3">
+                                                                {row.logo ? (
+                                                                    <img src={row.logo} alt="" className="w-8 h-8 rounded-full border border-zinc-200 dark:border-white/10 flex-shrink-0" />
+                                                                ) : (
+                                                                    <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                                                        <Coins className="w-4 h-4 text-emerald-500" />
+                                                                    </div>
+                                                                )}
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="text-sm font-mono font-medium text-zinc-900 dark:text-white">
+                                                                            {row.amount != null ? Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—'}
+                                                                        </span>
+                                                                        <span className="text-[10px] text-zinc-500 font-medium uppercase">{row.symbol}</span>
+                                                                        {row.usdValue > 0 && <UsdValue value={row.usdValue} className="text-[10px]" />}
+                                                                    </div>
+                                                                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                                        {row.transferType === 'mint' && (
+                                                                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Mint</span>
+                                                                        )}
+                                                                        {row.transferType === 'burn' && (
+                                                                            <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Burn</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        )}
+                                                            <div className="min-w-0 flex justify-end">
+                                                                {row.from ? (
+                                                                    <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} size={16} align="right" className="w-full" />
+                                                                ) : row.transferType === 'mint' ? (
+                                                                    <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Mint</span>
+                                                                ) : (
+                                                                    <span />
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center justify-center text-zinc-300 dark:text-zinc-600">
+                                                                <ArrowRight className="w-4 h-4" />
+                                                            </div>
+                                                            <div className="min-w-0 flex">
+                                                                {row.to ? (
+                                                                    <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} size={16} className="w-full" />
+                                                                ) : row.transferType === 'burn' ? (
+                                                                    <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Burn</span>
+                                                                ) : (
+                                                                    <span />
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center justify-end">
+                                                                {renderTransferRowBadge(row)}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="lg:hidden space-y-3">
+                                                            <div>
+                                                                <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Asset</div>
+                                                                <div className="min-w-0 flex items-center gap-3">
+                                                                    {row.logo ? (
+                                                                        <img src={row.logo} alt="" className="w-8 h-8 rounded-full border border-zinc-200 dark:border-white/10 flex-shrink-0" />
+                                                                    ) : (
+                                                                        <div className="w-8 h-8 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                                                                            <Coins className="w-4 h-4 text-emerald-500" />
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="min-w-0">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <span className="text-sm font-mono font-medium text-zinc-900 dark:text-white">
+                                                                                {row.amount != null ? Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—'}
+                                                                            </span>
+                                                                            <span className="text-[10px] text-zinc-500 font-medium uppercase">{row.symbol}</span>
+                                                                            {row.usdValue > 0 && <UsdValue value={row.usdValue} className="text-[10px]" />}
+                                                                        </div>
+                                                                        <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                                            {row.transferType === 'mint' && (
+                                                                                <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Mint</span>
+                                                                            )}
+                                                                            {row.transferType === 'burn' && (
+                                                                                <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Burn</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] sm:items-center">
+                                                                <div>
+                                                                    <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">From</div>
+                                                                    {row.from ? (
+                                                                        <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} size={16} />
+                                                                    ) : row.transferType === 'mint' ? (
+                                                                        <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Mint</span>
+                                                                    ) : (
+                                                                        <span />
+                                                                    )}
+                                                                </div>
+                                                                <div className="hidden sm:flex items-center justify-center text-zinc-300 dark:text-zinc-600 pt-5">
+                                                                    <ArrowRight className="w-4 h-4" />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">To</div>
+                                                                    {row.to ? (
+                                                                        <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} size={16} />
+                                                                    ) : row.transferType === 'burn' ? (
+                                                                        <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Burn</span>
+                                                                    ) : (
+                                                                        <span />
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div>
+                                                                <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">Context</div>
+                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                    {renderTransferRowBadge(row)}
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    {/* Col 2: Amount + symbol + USD */}
-                                                    <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                                        <span className="text-xs font-mono font-medium text-zinc-900 dark:text-white">
-                                                            {row.amount != null ? Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—'}
-                                                        </span>
-                                                        <span className="text-[10px] text-zinc-500 font-medium uppercase">{row.symbol}</span>
-                                                        {row.usdValue > 0 && <UsdValue value={row.usdValue} className="text-[10px]" />}
-                                                        {row.transferType === 'mint' && (
-                                                            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Mint</span>
-                                                        )}
-                                                        {row.transferType === 'burn' && (
-                                                            <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Burn</span>
-                                                        )}
-                                                    </div>
-                                                    {/* Col 3: From address */}
-                                                    <div className="flex items-center gap-1 text-[11px] text-zinc-500 justify-end">
-                                                        {row.from ? (
-                                                            <span className="inline-flex items-center gap-1">
-                                                                <span className="text-zinc-400 dark:text-zinc-600">From</span> <AddressLink address={row.from} prefixLen={6} suffixLen={4} size={16} className="text-[11px]" />
-                                                            </span>
-                                                        ) : row.transferType === 'mint' ? (
-                                                            <span className="text-zinc-400 dark:text-zinc-600 italic">Mint</span>
-                                                        ) : <span />}
-                                                    </div>
-                                                    {/* Col 4: Arrow */}
-                                                    <div className="flex items-center justify-center text-zinc-300 dark:text-zinc-600 text-[11px] w-4">
-                                                        {row.from && row.to ? '→' : ''}
-                                                    </div>
-                                                    {/* Col 5: To address */}
-                                                    <div className="flex items-center gap-1 text-[11px] text-zinc-500">
-                                                        {row.to ? (
-                                                            <span className="inline-flex items-center gap-1">
-                                                                <span className="text-zinc-400 dark:text-zinc-600">To</span> <AddressLink address={row.to} prefixLen={6} suffixLen={4} size={16} className="text-[11px]" />
-                                                            </span>
-                                                        ) : row.transferType === 'burn' ? (
-                                                            <span className="text-zinc-400 dark:text-zinc-600 italic">Burn</span>
-                                                        ) : <span />}
-                                                    </div>
-                                                    {/* Col 6: Badge */}
-                                                    <div className="flex items-center justify-end">
-                                                        {renderTransferRowBadge(row)}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 )}

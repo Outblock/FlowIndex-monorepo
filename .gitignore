@@ -30,6 +30,7 @@ backend/indexer
 backend/build_error*.log
 *.log
 output/
+simulate/frontend/.output/
 
 # Docker
 docker-compose.override.yml
