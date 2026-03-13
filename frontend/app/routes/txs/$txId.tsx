@@ -1143,7 +1143,8 @@ function TransactionDetail() {
     const [scriptFormatted, setScriptFormatted] = useState(false);
     const nowTick = useTimeTicker(20000);
     const { theme } = useTheme();
-    const syntaxTheme = theme === 'dark' ? vscDarkPlus : oneLight;
+    const isDark = theme === 'dark';
+    const syntaxTheme = isDark ? vscDarkPlus : oneLight;
 
     // Parse error for structured display + script highlighting
     const parsedError = useMemo(() => {
@@ -1588,7 +1589,7 @@ function TransactionDetail() {
                                                         targetId="error-context-line"
                                                         message={parsed.summary}
                                                         line={errLine}
-                                                        isDark={true}
+                                                        isDark={isDark}
                                                     />
                                                 )}
                                             </div>
@@ -2367,7 +2368,7 @@ function TransactionDetail() {
                                                     targetId="script-error-line"
                                                     message={parsedError.summary}
                                                     line={parsedError.scriptErrorLine}
-                                                    isDark={theme === 'dark'}
+                                                    isDark={isDark}
                                                 />
                                             )}
                                         </div>
