@@ -772,7 +772,7 @@ function TransactionDetail() {
             });
         }
 
-        // For ft_transfers: prefer API enrichment (has usd_value), fall back to derived, then SSR.
+        // For ft_transfers: prefer API enrichment (has usd_value + canonicalization), fall back to derived, then SSR.
         // Merge transfer_type + evm_to/from_address from derived enrichments into API data.
         const derivedFt = enrichments?.ft_transfers;
         let ftTransfers = apiEnrichment?.ft_transfers?.length > 0
@@ -798,6 +798,29 @@ function TransactionDetail() {
                 };
             });
         }
+
+        const displayMetaByEvent = new Map<string, any>();
+        const displayMetaByToken = new Map<string, any>();
+        for (const ft of ftTransfers || []) {
+            const eventKey = `${ft.token}:${ft.event_index}`;
+            if (!displayMetaByEvent.has(eventKey)) displayMetaByEvent.set(eventKey, ft);
+            if (ft.token && !displayMetaByToken.has(ft.token)) displayMetaByToken.set(ft.token, ft);
+        }
+        const rawFtTransfers = ((derivedFt && derivedFt.length > 0) ? derivedFt : (transaction?.raw_ft_transfers || ftTransfers || [])).map((ft: any) => {
+            const meta = displayMetaByEvent.get(`${ft.token}:${ft.event_index}`) || displayMetaByToken.get(ft.token) || {};
+            return {
+                ...ft,
+                token_logo: ft.token_logo || meta.token_logo,
+                token_symbol: ft.token_symbol || meta.token_symbol,
+                token_name: ft.token_name || meta.token_name,
+                token_decimals: ft.token_decimals ?? meta.token_decimals,
+                approx_usd_price: ft.approx_usd_price ?? meta.approx_usd_price,
+                usd_value: ft.usd_value ?? meta.usd_value,
+                transfer_type: ft.transfer_type || meta.transfer_type,
+                evm_to_address: ft.evm_to_address || meta.evm_to_address,
+                evm_from_address: ft.evm_from_address || meta.evm_from_address,
+            };
+        });
 
         // Merge evm_executions: API data has extra fields (gas_price etc.) but may have
         // null from/to for old records. Derived data now decodes 0xff payloads properly.
@@ -858,6 +881,7 @@ function TransactionDetail() {
         return {
             ...transaction,
             ft_transfers: ftTransfers,
+            raw_ft_transfers: rawFtTransfers,
             canonical_transfer_summary: apiEnrichment?.canonical_transfer_summary || transaction?.canonical_transfer_summary,
             transfer_summary: apiEnrichment?.transfer_summary || transaction?.transfer_summary,
             nft_transfers: mergedNfts.length > 0 ? mergedNfts : apiNfts,
@@ -870,9 +894,16 @@ function TransactionDetail() {
     }, [enrichments, apiEnrichment, transaction]);
 
     const assetView = useMemo(() => buildTxDetailAssetView(fullTx), [fullTx]);
-
-    const hasTransfers = assetView.transferListRows.length > 0 || fullTx?.nft_transfers?.length > 0 || fullTx?.defi_events?.length > 0;
+    const [transferDisplayMode, setTransferDisplayMode] = useState<'meaningful' | 'all'>('meaningful');
+    const visibleTransferRows = transferDisplayMode === 'all' && assetView.rawTransferListRows.length > 0
+        ? assetView.rawTransferListRows
+        : assetView.transferListRows;
+    const showTransferNoiseToggle = assetView.rawTransferListRows.length > assetView.transferListRows.length;
+    const hasTransfers = assetView.transferListRows.length > 0 || assetView.rawTransferListRows.length > 0 || fullTx?.nft_transfers?.length > 0 || fullTx?.defi_events?.length > 0;
     const showTransfersTab = hasTransfers;
+    useEffect(() => {
+        setTransferDisplayMode('meaningful');
+    }, [transaction?.id]);
     const hasEvmExecutions = (fullTx?.evm_executions?.length || 0) > 0;
     const validTabs = ['transfers', 'script', 'events', 'evm'];
     const defaultTab = hasTransfers ? 'transfers' : hasEvmExecutions ? 'evm' : (fullTx?.script ? 'script' : 'events');
@@ -1570,14 +1601,49 @@ function TransactionDetail() {
                                     </div>
                                 )}
 
-                                {assetView.transferListRows.length > 0 && (
+                                {visibleTransferRows.length > 0 && (
                                     <div>
-                                        <h3 className="text-xs text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                            <Coins className="h-4 w-4" /> Token Transfers ({assetView.transferListRows.length})
-                                        </h3>
+                                        <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
+                                            <div className="min-w-0">
+                                                <h3 className="text-xs text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                                    <Coins className="h-4 w-4" /> Token Transfers ({visibleTransferRows.length})
+                                                </h3>
+                                                {showTransferNoiseToggle && (
+                                                    <p className="mt-1 text-[10px] text-zinc-500">
+                                                        {transferDisplayMode === 'meaningful'
+                                                            ? `Showing merged asset flow. Hidden ${assetView.rawTransferListRows.length - assetView.transferListRows.length} noisy legs such as duplicate mint/burn bookkeeping and small operational transfers.`
+                                                            : 'Showing every event-decoded FT row, including duplicate bridge legs, mint/burn bookkeeping, and fee-like operational transfers.'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            {showTransferNoiseToggle && (
+                                                <div className="inline-flex items-center rounded-sm border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 p-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTransferDisplayMode('meaningful')}
+                                                        className={`px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors rounded-sm ${transferDisplayMode === 'meaningful'
+                                                            ? 'bg-white dark:bg-black/50 text-zinc-900 dark:text-white shadow-sm'
+                                                            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                                            }`}
+                                                    >
+                                                        Meaningful {assetView.transferListRows.length}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTransferDisplayMode('all')}
+                                                        className={`px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors rounded-sm ${transferDisplayMode === 'all'
+                                                            ? 'bg-white dark:bg-black/50 text-zinc-900 dark:text-white shadow-sm'
+                                                            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                                                            }`}
+                                                    >
+                                                        All Decoded {assetView.rawTransferListRows.length}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="divide-y divide-zinc-100 dark:divide-white/5 border border-zinc-200 dark:border-white/5 rounded-sm overflow-hidden">
-                                            {assetView.transferListRows.map((row, idx) => (
-                                                <div key={`${row.layer}-${row.from}-${row.to}-${row.symbol}-${idx}`} className="grid items-center gap-x-3 p-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors" style={{ gridTemplateColumns: 'auto minmax(120px, 1fr) auto auto auto auto' }}>
+                                            {visibleTransferRows.map((row, idx) => (
+                                                <div key={`${row.layer}-${row.eventIndex || 'agg'}-${row.from}-${row.to}-${row.symbol}-${idx}`} className="grid items-center gap-x-3 p-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors" style={{ gridTemplateColumns: 'auto minmax(120px, 1fr) auto auto auto auto' }}>
                                                     {/* Col 1: Token icon */}
                                                     <div className="flex-shrink-0">
                                                         {row.logo ? (
@@ -1608,6 +1674,8 @@ function TransactionDetail() {
                                                             <span className="inline-flex items-center gap-1">
                                                                 <span className="text-zinc-400 dark:text-zinc-600">From</span> <AddressLink address={row.from} prefixLen={6} suffixLen={4} size={16} className="text-[11px]" />
                                                             </span>
+                                                        ) : row.transferType === 'mint' ? (
+                                                            <span className="text-zinc-400 dark:text-zinc-600 italic">Mint</span>
                                                         ) : <span />}
                                                     </div>
                                                     {/* Col 4: Arrow */}
@@ -1620,6 +1688,8 @@ function TransactionDetail() {
                                                             <span className="inline-flex items-center gap-1">
                                                                 <span className="text-zinc-400 dark:text-zinc-600">To</span> <AddressLink address={row.to} prefixLen={6} suffixLen={4} size={16} className="text-[11px]" />
                                                             </span>
+                                                        ) : row.transferType === 'burn' ? (
+                                                            <span className="text-zinc-400 dark:text-zinc-600 italic">Burn</span>
                                                         ) : <span />}
                                                     </div>
                                                     {/* Col 6: Badge */}

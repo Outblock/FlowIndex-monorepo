@@ -37,6 +37,7 @@ export type TxDetailDisplayLayer = 'cadence' | 'evm' | 'cross_vm';
 export interface TxDetailDisplayTransferRow {
   amount: number;
   count: number;
+  eventIndex?: number;
   from: string;
   layer: TxDetailDisplayLayer;
   logo?: string;
@@ -49,8 +50,11 @@ export interface TxDetailDisplayTransferRow {
 export interface TxDetailAssetView {
   canonicalFtTransfers: DetailTransfer[];
   canonicalTransaction: any;
+  rawFtTransfers: DetailTransfer[];
+  rawTransaction: any;
   summaryLine: string;
   summaryTransaction: any;
+  rawTransferListRows: TxDetailDisplayTransferRow[];
   transferListRows: TxDetailDisplayTransferRow[];
 }
 
@@ -303,6 +307,35 @@ function buildTransferListRows(transfers: DetailTransfer[]): TxDetailDisplayTran
   return Array.from(rows.values()).sort((a, b) => b.usdValue - a.usdValue || b.amount - a.amount);
 }
 
+function rawTransferLayer(transfer: DetailTransfer): TxDetailDisplayLayer {
+  if (transfer.is_cross_vm || transfer.evm_to_address || transfer.evm_from_address) {
+    return 'cross_vm';
+  }
+  return 'cadence';
+}
+
+function buildRawTransferListRows(transfers: DetailTransfer[]): TxDetailDisplayTransferRow[] {
+  return transfers
+    .map((transfer) => ({
+      amount: parseAmount(transfer.amount),
+      count: 1,
+      eventIndex: Number(transfer.event_index || 0),
+      from: transfer.from_address || '',
+      layer: rawTransferLayer(transfer),
+      logo: transfer.token_logo,
+      symbol: tokenSymbol(transfer),
+      to: transfer.to_address || '',
+      transferType: transfer.transfer_type,
+      usdValue: tokenUsdValue(transfer),
+    }))
+    .filter((row) => row.amount > 0)
+    .sort((a, b) => {
+      const byEvent = (a.eventIndex || 0) - (b.eventIndex || 0);
+      if (byEvent !== 0) return byEvent;
+      return b.usdValue - a.usdValue || b.amount - a.amount;
+    });
+}
+
 function isLikelyOperationalNoiseForSummary(
   transfer: DetailTransfer,
   allTransfers: DetailTransfer[],
@@ -347,17 +380,26 @@ function buildSummaryLineFromTransfers(transfers: DetailTransfer[]): string {
 
 export function buildTxDetailAssetView(detail: any): TxDetailAssetView {
   const baseDetail = detail || {};
+  const rawFtTransfers = (((baseDetail?.raw_ft_transfers || baseDetail?.ft_transfers || []) as DetailTransfer[]))
+    .map((transfer) => ({ ...transfer }));
   const canonicalFtTransfers = canonicalizeFtTransfers(detail);
   const canonicalTransaction = {
     ...baseDetail,
     ft_transfers: canonicalFtTransfers,
   };
+  const rawTransaction = {
+    ...baseDetail,
+    ft_transfers: rawFtTransfers,
+  };
 
   return {
     canonicalFtTransfers,
     canonicalTransaction,
+    rawFtTransfers,
+    rawTransaction,
     summaryLine: buildSummaryLineFromTransfers(canonicalFtTransfers),
     summaryTransaction: canonicalTransaction,
+    rawTransferListRows: buildRawTransferListRows(rawFtTransfers),
     transferListRows: buildTransferListRows(canonicalFtTransfers),
   };
 }
