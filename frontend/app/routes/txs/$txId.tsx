@@ -1500,7 +1500,8 @@ function TransactionDetail() {
                                         </h3>
                                         <div className="divide-y divide-zinc-100 dark:divide-white/5 border border-zinc-200 dark:border-white/5 rounded-sm overflow-hidden">
                                             {assetView.transferListRows.map((row, idx) => (
-                                                <div key={`${row.layer}-${row.from}-${row.to}-${row.symbol}-${idx}`} className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors">
+                                                <div key={`${row.layer}-${row.from}-${row.to}-${row.symbol}-${idx}`} className="grid items-center gap-x-3 p-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors" style={{ gridTemplateColumns: 'auto minmax(120px, 1fr) auto auto auto auto' }}>
+                                                    {/* Col 1: Token icon */}
                                                     <div className="flex-shrink-0">
                                                         {row.logo ? (
                                                             <img src={row.logo} alt="" className="w-7 h-7 rounded-full border border-zinc-200 dark:border-white/10" />
@@ -1510,7 +1511,7 @@ function TransactionDetail() {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    {/* Left: amount + symbol + badges */}
+                                                    {/* Col 2: Amount + symbol + USD */}
                                                     <div className="flex items-center gap-2 flex-wrap min-w-0">
                                                         <span className="text-xs font-mono font-medium text-zinc-900 dark:text-white">
                                                             {row.amount != null ? Number(row.amount).toLocaleString(undefined, { maximumFractionDigits: 8 }) : '—'}
@@ -1523,21 +1524,29 @@ function TransactionDetail() {
                                                         {row.transferType === 'burn' && (
                                                             <span className="text-[9px] text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider font-medium">Burn</span>
                                                         )}
-                                                        {row.badge}
                                                     </div>
-                                                    {/* Right: From → To */}
-                                                    <div className="ml-auto flex items-center gap-1.5 text-[11px] text-zinc-500 flex-shrink-0">
-                                                        {row.from && (
+                                                    {/* Col 3: From address */}
+                                                    <div className="flex items-center gap-1 text-[11px] text-zinc-500 justify-end">
+                                                        {row.from ? (
                                                             <span className="inline-flex items-center gap-1">
-                                                                <span className="text-zinc-400 dark:text-zinc-600">From</span> <AddressLink address={row.from} prefixLen={8} suffixLen={4} size={12} className="text-[11px]" />
+                                                                <span className="text-zinc-400 dark:text-zinc-600">From</span> <AddressLink address={row.from} prefixLen={6} suffixLen={4} size={12} className="text-[11px]" />
                                                             </span>
-                                                        )}
-                                                        {row.from && row.to && <span className="text-zinc-300 dark:text-zinc-600 mx-1">→</span>}
-                                                        {row.to && (
+                                                        ) : <span />}
+                                                    </div>
+                                                    {/* Col 4: Arrow */}
+                                                    <div className="flex items-center justify-center text-zinc-300 dark:text-zinc-600 text-[11px] w-4">
+                                                        {row.from && row.to ? '→' : ''}
+                                                    </div>
+                                                    {/* Col 5: To address */}
+                                                    <div className="flex items-center gap-1 text-[11px] text-zinc-500">
+                                                        {row.to ? (
                                                             <span className="inline-flex items-center gap-1">
-                                                                <span className="text-zinc-400 dark:text-zinc-600">To</span> <AddressLink address={row.to} prefixLen={8} suffixLen={4} size={12} className="text-[11px]" />
+                                                                <span className="text-zinc-400 dark:text-zinc-600">To</span> <AddressLink address={row.to} prefixLen={6} suffixLen={4} size={12} className="text-[11px]" />
                                                             </span>
-                                                        )}
+                                                        ) : <span />}
+                                                    </div>
+                                                    {/* Col 6: Badge */}
+                                                    <div className="flex items-center justify-end">
                                                         {renderTransferRowBadge(row)}
                                                     </div>
                                                 </div>
