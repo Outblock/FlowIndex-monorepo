@@ -1168,7 +1168,7 @@ function TransactionDetail() {
         ? assetView.rawTransferListRows
         : assetView.transferListRows;
     const showTransferNoiseToggle = assetView.rawTransferListRows.length > assetView.transferListRows.length;
-    const transferTableColumns = 'minmax(260px,1.15fr) minmax(220px,0.95fr) 36px minmax(220px,0.95fr) auto';
+    const transferTableColumns = 'minmax(200px,1fr) minmax(180px,1fr) 36px minmax(180px,1fr) minmax(80px,auto)';
     const detailFlowReady = !transaction?.lite || !!apiEnrichment || fullFetchSettled;
     const hasTransfers = assetView.transferListRows.length > 0 || assetView.rawTransferListRows.length > 0 || fullTx?.nft_transfers?.length > 0 || fullTx?.defi_events?.length > 0;
     const showTransfersTab = hasTransfers;
@@ -1932,8 +1932,7 @@ function TransactionDetail() {
                                                 {visibleTransferRows.map((row, idx) => (
                                                     <div
                                                         key={`${row.layer}-${row.eventIndex || 'agg'}-${row.from}-${row.to}-${row.symbol}-${idx}`}
-                                                        className="grid gap-3 px-4 py-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors lg:items-center"
-                                                        style={{ gridTemplateColumns: '1fr', }}
+                                                        className="px-4 py-3 bg-zinc-50 dark:bg-black/30 hover:bg-zinc-100 dark:hover:bg-black/50 transition-colors"
                                                     >
                                                         <div
                                                             className="hidden lg:grid items-center gap-x-4"
@@ -1965,7 +1964,7 @@ function TransactionDetail() {
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div className="min-w-0 flex justify-end">
+                                                            <div className="min-w-0 overflow-hidden flex justify-end">
                                                                 {row.from ? (
                                                                     <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} reserveLabelSpace size={16} align="right" className="w-full" />
                                                                 ) : row.transferType === 'mint' ? (
@@ -1977,7 +1976,7 @@ function TransactionDetail() {
                                                             <div className="flex items-center justify-center text-zinc-300 dark:text-zinc-600">
                                                                 <ArrowRight className="w-4 h-4" />
                                                             </div>
-                                                            <div className="min-w-0 flex">
+                                                            <div className="min-w-0 overflow-hidden flex">
                                                                 {row.to ? (
                                                                     <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} reserveLabelSpace size={16} className="w-full" />
                                                                 ) : row.transferType === 'burn' ? (
