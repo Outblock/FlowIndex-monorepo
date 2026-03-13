@@ -52,8 +52,10 @@ export async function authenticateRequest(req: NextRequest) {
  * Authorization is enforced via explicit .eq("user_id", user.id) filters.
  */
 export function createServiceClient() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
   return createClient(
     process.env.SUPABASE_URL_INTERNAL || process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    key
   );
 }

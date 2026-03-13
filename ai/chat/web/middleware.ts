@@ -16,6 +16,7 @@ function corsHeaders(origin: string | null): Record<string, string> {
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "86400",
   };
   if (origin && ALLOWED_ORIGINS.has(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
@@ -33,11 +34,15 @@ export async function middleware(request: NextRequest) {
     if (request.method === "OPTIONS") {
       return new NextResponse(null, { status: 204, headers: corsHeaders(origin) });
     }
-    const response = NextResponse.next();
-    for (const [key, value] of Object.entries(corsHeaders(origin))) {
-      response.headers.set(key, value);
+    // Cross-origin Bearer requests: skip cookie refresh, just add CORS headers
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
+      const response = NextResponse.next();
+      for (const [key, value] of Object.entries(corsHeaders(origin))) {
+        response.headers.set(key, value);
+      }
+      return response;
     }
-    return response;
+    // Same-origin requests: fall through to cookie refresh logic below
   }
 
   let supabaseResponse = NextResponse.next({ request });
