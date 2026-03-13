@@ -11,6 +11,7 @@ import { useTimeTicker } from '../../hooks/useTimeTicker';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
 import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { motion } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
 import { CopyButton } from '@/components/animate-ui/components/buttons/copy';
 import DecryptedText from '../../components/ui/DecryptedText';
@@ -1772,21 +1773,35 @@ function TransactionDetail() {
                                                     <button
                                                         type="button"
                                                         onClick={() => setTransferDisplayMode('meaningful')}
-                                                        className={`px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors rounded-sm ${transferDisplayMode === 'meaningful'
-                                                            ? 'bg-white dark:bg-black/50 text-zinc-900 dark:text-white shadow-sm'
+                                                        className={`relative px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors rounded-sm z-10 ${transferDisplayMode === 'meaningful'
+                                                            ? 'text-white dark:text-zinc-900'
                                                             : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                                                             }`}
                                                     >
+                                                        {transferDisplayMode === 'meaningful' && (
+                                                            <motion.div
+                                                                layoutId="tx-transfer-mode-toggle"
+                                                                className="absolute inset-0 rounded-sm bg-zinc-900 dark:bg-white -z-10 shadow-md"
+                                                                transition={{ type: 'spring', bounce: 0.2, duration: 0.45 }}
+                                                            />
+                                                        )}
                                                         Meaningful {assetView.transferListRows.length}
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={() => setTransferDisplayMode('all')}
-                                                        className={`px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors rounded-sm ${transferDisplayMode === 'all'
-                                                            ? 'bg-white dark:bg-black/50 text-zinc-900 dark:text-white shadow-sm'
+                                                        className={`relative px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] transition-colors rounded-sm z-10 ${transferDisplayMode === 'all'
+                                                            ? 'text-white dark:text-zinc-900'
                                                             : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                                                             }`}
                                                     >
+                                                        {transferDisplayMode === 'all' && (
+                                                            <motion.div
+                                                                layoutId="tx-transfer-mode-toggle"
+                                                                className="absolute inset-0 rounded-sm bg-zinc-900 dark:bg-white -z-10 shadow-md"
+                                                                transition={{ type: 'spring', bounce: 0.2, duration: 0.45 }}
+                                                            />
+                                                        )}
                                                         All Decoded {assetView.rawTransferListRows.length}
                                                     </button>
                                                 </div>

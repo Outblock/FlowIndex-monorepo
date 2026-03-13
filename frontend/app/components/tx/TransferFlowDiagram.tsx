@@ -106,16 +106,29 @@ export function buildTokenIconMap(transaction: any): Map<string, string> {
     return map;
 }
 
+const SYNTHETIC_PREFIXES = ['MINT:', 'BURN:', 'DEX:', 'STAKE:', 'BRIDGE:'];
+
+function isSyntheticNodeAddress(addr: string): boolean {
+    return SYNTHETIC_PREFIXES.some((prefix) => addr.startsWith(prefix));
+}
+
+function normalizeGraphAddress(value: string): string {
+    if (!value) return '';
+    return isSyntheticNodeAddress(value) ? value : normalizeAddress(value);
+}
+
 /* ── Layout: assign (x,y) per unique address, left-to-right ── */
 
 export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<string, string>, addressBook?: TxAddressBook): { nodes: Node[]; edges: Edge[] } {
     const seen = new Map<string, { label: string; isSource: boolean; isTarget: boolean }>();
     for (const f of flows) {
-        if (!seen.has(f.from)) seen.set(f.from, { label: f.fromLabel || formatShort(f.from, 8, 4), isSource: true, isTarget: false });
-        else seen.get(f.from)!.isSource = true;
+        const from = normalizeGraphAddress(f.from);
+        const to = normalizeGraphAddress(f.to);
+        if (!seen.has(from)) seen.set(from, { label: f.fromLabel || formatShort(from, 8, 4), isSource: true, isTarget: false });
+        else seen.get(from)!.isSource = true;
 
-        if (!seen.has(f.to)) seen.set(f.to, { label: f.toLabel || formatShort(f.to, 8, 4), isSource: false, isTarget: true });
-        else seen.get(f.to)!.isTarget = true;
+        if (!seen.has(to)) seen.set(to, { label: f.toLabel || formatShort(to, 8, 4), isSource: false, isTarget: true });
+        else seen.get(to)!.isTarget = true;
     }
 
     const sources: string[] = [];
@@ -142,7 +155,7 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         cursor: 'grab',
     };
 
-    const isSynthetic = (addr: string) => addr.startsWith('MINT:') || addr.startsWith('BURN:') || addr.startsWith('DEX:') || addr.startsWith('STAKE:') || addr.startsWith('BRIDGE:');
+    const isSynthetic = (addr: string) => isSyntheticNodeAddress(addr);
 
     const syntheticColor = (addr: string) =>
         addr.startsWith('MINT:') ? (isDark ? '#4ade80' : '#16a34a')
@@ -177,7 +190,7 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         if (widthByAddress.has(addr)) return widthByAddress.get(addr)!;
         const synthetic = isSynthetic(addr);
         const info = seen.get(addr)!;
-        const normalized = normalizeAddress(addr);
+        const normalized = normalizeGraphAddress(addr);
         const resolved = getTxAddressBookEntry(addressBook, normalized);
         const primaryLabel = resolved?.primaryLabel || info.label;
         const addrType = addressType(normalized);
@@ -202,7 +215,7 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         addrs.map((addr, row) => {
             const synthetic = isSynthetic(addr);
             const info = seen.get(addr)!;
-            const normalized = normalizeAddress(addr);
+            const normalized = normalizeGraphAddress(addr);
             const addrT = addressType(normalized);
             const colors = colorsFromAddress(normalized);
             const tag = TAG_STYLES[addrT];
@@ -434,7 +447,7 @@ function transfersToFlows(detail: any): Flow[] {
         if (ft.from_address && ft.to_coa_flow_address) {
             // Cadence leg: sender → COA — record the sender for matching
             const key = `${sym}|${amount}`;
-            crossVmSenders.set(key, { from: ft.from_address, amount, usdValue: parseFloat(ft.usd_value) || 0 });
+            crossVmSenders.set(key, { from: normalizeGraphAddress(ft.from_address), amount, usdValue: parseFloat(ft.usd_value) || 0 });
         }
     }
     // Match unmatched deposits (would-be "mints") with cross-VM senders
@@ -477,7 +490,7 @@ function transfersToFlows(detail: any): Flow[] {
         const decoded = decodeEVMCallData(exec.data);
         if (decoded.callType === 'erc20_transfer' || decoded.callType === 'erc20_transferFrom') {
             // The EVM 'from' is the source COA
-            const fromCOA = `0x${(exec.from as string).replace(/^0x/, '').padStart(40, '0')}`;
+            const fromCOA = normalizeGraphAddress(`0x${(exec.from as string).replace(/^0x/, '').padStart(40, '0')}`);
             // Match by EVM contract address (the 'to' of the execution = token contract)
             const evmContract = (exec.to as string)?.replace(/^0x/, '').toLowerCase() || '';
             bridgeFromMap.set(evmContract, fromCOA);
@@ -495,8 +508,8 @@ function transfersToFlows(detail: any): Flow[] {
     for (let i = 0; i < ftTransfers.length; i++) {
         if (mergedMints.has(i)) continue; // skip COA legs already merged
         const ft = ftTransfers[i];
-        let rawFrom = ft.from_address || '';
-        const rawTo = ft.to_address || '';
+        let rawFrom = normalizeGraphAddress(ft.from_address || '');
+        const rawTo = normalizeGraphAddress(ft.to_address || '');
         if (!rawFrom && !rawTo) continue;
         const sym = ft.token_symbol || ft.token?.split('.').pop() || 'FT';
         const amount = parseFloat(ft.amount) || 0;
@@ -508,7 +521,7 @@ function transfersToFlows(detail: any): Flow[] {
             if (match) {
                 const evmContract = match[1].toLowerCase();
                 const bridgeFrom = bridgeFromMap.get(evmContract);
-                if (bridgeFrom) rawFrom = bridgeFrom;
+                if (bridgeFrom) rawFrom = normalizeGraphAddress(bridgeFrom);
             }
         }
 
@@ -525,7 +538,7 @@ function transfersToFlows(detail: any): Flow[] {
             if (e1) { e1.amount += amount; e1.usdValue += usdValue; }
             else { ftAgg.set(k1, { from, to, amount, symbol: sym, usdValue }); }
             // Leg 2: COA → EVM recipient
-            const evmToNorm = evmTo.toLowerCase().replace(/^0x/, '');
+            const evmToNorm = normalizeGraphAddress(evmTo);
             const k2 = `${to}|${evmToNorm}|${sym}`;
             const e2 = ftAgg.get(k2);
             if (e2) { e2.amount += amount; e2.usdValue += usdValue; }
@@ -561,8 +574,8 @@ function transfersToFlows(detail: any): Flow[] {
     // Aggregate NFT transfers by (from, to, collection)
     const nftAgg = new Map<string, { from: string; to: string; count: number; collection: string; items: string[] }>();
     for (const nt of nftTransfers) {
-        const from = nt.from_address;
-        const to = nt.to_address;
+        const from = normalizeGraphAddress(nt.from_address || '');
+        const to = normalizeGraphAddress(nt.to_address || '');
         if (!from || !to) continue;
         const name = nt.collection_name || nt.token?.split('.').pop() || 'NFT';
         const key = `${from}|${to}|${name}`;
@@ -591,7 +604,7 @@ function transfersToFlows(detail: any): Flow[] {
         const dex = de.dex || 'DEX';
         const dexNode = `DEX:${dex}`;
         // Determine user address from the associated ft_transfers or proposer
-        const user = de.user_address || detail?.proposer || detail?.payer || '';
+        const user = normalizeGraphAddress(de.user_address || detail?.proposer || detail?.payer || '');
         if (!user) continue;
 
         const asset0In = parseFloat(de.asset0_in) || 0;
