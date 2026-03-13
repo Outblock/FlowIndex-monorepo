@@ -64,7 +64,7 @@ func deriveEVMEntityKind(label repository.EVMAddressLabelMetadata, contract repo
 	}
 }
 
-func buildEVMEntityMeta(addr string, labels map[string]repository.EVMAddressLabelMetadata, contracts map[string]repository.EVMContractMetadata) map[string]interface{} {
+func buildEVMEntityMeta(addr string, labels map[string]repository.EVMAddressLabelMetadata, contracts map[string]repository.EVMContractMetadata, coaMap map[string]string) map[string]interface{} {
 	addr = normalizeEVMAddress(addr)
 	if addr == "" {
 		return nil
@@ -72,9 +72,23 @@ func buildEVMEntityMeta(addr string, labels map[string]repository.EVMAddressLabe
 
 	label := labels[addr]
 	contract := contracts[addr]
+	kind := deriveEVMEntityKind(label, contract)
+	// Override kind to "coa" if address is a COA and not already a contract/token
+	flowAddr := ""
+	if coaMap != nil {
+		if fa, ok := coaMap[addr]; ok {
+			flowAddr = fa
+			if kind == "eoa" {
+				kind = "coa"
+			}
+		}
+	}
 	out := map[string]interface{}{
 		"address": formatAddressV1(addr),
-		"kind":    deriveEVMEntityKind(label, contract),
+		"kind":    kind,
+	}
+	if flowAddr != "" {
+		out["flow_address"] = formatAddressV1(flowAddr)
 	}
 	if display := preferredEVMEntityLabel(label, contract); display != "" {
 		out["label"] = display
@@ -277,6 +291,7 @@ func (s *Server) buildEnrichedEVMExecutions(ctx context.Context, evmExecs []repo
 	addresses := collectUniqueEVMExecutionAddresses(evmExecs)
 	labelMap, _ := s.repo.GetEVMAddressLabelsByAddresses(ctx, addresses)
 	contractMap, _ := s.repo.GetEVMContractsByAddresses(ctx, addresses)
+	coaMap, _ := s.repo.CheckAddressesAreCOA(ctx, addresses)
 
 	implAddresses := make([]string, 0)
 	for _, contract := range contractMap {
@@ -295,10 +310,10 @@ func (s *Server) buildEnrichedEVMExecutions(ctx context.Context, evmExecs []repo
 	out := make([]map[string]interface{}, 0, len(evmExecs))
 	for _, rec := range evmExecs {
 		item := toEVMTransactionOutput(rec)
-		if meta := buildEVMEntityMeta(rec.FromAddress, labelMap, contractMap); meta != nil {
+		if meta := buildEVMEntityMeta(rec.FromAddress, labelMap, contractMap, coaMap); meta != nil {
 			item["from_meta"] = meta
 		}
-		if meta := buildEVMEntityMeta(rec.ToAddress, labelMap, contractMap); meta != nil {
+		if meta := buildEVMEntityMeta(rec.ToAddress, labelMap, contractMap, coaMap); meta != nil {
 			item["to_meta"] = meta
 		}
 

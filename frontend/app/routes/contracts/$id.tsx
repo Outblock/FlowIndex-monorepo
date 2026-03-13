@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { AddressLink } from '../../components/AddressLink';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ensureHeyApiConfigured } from '../../api/heyapi';
 import { getFlowV1Contract } from '../../api/gen/find';
 import { resolveApiBaseUrl } from '../../api';
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
 import swift from 'react-syntax-highlighter/dist/esm/languages/prism/swift';
 import { vscDarkPlus, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { ArrowLeft, Box, Code, FileText, Layers, Activity, GitCompare, ChevronDown, ChevronRight, Clock, Hash, Sparkles, Terminal, GitBranch, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Box, Code, FileText, Layers, Activity, GitCompare, ChevronDown, ChevronRight, Clock, Hash, Sparkles, Terminal, GitBranch, ExternalLink, Link2 } from 'lucide-react';
 import { openAIChat } from '../../components/chat/openAIChat';
 import { VerifiedBadge } from '@flowindex/flow-ui';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -86,14 +86,54 @@ interface ContractTransaction {
     fee: number;
 }
 
+/** Parse a lines param like "10", "10-20", "5,10-20,25" into a Set of line numbers */
+function parseLines(raw: string | undefined | null): Set<number> {
+    const set = new Set<number>();
+    if (!raw) return set;
+    for (const part of String(raw).split(',')) {
+        const trimmed = part.trim();
+        const range = trimmed.match(/^(\d+)-(\d+)$/);
+        if (range) {
+            const a = Math.max(1, Number(range[1]));
+            const b = Math.min(Number(range[2]), 100000);
+            for (let i = Math.min(a, b); i <= Math.max(a, b); i++) set.add(i);
+        } else {
+            const n = Number(trimmed);
+            if (n > 0) set.add(n);
+        }
+    }
+    return set;
+}
+
+/** Serialize a Set of line numbers into compact range notation: "5,10-20,25" */
+function serializeLines(lines: Set<number>): string {
+    if (lines.size === 0) return '';
+    const sorted = [...lines].sort((a, b) => a - b);
+    const ranges: string[] = [];
+    let start = sorted[0], end = sorted[0];
+    for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i] === end + 1) {
+            end = sorted[i];
+        } else {
+            ranges.push(start === end ? `${start}` : `${start}-${end}`);
+            start = end = sorted[i];
+        }
+    }
+    ranges.push(start === end ? `${start}` : `${start}-${end}`);
+    return ranges.join(',');
+}
+
 export const Route = createFileRoute('/contracts/$id')({
     component: ContractDetail,
-    validateSearch: (search: Record<string, unknown>): { tab?: ContractTab; line?: number; col?: number } => {
+    validateSearch: (search: Record<string, unknown>): { tab?: ContractTab; lines?: string; line?: number; col?: number } => {
         const tab = search.tab as string;
+        const lines = search.lines ? String(search.lines) : undefined;
+        // Keep legacy single-line support
         const line = Number(search.line) || undefined;
         const col = Number(search.col) || undefined;
         return {
             tab: VALID_TABS.includes(tab as ContractTab) ? (tab as ContractTab) : undefined,
+            lines,
             line,
             col,
         };
@@ -146,7 +186,7 @@ export const Route = createFileRoute('/contracts/$id')({
 
 function ContractDetail() {
     const { id } = Route.useParams();
-    const { tab: searchTab, line: highlightLine } = Route.useSearch();
+    const { tab: searchTab, lines: linesParam, line: legacyLine } = Route.useSearch();
     const navigate = useNavigate({ from: Route.fullPath });
     const { contract: initialContract, code: initialCode, error: initialError } = Route.useLoaderData();
 
@@ -159,16 +199,78 @@ function ContractDetail() {
     const syntaxTheme = theme === 'dark' ? vscDarkPlus : oneLight;
     const scrolledRef = useRef(false);
 
-    // Scroll to highlighted line on mount
+    // Line selection state
+    const initialLines = useMemo(() => {
+        if (linesParam) return parseLines(linesParam);
+        if (legacyLine) return new Set([legacyLine]);
+        return new Set<number>();
+    }, [linesParam, legacyLine]);
+    const [selectedLines, setSelectedLines] = useState<Set<number>>(initialLines);
+    const lastClickedLine = useRef<number | null>(null);
+    const [linkCopied, setLinkCopied] = useState(false);
+
+    // Update URL when selection changes (skip initial load)
+    const isInitialMount = useRef(true);
     useEffect(() => {
-        if (highlightLine && code && !scrolledRef.current) {
+        if (isInitialMount.current) { isInitialMount.current = false; return; }
+        const serialized = serializeLines(selectedLines);
+        navigate({
+            search: (prev: any) => ({
+                ...prev,
+                lines: serialized || undefined,
+                line: undefined, // clear legacy param
+            }),
+            replace: true,
+        });
+    }, [selectedLines, navigate]);
+
+    // Click handler for line numbers
+    const handleLineClick = useCallback((lineNumber: number, e: React.MouseEvent) => {
+        e.preventDefault();
+        setSelectedLines(prev => {
+            const next = new Set<number>();
+            if (e.shiftKey && lastClickedLine.current != null) {
+                // Shift+click: select range from last clicked to current
+                // Keep existing selection and add range
+                prev.forEach(l => next.add(l));
+                const from = Math.min(lastClickedLine.current, lineNumber);
+                const to = Math.max(lastClickedLine.current, lineNumber);
+                for (let i = from; i <= to; i++) next.add(i);
+            } else {
+                // Single click: toggle or select just this line
+                if (prev.size === 1 && prev.has(lineNumber)) {
+                    // Deselect
+                } else {
+                    next.add(lineNumber);
+                }
+            }
+            lastClickedLine.current = lineNumber;
+            return next;
+        });
+        setLinkCopied(false);
+    }, []);
+
+    const copyLineLink = useCallback(() => {
+        const serialized = serializeLines(selectedLines);
+        if (!serialized) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('lines', serialized);
+        url.searchParams.delete('line');
+        navigator.clipboard.writeText(url.toString());
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
+    }, [selectedLines]);
+
+    // Scroll to first highlighted line on mount
+    useEffect(() => {
+        if (selectedLines.size > 0 && code && !scrolledRef.current) {
             scrolledRef.current = true;
             setTimeout(() => {
                 const el = document.getElementById('contract-highlight-line');
                 el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }, 300);
         }
-    }, [highlightLine, code]);
+    }, [selectedLines.size, code]);
 
     const switchTab = (tab: ContractTab) => {
         navigate({ search: { tab: tab === 'source' ? undefined : tab } as any, replace: true });
@@ -523,6 +625,17 @@ function ContractDetail() {
                     {/* Source Code Tab */}
                     {activeTab === 'source' && (
                         <div className={`flex-1 relative overflow-auto ${theme === 'dark' ? 'bg-[#1e1e1e]' : 'bg-zinc-50'}`}>
+                            {/* Line link copy floating button */}
+                            {selectedLines.size > 0 && (
+                                <button
+                                    onClick={copyLineLink}
+                                    className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] uppercase tracking-widest font-bold rounded-sm border transition-all duration-200
+                                        bg-white dark:bg-zinc-800 border-zinc-200 dark:border-white/20 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 shadow-sm"
+                                >
+                                    <Link2 className="h-3 w-3" />
+                                    {linkCopied ? 'Copied!' : `Copy link ${serializeLines(selectedLines)}`}
+                                </button>
+                            )}
                             {code ? (
                                 <SyntaxHighlighter
                                     language="swift"
@@ -536,20 +649,32 @@ function ContractDetail() {
                                     }}
                                     showLineNumbers={true}
                                     wrapLines={true}
-                                    lineNumberStyle={{ minWidth: "2em", paddingRight: "1em", color: theme === 'dark' ? "#555" : "#999", userSelect: "none", textAlign: "right" }}
+                                    lineNumberStyle={(lineNumber: number) => ({
+                                        minWidth: "2.5em",
+                                        paddingRight: "1em",
+                                        color: selectedLines.has(lineNumber)
+                                            ? (theme === 'dark' ? '#4ade80' : '#16a34a')
+                                            : (theme === 'dark' ? '#555' : '#999'),
+                                        userSelect: "none",
+                                        textAlign: "right" as const,
+                                        cursor: "pointer",
+                                    })}
                                     lineProps={(lineNumber: number) => {
-                                        if (highlightLine && lineNumber === highlightLine) {
-                                            return {
-                                                id: 'contract-highlight-line',
-                                                style: {
+                                        const isSelected = selectedLines.has(lineNumber);
+                                        const isFirst = isSelected && !selectedLines.has(lineNumber - 1);
+                                        return {
+                                            ...(isFirst ? { id: 'contract-highlight-line' } : {}),
+                                            onClick: (e: React.MouseEvent) => handleLineClick(lineNumber, e),
+                                            style: {
+                                                display: 'block',
+                                                cursor: 'pointer',
+                                                ...(isSelected ? {
                                                     backgroundColor: theme === 'dark' ? 'rgba(74,222,128,0.12)' : 'rgba(22,163,74,0.08)',
                                                     borderLeft: `3px solid ${theme === 'dark' ? '#4ade80' : '#16a34a'}`,
                                                     marginLeft: '-3px',
-                                                    display: 'block',
-                                                },
-                                            };
-                                        }
-                                        return { style: { display: 'block' } };
+                                                } : {}),
+                                            },
+                                        };
                                     }}
                                 >
                                     {code}

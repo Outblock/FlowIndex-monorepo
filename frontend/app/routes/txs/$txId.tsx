@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { AddressLink } from '../../components/AddressLink';
+import { AddressLink, avatarVariant, colorsFromAddress } from '../../components/AddressLink';
+import Avatar from 'boring-avatars';
 import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import { resolveApiBaseUrl } from '../../api';
 import { buildMeta } from '../../lib/og/meta';
@@ -153,13 +154,31 @@ function evmAddressHref(address?: string): string {
 }
 
 function EVMEntityLink({ address, meta, fallbackLabel }: { address?: string; meta?: any; fallbackLabel?: string }) {
-    const label = String(meta?.label || meta?.contract_name || fallbackLabel || '').trim();
+    const label = String(meta?.label || meta?.contract_name || '').trim();
     const href = evmAddressHref(address);
     const verified = Boolean(meta?.verified);
+    const kind = meta?.kind as string | undefined; // "coa" | "eoa" | "contract" | "token"
+    const flowAddr = meta?.flow_address as string | undefined;
 
+    // Badge for COA/EOA (not for contracts/tokens which have their own labels)
+    const kindBadge = kind === 'coa' ? (
+        <span className="text-[9px] font-bold uppercase px-1 py-px rounded-sm leading-none bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">COA</span>
+    ) : kind === 'eoa' ? (
+        <span className="text-[9px] font-bold uppercase px-1 py-px rounded-sm leading-none bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">EOA</span>
+    ) : null;
+
+    // Has a named label (contract name, token name, etc.)
     if (label) {
         return (
             <div className="flex items-center gap-1.5 min-w-0">
+                {address && (
+                    <Avatar
+                        size={16}
+                        name={`0x${address.replace(/^0x/i, '')}`}
+                        variant={avatarVariant(`0x${address.replace(/^0x/i, '')}`)}
+                        colors={colorsFromAddress(`0x${address.replace(/^0x/i, '')}`)}
+                    />
+                )}
                 <a
                     href={href}
                     target="_blank"
@@ -171,25 +190,47 @@ function EVMEntityLink({ address, meta, fallbackLabel }: { address?: string; met
                 </a>
                 {verified && <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />}
                 <ExternalLink className="h-3 w-3 text-zinc-400 flex-shrink-0" />
+                {kindBadge}
             </div>
         );
     }
 
-    return (
-        <div className="flex items-center gap-2">
-            <code className="text-xs text-zinc-700 dark:text-zinc-300 font-mono break-all">
-                {address ? `0x${address.replace(/^0x/i, '')}` : fallbackLabel || 'N/A'}
-            </code>
-            {address && (
+    // Has address but no label — show the address with avatar + COA/EOA badge
+    if (address) {
+        const normalized = `0x${address.replace(/^0x/i, '')}`;
+        return (
+            <div className="flex items-center gap-1.5 min-w-0">
+                <Avatar
+                    size={16}
+                    name={normalized}
+                    variant={avatarVariant(normalized)}
+                    colors={colorsFromAddress(normalized)}
+                />
                 <a
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-zinc-400 hover:text-blue-500 transition-colors flex-shrink-0"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono"
                 >
-                    <ExternalLink className="h-3 w-3" />
+                    {normalized.slice(0, 10)}…{normalized.slice(-8)}
                 </a>
-            )}
+                <ExternalLink className="h-3 w-3 text-zinc-400 flex-shrink-0" />
+                {kindBadge}
+                {flowAddr && (
+                    <span className="text-[10px] text-purple-500 inline-flex items-center gap-0.5">
+                        → <AddressLink address={flowAddr} prefixLen={8} suffixLen={4} size={12} className="text-[10px] text-purple-500" />
+                    </span>
+                )}
+            </div>
+        );
+    }
+
+    // No address at all — show fallback
+    return (
+        <div className="flex items-center gap-2">
+            <code className="text-xs text-zinc-700 dark:text-zinc-300 font-mono">
+                {fallbackLabel || '—'}
+            </code>
         </div>
     );
 }
@@ -2455,21 +2496,13 @@ function TransactionDetail() {
                                     fullTx.evm_executions.map((exec: any, idx: number) => (
                                         <div key={idx} className="border border-zinc-200 dark:border-white/10 rounded-sm overflow-hidden">
                                             {(() => {
-                                                const executionLabel = getEvmExecutionDisplayLabel(exec, transaction.events);
                                                 const headerLink = getEVMExecutionHeaderLink(exec, transaction.events);
                                                 return (
                                             <div className="bg-zinc-50 dark:bg-black/40 px-4 py-3 border-b border-zinc-200 dark:border-white/5 flex items-center justify-between">
-                                                <div className="min-w-0">
-                                                    <span className="text-[10px] text-zinc-500 uppercase tracking-widest block">
-                                                        EVM Execution {fullTx.evm_executions.length > 1 ? `#${idx + 1}` : ''}
-                                                    </span>
-                                                    {executionLabel && (
-                                                        <span className="text-xs text-zinc-700 dark:text-zinc-300 font-mono block mt-1 truncate">
-                                                            {executionLabel}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {headerLink ? (
+                                                <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                                                    EVM Execution {fullTx.evm_executions.length > 1 ? `#${idx + 1}` : ''}
+                                                </span>
+                                                {headerLink && (
                                                     <a
                                                         href={headerLink.href}
                                                         target="_blank"
@@ -2481,14 +2514,6 @@ function TransactionDetail() {
                                                         </span>
                                                         {headerLink.verified && <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />}
                                                     </a>
-                                                ) : (
-                                                    <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-sm border ${
-                                                        exec.status === 'SEALED' || exec.status === 'SUCCESS'
-                                                            ? 'text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10'
-                                                            : 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10'
-                                                    }`}>
-                                                        {exec.status || 'UNKNOWN'}
-                                                    </span>
                                                 )}
                                             </div>
                                                 );
