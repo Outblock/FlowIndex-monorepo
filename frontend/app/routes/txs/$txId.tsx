@@ -154,6 +154,64 @@ function EVMMetaBadges({ meta }: { meta?: any }) {
     );
 }
 
+type EvmExecutionTag = {
+    label: string;
+    className: string;
+    mono?: boolean;
+};
+
+function getExecutionCallData(exec: any, events?: any[]): string {
+    if (exec?.data) return exec.data;
+    const matchedEvt = events?.find((event: any) => event.event_index === exec?.event_index);
+    const evtPayload = matchedEvt?.values || matchedEvt?.payload || matchedEvt?.data;
+    if (!evtPayload) return '';
+    const formatted = formatEventPayload(evtPayload);
+    if (!formatted?.payload) return '';
+    return decodeFlowDirectCallPayload(formatted.payload)?.data || '';
+}
+
+function getEvmStandardTag(callType: string, value?: string | number): EvmExecutionTag | null {
+    const standard = (() => {
+        if (callType.startsWith('erc20')) return 'ERC-20';
+        if (callType.startsWith('erc721')) return 'ERC-721';
+        if (callType.startsWith('erc1155')) return 'ERC-1155';
+        const numericValue = typeof value === 'number' ? value : Number(value || 0);
+        if (numericValue > 0) return 'Native';
+        return '';
+    })();
+
+    if (!standard) return null;
+
+    const className = standard === 'ERC-20'
+        ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30'
+        : standard === 'ERC-721'
+            ? 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30'
+            : standard === 'ERC-1155'
+                ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'
+                : 'text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/30';
+
+    return { label: standard, className };
+}
+
+function getEvmExecutionTags(exec: any, events?: any[]): EvmExecutionTag[] {
+    const tags: EvmExecutionTag[] = [];
+    const method = String(exec?.decoded_call?.method || '').trim();
+    if (method) {
+        tags.push({
+            label: `${method}()`,
+            className: 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/20',
+            mono: true,
+        });
+    }
+
+    const callData = getExecutionCallData(exec, events);
+    const decoded = callData ? decodeEVMCallData(callData) : { callType: 'unknown' };
+    const standardTag = getEvmStandardTag(decoded.callType || 'unknown', exec?.value);
+    if (standardTag) tags.push(standardTag);
+
+    return tags;
+}
+
 /** NFT transfer row with lazy-loaded name + thumbnail */
 function NFTSummaryRow({ nt, onClick, isAdmin, fmtAddr }: { nt: any; onClick?: () => void; isAdmin?: boolean; fmtAddr: (a: string) => string }) {
     const { thumbnailSrc, displayName, loading } = useNFTLazyDetail(nt);
@@ -412,7 +470,7 @@ function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, addressBook 
             {/* FROM */}
             <div className="flex items-center gap-1.5 px-3 py-2.5 min-w-0 flex-shrink-0">
                 {from ? (
-                    <TxResolvedAddress address={from} book={addressBook} prefixLen={8} suffixLen={4} size={14} />
+                    <TxResolvedAddress address={from} book={addressBook} prefixLen={8} suffixLen={4} reserveLabelSpace size={14} />
                 ) : (
                     <span className="text-[11px] text-zinc-400 italic">Mint</span>
                 )}
@@ -432,7 +490,7 @@ function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, addressBook 
             {/* TO */}
             <div className="flex items-center gap-1.5 px-3 py-2.5 min-w-0 flex-shrink-0">
                 {to ? (
-                    <TxResolvedAddress address={to} book={addressBook} prefixLen={8} suffixLen={4} size={14} />
+                    <TxResolvedAddress address={to} book={addressBook} prefixLen={8} suffixLen={4} reserveLabelSpace size={14} />
                 ) : (
                     <span className="text-[11px] text-zinc-400 italic">Burn</span>
                 )}
@@ -652,23 +710,39 @@ function TransactionSummaryCard({ transaction, assetView, addressBook, formatAdd
 
             {/* EVM hash links — show all EVM tx hashes from executions (or legacy field) */}
             {hasEvm && (() => {
-                const hashes: string[] = [];
-                if (transaction.evm_executions?.length > 0) {
-                    for (const exec of transaction.evm_executions) {
-                        if (exec.hash) hashes.push(exec.hash);
-                    }
-                } else if (transaction.evm_hash) {
-                    hashes.push(transaction.evm_hash);
-                }
-                return hashes.length > 0 ? (
+                const executionRows = (transaction.evm_executions || [])
+                    .filter((exec: any) => exec?.hash)
+                    .map((exec: any) => ({
+                        hash: exec.hash,
+                        tags: getEvmExecutionTags(exec, transaction.events),
+                    }));
+                const fallbackHashes = executionRows.length === 0 && transaction.evm_hash ? [{ hash: transaction.evm_hash, tags: [] as EvmExecutionTag[] }] : [];
+                const rows = executionRows.length > 0 ? executionRows : fallbackHashes;
+                return rows.length > 0 ? (
                     <div className="space-y-1.5 mb-4">
-                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">EVM Hash{hashes.length > 1 ? 'es' : ''}</span>
-                        {hashes.map((hash, idx) => (
-                            <div key={idx} className="flex items-center gap-2 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/5 p-3 rounded-sm">
-                                <code className="text-xs text-blue-600 dark:text-blue-400 font-mono break-all">0x{hash.replace(/^0x/, '')}</code>
-                                <a href={`https://evm.flowindex.io/tx/0x${hash.replace(/^0x/, '')}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-500 transition-colors flex-shrink-0">
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-wider">EVM Hash{rows.length > 1 ? 'es' : ''}</span>
+                        {rows.map((row, idx) => (
+                            <div key={`${row.hash}-${idx}`} className="flex flex-col gap-3 bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/5 p-3 rounded-sm md:flex-row md:items-center md:justify-between">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <code className="text-xs text-blue-600 dark:text-blue-400 font-mono break-all min-w-0">
+                                        0x{row.hash.replace(/^0x/, '')}
+                                    </code>
+                                    <a href={`https://evm.flowindex.io/tx/0x${row.hash.replace(/^0x/, '')}`} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-blue-500 transition-colors flex-shrink-0">
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                    </a>
+                                </div>
+                                {row.tags.length > 0 && (
+                                    <div className="flex items-center gap-2 flex-wrap md:justify-end md:max-w-[48%]">
+                                        {row.tags.map((tag, tagIndex) => (
+                                            <span
+                                                key={`${row.hash}-${tag.label}-${tagIndex}`}
+                                                className={`inline-flex items-center px-2 py-1 rounded-sm border text-[10px] ${tag.mono ? 'font-mono' : 'font-semibold uppercase tracking-wider'} ${tag.className}`}
+                                            >
+                                                {tag.label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -1718,7 +1792,7 @@ function TransactionDetail() {
                                                             </div>
                                                             <div className="min-w-0 flex justify-end">
                                                                 {row.from ? (
-                                                                    <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} size={16} align="right" className="w-full" />
+                                                                    <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} reserveLabelSpace size={16} align="right" className="w-full" />
                                                                 ) : row.transferType === 'mint' ? (
                                                                     <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Mint</span>
                                                                 ) : (
@@ -1730,7 +1804,7 @@ function TransactionDetail() {
                                                             </div>
                                                             <div className="min-w-0 flex">
                                                                 {row.to ? (
-                                                                    <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} size={16} className="w-full" />
+                                                                    <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} reserveLabelSpace size={16} className="w-full" />
                                                                 ) : row.transferType === 'burn' ? (
                                                                     <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Burn</span>
                                                                 ) : (
@@ -1777,7 +1851,7 @@ function TransactionDetail() {
                                                                 <div>
                                                                     <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">From</div>
                                                                     {row.from ? (
-                                                                        <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} size={16} />
+                                                                        <TxResolvedAddress address={row.from} book={addressBook} prefixLen={6} suffixLen={4} reserveLabelSpace size={16} />
                                                                     ) : row.transferType === 'mint' ? (
                                                                         <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Mint</span>
                                                                     ) : (
@@ -1790,7 +1864,7 @@ function TransactionDetail() {
                                                                 <div>
                                                                     <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">To</div>
                                                                     {row.to ? (
-                                                                        <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} size={16} />
+                                                                        <TxResolvedAddress address={row.to} book={addressBook} prefixLen={6} suffixLen={4} reserveLabelSpace size={16} />
                                                                     ) : row.transferType === 'burn' ? (
                                                                         <span className="text-zinc-400 dark:text-zinc-600 italic text-sm">Burn</span>
                                                                     ) : (

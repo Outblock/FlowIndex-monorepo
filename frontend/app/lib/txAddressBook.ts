@@ -220,7 +220,7 @@ export function buildTxAddressBook(transaction: any): TxAddressBook {
         if (raw.addressKind === 'coa' && owner) {
             const ownerLabel = ownerPrimaryLabel(owner);
             if (ownerLabel) {
-                primaryLabel = `${ownerLabel} COA`;
+                primaryLabel = ownerLabel;
             }
         }
         if (!primaryLabel && raw.roles.length > 0) {

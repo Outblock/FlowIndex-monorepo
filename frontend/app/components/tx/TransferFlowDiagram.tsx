@@ -127,15 +127,14 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         else middle.push(addr);
     }
 
-    const colWidth = 300;
-    const rowHeight = 100;
+    const rowHeight = 108;
+    const columnGap = 88;
 
     const nodeStyle = {
         padding: '12px 16px',
         borderRadius: '6px',
         fontSize: '11px',
         fontFamily: 'ui-monospace, monospace',
-        minWidth: 170,
         border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e4e4e7',
         background: isDark ? '#18181b' : '#ffffff',
         color: isDark ? '#e4e4e7' : '#27272a',
@@ -165,6 +164,40 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
         eoa: { color: isDark ? '#fbbf24' : '#d97706', label: 'EOA' },
     };
 
+    const clampWidth = (value: number, min = 176, max = 336) => Math.max(min, Math.min(max, value));
+    const estimateWidth = (label: string, secondaryAddress: string, tagLabel: string, synthetic: boolean) => {
+        if (synthetic) return clampWidth(90 + label.length * 7, 110, 220);
+        const primaryWidth = 90 + label.length * 8;
+        const secondaryWidth = 98 + secondaryAddress.length * 6 + tagLabel.length * 7;
+        return clampWidth(Math.max(primaryWidth, secondaryWidth));
+    };
+
+    const widthByAddress = new Map<string, number>();
+    const computeWidth = (addr: string) => {
+        if (widthByAddress.has(addr)) return widthByAddress.get(addr)!;
+        const synthetic = isSynthetic(addr);
+        const info = seen.get(addr)!;
+        const normalized = normalizeAddress(addr);
+        const resolved = getTxAddressBookEntry(addressBook, normalized);
+        const primaryLabel = resolved?.primaryLabel || info.label;
+        const addrType = addressType(normalized);
+        const secondaryAddress = resolved?.shortAddress || formatShort(normalized, 8, 4);
+        const tagLabel = TAG_STYLES[addrType]?.label || 'Flow';
+        const width = estimateWidth(primaryLabel, secondaryAddress, tagLabel, synthetic);
+        widthByAddress.set(addr, width);
+        return width;
+    };
+
+    const columnWidth = (addrs: string[]) => {
+        if (addrs.length === 0) return 0;
+        return Math.max(...addrs.map((addr) => computeWidth(addr)));
+    };
+
+    const sourceWidth = columnWidth(sources);
+    const middleWidth = columnWidth(middle);
+    const targetColumnIndex = middle.length > 0 ? 2 : 1;
+    const xPositions = [0, sourceWidth + columnGap, sourceWidth + columnGap + middleWidth + columnGap];
+
     const placeColumn = (addrs: string[], col: number): Node[] =>
         addrs.map((addr, row) => {
             const synthetic = isSynthetic(addr);
@@ -175,10 +208,8 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
             const tag = TAG_STYLES[addrT];
             const resolved = getTxAddressBookEntry(addressBook, normalized);
             const primaryLabel = resolved?.primaryLabel || info.label;
-            const secondaryParts = [];
-            if (resolved?.callLabel) secondaryParts.push(resolved.callLabel);
-            if (primaryLabel !== resolved?.shortAddress && resolved?.shortAddress) secondaryParts.push(resolved.shortAddress);
-            const secondaryLabel = secondaryParts.join(' · ');
+            const secondaryAddress = resolved?.shortAddress || formatShort(normalized, 8, 4);
+            const computedWidth = computeWidth(addr);
             return {
                 id: addr,
                 data: {
@@ -189,54 +220,81 @@ export function layoutGraph(flows: Flow[], isDark: boolean, tokenIcons: Map<stri
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
                             <Avatar
                                 size={24}
                                 name={normalized}
                                 variant={avatarVariant(normalized)}
                                 colors={colors}
                             />
-                            <div style={{ minWidth: 0 }}>
-                                <div style={{ fontWeight: 700, fontSize: '11px', color: isDark ? '#e4e4e7' : '#27272a' }}>
+                            <div style={{ minWidth: 0, width: '100%' }}>
+                                <div style={{
+                                    fontWeight: 700,
+                                    fontSize: '11px',
+                                    color: isDark ? '#e4e4e7' : '#27272a',
+                                    display: 'block',
+                                    width: '100%',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                }}>
                                     {primaryLabel}
                                 </div>
-                                {secondaryLabel && (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    marginTop: '4px',
+                                    minWidth: 0,
+                                }}>
                                     <div style={{
                                         fontSize: '9px',
                                         fontFamily: 'ui-monospace, monospace',
-                                        marginTop: '2px',
                                         color: isDark ? '#a1a1aa' : '#71717a',
+                                        flex: '1 1 auto',
+                                        minWidth: 0,
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
-                                        maxWidth: '160px',
                                     }}>
-                                        {secondaryLabel}
+                                        {secondaryAddress}
                                     </div>
-                                )}
-                                <div style={{ fontSize: '9px', fontFamily: 'ui-monospace, monospace', marginTop: '2px', color: tag?.color || (isDark ? '#71717a' : '#a1a1aa') }}>
-                                    {tag?.label || 'Flow'}
+                                    <span style={{
+                                        fontSize: '9px',
+                                        lineHeight: 1,
+                                        padding: '2px 4px',
+                                        borderRadius: '4px',
+                                        border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e4e4e7',
+                                        color: tag?.color || (isDark ? '#71717a' : '#a1a1aa'),
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.08em',
+                                        flexShrink: 0,
+                                    }}>
+                                        {tag?.label || 'Flow'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
                     ),
                 },
-                position: { x: col * colWidth, y: row * rowHeight },
+                position: { x: xPositions[col], y: row * rowHeight },
                 sourcePosition: Position.Right,
                 targetPosition: Position.Left,
                 draggable: true,
-                style: synthetic ? {
+                style: {
                     ...nodeStyle,
-                    border: syntheticBorder(addr),
-                    minWidth: 100,
-                } : nodeStyle,
+                    border: synthetic ? syntheticBorder(addr) : nodeStyle.border,
+                    minWidth: computedWidth,
+                    width: computedWidth,
+                    maxWidth: computedWidth,
+                },
             };
         });
 
     const nodes: Node[] = [
         ...placeColumn(sources, 0),
         ...placeColumn(middle, 1),
-        ...placeColumn(targets, middle.length > 0 ? 2 : 1),
+        ...placeColumn(targets, targetColumnIndex),
     ];
 
     const accentColor = isDark ? '#4ade80' : '#16a34a';
