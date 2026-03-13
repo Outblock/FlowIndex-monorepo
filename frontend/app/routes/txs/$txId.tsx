@@ -130,16 +130,6 @@ function EVMMetaBadges({ meta }: { meta?: any }) {
     if (!meta) return null;
     return (
         <div className="mt-1.5 flex flex-wrap gap-1">
-            {meta.kind && (
-                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm border border-zinc-200 dark:border-white/10 text-zinc-500">
-                    {meta.kind}
-                </span>
-            )}
-            {meta.verified && (
-                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm border border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10">
-                    Verified
-                </span>
-            )}
             {meta.proxy_type && (
                 <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm border border-purple-200 dark:border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10">
                     Proxy
@@ -152,6 +142,65 @@ function EVMMetaBadges({ meta }: { meta?: any }) {
             ))}
         </div>
     );
+}
+
+function evmAddressHref(address?: string): string {
+    if (!address) return 'https://evm.flowindex.io';
+    return `https://evm.flowindex.io/address/0x${address.replace(/^0x/i, '')}`;
+}
+
+function EVMEntityLink({ address, meta, fallbackLabel }: { address?: string; meta?: any; fallbackLabel?: string }) {
+    const label = String(meta?.label || meta?.contract_name || fallbackLabel || '').trim();
+    const href = evmAddressHref(address);
+    const verified = Boolean(meta?.verified);
+
+    if (label) {
+        return (
+            <div className="flex items-center gap-1.5 min-w-0">
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium truncate"
+                    title={label}
+                >
+                    {label}
+                </a>
+                {verified && <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />}
+                <ExternalLink className="h-3 w-3 text-zinc-400 flex-shrink-0" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center gap-2">
+            <code className="text-xs text-zinc-700 dark:text-zinc-300 font-mono break-all">
+                {address ? `0x${address.replace(/^0x/i, '')}` : fallbackLabel || 'N/A'}
+            </code>
+            {address && (
+                <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-zinc-400 hover:text-blue-500 transition-colors flex-shrink-0"
+                >
+                    <ExternalLink className="h-3 w-3" />
+                </a>
+            )}
+        </div>
+    );
+}
+
+function getEVMExecutionHeaderLink(exec: any): { href: string; label: string; verified: boolean } | null {
+    const method = String(exec?.decoded_call?.method || '').trim();
+    const contract = String(exec?.to_meta?.label || exec?.decoded_call?.implementation_name || exec?.decoded_call?.contract_name || exec?.to_meta?.contract_name || '').trim();
+    const label = method ? `${method}()` : contract;
+    if (!label) return null;
+    return {
+        href: exec?.to ? evmAddressHref(exec.to) : `https://evm.flowindex.io/tx/0x${String(exec?.hash || '').replace(/^0x/i, '')}`,
+        label,
+        verified: Boolean(exec?.to_meta?.verified),
+    };
 }
 
 type EvmExecutionTag = {
@@ -2320,6 +2369,9 @@ function TransactionDetail() {
                                 {fullTx.evm_executions && fullTx.evm_executions.length > 0 ? (
                                     fullTx.evm_executions.map((exec: any, idx: number) => (
                                         <div key={idx} className="border border-zinc-200 dark:border-white/10 rounded-sm overflow-hidden">
+                                            {(() => {
+                                                const headerLink = getEVMExecutionHeaderLink(exec);
+                                                return (
                                             <div className="bg-zinc-50 dark:bg-black/40 px-4 py-3 border-b border-zinc-200 dark:border-white/5 flex items-center justify-between">
                                                 <div className="min-w-0">
                                                     <span className="text-[10px] text-zinc-500 uppercase tracking-widest block">
@@ -2331,14 +2383,30 @@ function TransactionDetail() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-sm border ${
-                                                    exec.status === 'SEALED' || exec.status === 'SUCCESS'
-                                                        ? 'text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10'
-                                                        : 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10'
-                                                }`}>
-                                                    {exec.status || 'UNKNOWN'}
-                                                </span>
+                                                {headerLink ? (
+                                                    <a
+                                                        href={headerLink.href}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 min-w-0 text-right"
+                                                    >
+                                                        <span className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-mono truncate">
+                                                            {headerLink.label}
+                                                        </span>
+                                                        {headerLink.verified && <CheckCircle className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />}
+                                                    </a>
+                                                ) : (
+                                                    <span className={`text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-sm border ${
+                                                        exec.status === 'SEALED' || exec.status === 'SUCCESS'
+                                                            ? 'text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10'
+                                                            : 'text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10'
+                                                    }`}>
+                                                        {exec.status || 'UNKNOWN'}
+                                                    </span>
+                                                )}
                                             </div>
+                                                );
+                                            })()}
                                             <div className="p-4 space-y-4">
                                                 {/* EVM Hash */}
                                                 <div>
@@ -2363,50 +2431,12 @@ function TransactionDetail() {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     <div>
                                                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">From</p>
-                                                        <div className="flex items-center gap-2">
-                                                            <code className="text-xs text-zinc-700 dark:text-zinc-300 font-mono break-all">
-                                                                {exec.from ? `0x${exec.from.replace(/^0x/i, '')}` : 'N/A'}
-                                                            </code>
-                                                            {exec.from && (
-                                                                <a
-                                                                    href={`https://evm.flowindex.io/address/0x${exec.from?.replace(/^0x/i, '')}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-zinc-400 hover:text-blue-500 transition-colors flex-shrink-0"
-                                                                >
-                                                                    <ExternalLink className="h-3 w-3" />
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                        {exec.from_meta?.label && (
-                                                            <p className="mt-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-medium">
-                                                                {exec.from_meta.label}
-                                                            </p>
-                                                        )}
+                                                        <EVMEntityLink address={exec.from} meta={exec.from_meta} fallbackLabel="N/A" />
                                                         <EVMMetaBadges meta={exec.from_meta} />
                                                     </div>
                                                     <div>
                                                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">To</p>
-                                                        <div className="flex items-center gap-2">
-                                                            <code className="text-xs text-zinc-700 dark:text-zinc-300 font-mono break-all">
-                                                                {exec.to ? `0x${exec.to.replace(/^0x/i, '')}` : 'Contract Creation'}
-                                                            </code>
-                                                            {exec.to && (
-                                                                <a
-                                                                    href={`https://evm.flowindex.io/address/0x${exec.to?.replace(/^0x/i, '')}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="text-zinc-400 hover:text-blue-500 transition-colors flex-shrink-0"
-                                                                >
-                                                                    <ExternalLink className="h-3 w-3" />
-                                                                </a>
-                                                            )}
-                                                        </div>
-                                                        {exec.to_meta?.label && (
-                                                            <p className="mt-1.5 text-xs text-zinc-700 dark:text-zinc-300 font-medium">
-                                                                {exec.to_meta.label}
-                                                            </p>
-                                                        )}
+                                                        <EVMEntityLink address={exec.to} meta={exec.to_meta} fallbackLabel="Contract Creation" />
                                                         {exec.to_meta?.implementation_address && (
                                                             <div className="mt-1 text-[10px] text-zinc-500 flex items-center gap-1.5">
                                                                 <span>Implementation</span>
