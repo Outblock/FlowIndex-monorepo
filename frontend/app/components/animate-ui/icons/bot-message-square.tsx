@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { motion } from 'motion/react';
 
-import { getVariants, useAnimateIconContext, IconWrapper } from './icon';
+import { getVariants, useAnimateIconContext, IconWrapper } from '@/components/animate-ui/icons/icon';
 
 const animations = {
   default: {

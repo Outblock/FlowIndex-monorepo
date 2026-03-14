@@ -9,9 +9,9 @@ import {
   DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@flowindex/flow-ui';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShimmeringText } from '../animate-ui/primitives/texts/shimmering';
-import { Bot as AnimatedBot } from '../animate-ui/icons/bot';
-import { BotMessageSquare as AnimatedBotMessageSquare } from '../animate-ui/icons/bot-message-square';
+import { ShimmeringText } from '@/components/animate-ui/primitives/texts/shimmering';
+import { Bot as AnimatedBot } from '@/components/animate-ui/icons/bot';
+import { BotMessageSquare as AnimatedBotMessageSquare } from '@/components/animate-ui/icons/bot-message-square';
 import ReactMarkdown from 'react-markdown';
 import { AnimatedMarkdown } from '@outblock/flowtoken';
 import '@outblock/flowtoken/styles.css';
