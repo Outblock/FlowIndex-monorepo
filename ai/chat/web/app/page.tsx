@@ -20,7 +20,30 @@ export default function Home() {
   const supabase = createClient();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    async function initAuth() {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setUser(data.user);
+        return;
+      }
+      // No Supabase session — try fi_auth cross-subdomain cookie from flowindex.io
+      const match = document.cookie.match(/(?:^|;\s*)fi_auth=([^;]*)/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(match[1]));
+          if (parsed?.access_token && parsed?.refresh_token) {
+            const { data: sessionData } = await supabase.auth.setSession({
+              access_token: parsed.access_token,
+              refresh_token: parsed.refresh_token,
+            });
+            if (sessionData?.user) {
+              setUser(sessionData.user);
+            }
+          }
+        } catch { /* invalid cookie — ignore */ }
+      }
+    }
+    initAuth();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
