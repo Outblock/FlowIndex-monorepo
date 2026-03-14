@@ -72,8 +72,8 @@ function ShimmeringThinking() {
       className="text-xs font-medium"
       text={phrase}
       duration={1.5}
-      color="var(--color-zinc-500)"
-      shimmeringColor="var(--color-emerald-400)"
+      color="var(--nothing-green-dark)"
+      shimmeringColor="var(--nothing-green)"
     />
   );
 }
