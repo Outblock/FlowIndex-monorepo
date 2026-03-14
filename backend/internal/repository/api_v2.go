@@ -1105,7 +1105,7 @@ func (r *Repository) ListContractVersions(ctx context.Context, address, name str
 		FROM app.contract_versions cv
 		LEFT JOIN raw.blocks b ON b.height = cv.block_height
 		WHERE cv.address = $1 AND cv.name = $2
-		ORDER BY cv.version DESC
+		ORDER BY cv.block_height DESC
 		LIMIT $3 OFFSET $4`, hexToBytes(address), name, limit, offset)
 	if err != nil {
 		return nil, err

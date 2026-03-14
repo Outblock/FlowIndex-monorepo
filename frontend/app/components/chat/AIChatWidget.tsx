@@ -1835,13 +1835,6 @@ export default function AIChatWidget({ authToken }: { authToken?: string | null 
                       className="flex-1 min-w-0 resize-none text-[16px] md:text-[13px] bg-zinc-50 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/10 rounded-sm px-3 py-2.5 text-zinc-700 dark:text-zinc-200 placeholder-zinc-400 focus:outline-none focus:border-nothing-green/40 transition-colors"
                       style={{ maxHeight: '120px' }}
                     />
-                    {lastUsage && (
-                      <ContextUsageIndicator
-                        usage={lastUsage}
-                        maxTokens={CONTEXT_WINDOW}
-                        modelLabel={CHAT_MODES.find((mode) => mode.key === chatMode)?.model || 'Claude'}
-                      />
-                    )}
                     {isStreaming ? (
                       <button
                         type="button"
@@ -1982,6 +1975,15 @@ export default function AIChatWidget({ authToken }: { authToken?: string | null 
                       </div>
                   </div>
                 </div>
+                    {lastUsage && (
+                      <div className="ml-auto">
+                        <ContextUsageIndicator
+                          usage={lastUsage}
+                          maxTokens={CONTEXT_WINDOW}
+                          modelLabel={CHAT_MODES.find((mode) => mode.key === chatMode)?.model || 'Claude'}
+                        />
+                      </div>
+                    )}
               </div>
               </div>
             </motion.div>
