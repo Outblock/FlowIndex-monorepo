@@ -1572,7 +1572,7 @@ export default function AIChatWidget({ authToken }: { authToken?: string | null 
                   </div>
                   <div>
                     <h3 className="text-[12px] font-bold text-zinc-900 dark:text-white uppercase tracking-widest">
-                      Flow AI
+                      FlowIndex AI
                     </h3>
                     <p className="text-[10px] text-zinc-400 uppercase tracking-widest">
                       Ask anything about Flow
@@ -1729,7 +1729,7 @@ export default function AIChatWidget({ authToken }: { authToken?: string | null 
                         <Sparkles size={24} className="text-nothing-green" />
                       </div>
                     </div>
-                    <h2 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">Ask Flow AI</h2>
+                    <h2 className="text-sm font-bold text-zinc-900 dark:text-white mb-1">Ask FlowIndex AI</h2>
                     <p className="text-[12px] text-zinc-400 mb-6 text-center max-w-[260px]">
                       Query the Flow blockchain with natural language - SQL and Cadence
                     </p>

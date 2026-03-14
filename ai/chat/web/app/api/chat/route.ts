@@ -498,18 +498,21 @@ export async function POST(req: Request) {
       anthropic: {
         // Enable native compaction: when input exceeds the trigger threshold,
         // Claude automatically summarises older context instead of failing.
-        contextManagement: {
-          edits: [
-            {
-              type: "compact_20260112" as const,
-              trigger: { type: "input_tokens" as const, value: 150_000 },
-              instructions:
-                "Summarize the conversation concisely. Preserve: key questions asked, " +
-                "SQL queries and their results, important data points, decisions made, " +
-                "and any error context. Drop verbose tool outputs.",
-            },
-          ],
-        },
+        // Note: Haiku does not support compact_20260112.
+        ...(mode !== "fast" && {
+          contextManagement: {
+            edits: [
+              {
+                type: "compact_20260112" as const,
+                trigger: { type: "input_tokens" as const, value: 150_000 },
+                instructions:
+                  "Summarize the conversation concisely. Preserve: key questions asked, " +
+                  "SQL queries and their results, important data points, decisions made, " +
+                  "and any error context. Drop verbose tool outputs.",
+              },
+            ],
+          },
+        }),
         ...(cfg.thinking && {
           thinking: { type: "enabled", budgetTokens: 10000 },
         }),
