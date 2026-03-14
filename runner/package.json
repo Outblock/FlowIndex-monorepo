@@ -45,6 +45,7 @@
     "recharts": "^3.7.0",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.0.1",
+    "solc": "^0.8.34",
     "tailwind-merge": "^2.2.0",
     "viem": "^2.47.4",
     "vscode-jsonrpc": "8.2.1",
