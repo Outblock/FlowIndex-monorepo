@@ -9,6 +9,9 @@ import {
   DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
 } from '@flowindex/flow-ui';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ShimmeringText } from '~/components/animate-ui/primitives/texts/shimmering';
+import { Bot as AnimatedBot } from '~/components/animate-ui/icons/bot';
+import { BotMessageSquare as AnimatedBotMessageSquare } from '~/components/animate-ui/icons/bot-message-square';
 import ReactMarkdown from 'react-markdown';
 import { AnimatedMarkdown } from '@outblock/flowtoken';
 import '@outblock/flowtoken/styles.css';
@@ -23,6 +26,71 @@ import {
 
 const AI_CHAT_URL = import.meta.env.VITE_AI_CHAT_URL || 'https://ai.flowindex.io';
 const CONTEXT_WINDOW = 200_000;
+
+const THINKING_PHRASES = [
+  'go with the Flow…',
+  'moving @resources around…',
+  'borrowing &capabilities…',
+  'executing Cadence scripts…',
+  'vibing with the blockchain…',
+  'scanning 145M blocks real quick…',
+  'asking Dapper Labs nicely…',
+  'negotiating with smart contracts…',
+  'herding NFT kittens…',
+  'staking some thoughts…',
+  'bridging to EVM and back…',
+  'reading the chain like a book…',
+  'crunching FLOW tokens…',
+  'parsing events at light speed…',
+  'summoning the Access Node…',
+  'flexing those SQL muscles…',
+  'this is fine. everything is fine…',
+  'reticulating splines on-chain…',
+];
+
+function ShimmeringThinking() {
+  const [phrase, setPhrase] = useState(() =>
+    THINKING_PHRASES[Math.floor(Math.random() * THINKING_PHRASES.length)]
+  );
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPhrase((prev) => {
+        let next: string;
+        do {
+          next = THINKING_PHRASES[Math.floor(Math.random() * THINKING_PHRASES.length)];
+        } while (next === prev && THINKING_PHRASES.length > 1);
+        return next;
+      });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <ShimmeringText
+      key={phrase}
+      className="text-xs font-medium"
+      text={phrase}
+      duration={1.5}
+      color="var(--color-zinc-500)"
+      shimmeringColor="var(--color-emerald-400)"
+    />
+  );
+}
+
+/** Animated bot icon: thinking → look around, idle → blink, hover → wink */
+function ChatBotIcon({ isThinking, size = 11 }: { isThinking?: boolean; size?: number }) {
+  return (
+    <AnimatedBot
+      size={size}
+      className="text-nothing-green"
+      animate={isThinking ? 'default' : 'blink'}
+      loop
+      loopDelay={isThinking ? 800 : 4000}
+      animateOnHover="wink"
+    />
+  );
+}
 
 function formatCompactTokens(value: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -945,7 +1013,7 @@ function ChatMessage({ message, hideTools, isStreamingMsg }: { message: UIMessag
     <div className="mb-4">
       <div className="flex items-start gap-2">
         <div className="shrink-0 mt-0.5 w-5 h-5 rounded-sm bg-nothing-green/10 border border-nothing-green/20 flex items-center justify-center">
-          <Bot size={11} className="text-nothing-green" />
+          <ChatBotIcon />
         </div>
         <div className="flex-1 min-w-0 overflow-hidden break-words">
           {message.parts.map((part, i) => {
@@ -1503,7 +1571,7 @@ export default function AIChatWidget({ authToken }: { authToken?: string | null 
             className="fixed bottom-6 right-6 z-[70] w-12 h-12 bg-nothing-green text-black rounded-sm shadow-lg shadow-nothing-green/20 hover:shadow-nothing-green/40 hover:scale-105 transition-all flex items-center justify-center"
             aria-label="Open AI Chat"
           >
-            <MessageSquare size={20} />
+            <AnimatedBotMessageSquare size={20} animate="blink" loop loopDelay={5000} animateOnHover="wink" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -1758,9 +1826,9 @@ export default function AIChatWidget({ authToken }: { authToken?: string | null 
                     {isStreaming && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
                       <div className="flex items-center gap-2 mb-4">
                         <div className="w-5 h-5 rounded-sm bg-nothing-green/10 border border-nothing-green/20 flex items-center justify-center">
-                          <Bot size={11} className="text-nothing-green" />
+                          <ChatBotIcon isThinking size={13} />
                         </div>
-                        <Loader2 size={14} className="animate-spin text-zinc-400" />
+                        <ShimmeringThinking />
                       </div>
                     )}
                     {chatError && (
