@@ -156,3 +156,6 @@ export {
 
 // Time utilities
 export { formatRelativeTime, formatAbsoluteTime } from "./utils/time"
+
+// Animated icons
+export { Bot, BotIcon, ChatBotIcon } from "./animate-ui/icons/bot"

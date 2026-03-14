@@ -5,6 +5,7 @@ export default defineConfig({
   format: ['esm'],
   dts: true,
   clean: true,
-  external: ['react', 'react-dom'],
+  external: ['react', 'react-dom', 'motion', 'motion/react'],
+  banner: { js: '"use client";' },
   sourcemap: true,
 });

@@ -87,7 +87,7 @@ import {
 import { shareSession, unshareSession } from "@/lib/chat-store";
 import { SqlResultTable } from "./sql-result-table";
 import { ChartArtifact } from "./chart-artifact";
-import { FlowLogo } from "./flow-logo";
+import { ChatBotIcon } from "@flowindex/flow-ui";
 import {
   useModelSelector,
   CHAT_MODES,
@@ -297,7 +297,7 @@ export function Chat({ sessionId, userId }: ChatProps) {
               {/* Logo with glow */}
               <div className="relative mb-8">
                 <div className="absolute inset-0 blur-2xl opacity-20 bg-[var(--flow-green)] rounded-full scale-150" />
-                <FlowLogo size={56} className="relative" />
+                <ChatBotIcon size={56} className="relative text-[var(--flow-green)]" />
               </div>
 
               <h1 className="text-[28px] font-semibold tracking-tight text-foreground mb-2">
@@ -344,7 +344,7 @@ export function Chat({ sessionId, userId }: ChatProps) {
                   <Message from="assistant">
                     <div className="flex items-start gap-3">
                       <div className="shrink-0 mt-0.5">
-                        <FlowLogo size={22} />
+                        <ChatBotIcon isThinking size={22} className="text-[var(--flow-green)]" />
                       </div>
                       <div
                         className="inline-block bg-clip-text animate-shine text-[13px]"
@@ -846,7 +846,7 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideToo
     <Message from="assistant">
       <div className="flex gap-3">
         <div className="shrink-0 mt-1.5">
-          <FlowLogo size={22} />
+          <ChatBotIcon size={22} className="text-[var(--flow-green)]" />
         </div>
         <MessageContent>
           {message.parts.map((part, i) => {

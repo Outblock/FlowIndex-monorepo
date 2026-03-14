@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@flowindex/auth-core": "workspace:*",
+    "@flowindex/flow-ui": "workspace:*",
     "@ai-sdk/anthropic": "^3.0.50",
     "@ai-sdk/mcp": "^1.0.22",
     "@ai-sdk/react": "^3.0.107",
