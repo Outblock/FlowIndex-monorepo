@@ -71,7 +71,7 @@ export function Sidebar({ activeSessionId, onSelectSession, onNewChat, refreshKe
                   <FlowLogo size={20} />
                </div>
               <div>
-                <h3 className="text-[11px] font-bold text-white uppercase tracking-[0.2em] dot-matrix">FLOWSCAN</h3>
+                <h3 className="text-[11px] font-bold text-white uppercase tracking-[0.2em] dot-matrix">FLOWINDEX</h3>
               </div>
             </div>
             <button onClick={() => setCollapsed(true)} className="p-1.5 text-zinc-600 hover:text-white hover:bg-white/5 transition-colors">

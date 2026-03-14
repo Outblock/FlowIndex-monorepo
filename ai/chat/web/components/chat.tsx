@@ -67,6 +67,22 @@ import {
   ReasoningContent,
 } from "@/components/ai-elements/reasoning";
 import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+} from "@/components/ai-elements/chain-of-thought";
+import {
+  Sandbox,
+  SandboxHeader,
+  SandboxContent,
+  SandboxTabs,
+  SandboxTabsBar,
+  SandboxTabsList,
+  SandboxTabsTrigger,
+  SandboxTabContent,
+} from "@/components/ai-elements/sandbox";
+import {
   Sources,
   SourcesTrigger,
   SourcesContent,
@@ -301,7 +317,7 @@ export function Chat({ sessionId, userId }: ChatProps) {
               </div>
 
               <h1 className="dot-matrix text-[32px] mb-4 text-white">
-                FLOWSCAN AI
+                FLOWINDEX AI
               </h1>
               <p className="text-[12px] text-[var(--text-secondary)] mb-12 max-w-sm text-center leading-relaxed font-mono uppercase tracking-wider">
                 Blockchain Intelligence / Natural Language Interface
@@ -813,34 +829,112 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideToo
     );
   }
 
+  // Assistant message: group sequential reasoning/tool parts into a ChainOfThought
+  const groups: Array<{ type: "process" | "text" | "sources"; parts: any[] }> = [];
+  let currentGroup: { type: "process" | "text" | "sources"; parts: any[] } | null = null;
+
+  message.parts.forEach((part) => {
+    const isProcess = part.type === "reasoning" || part.type.includes("tool");
+    const type = isProcess ? "process" : "text";
+
+    if (currentGroup && currentGroup.type === type) {
+      currentGroup.parts.push(part);
+    } else {
+      currentGroup = { type, parts: [part] };
+      groups.push(currentGroup);
+    }
+  });
+
   return (
     <Message from="assistant">
       <div className="flex gap-3">
         <div className="shrink-0 mt-1.5">
           <ChatBotIcon size={22} className="text-[var(--flow-green)]" />
         </div>
-        <MessageContent className="prose-nothing">
-          {message.parts.map((part, i) => {
-            if (part.type === "reasoning") {
-              const reasoningPart = part as any;
+        <MessageContent className="prose-nothing w-full">
+          {groups.map((group, gIdx) => {
+            if (group.type === "process") {
+              if (hideTools) return null;
               return (
-                <Reasoning key={i} isStreaming={isMessageStreaming && !!reasoningPart.reasoning}>
-                  <ReasoningTrigger className="!text-[10px] !uppercase !tracking-[0.2em] !font-bold !text-zinc-500" />
-                  <ReasoningContent className="!bg-zinc-950 !border-white/5 !rounded-none !text-zinc-400 !font-mono !text-[12px]">{reasoningPart.reasoning || ""}</ReasoningContent>
-                </Reasoning>
+                <ChainOfThought key={gIdx} className="mb-4 border-l border-white/5 pl-4 ml-1">
+                  <ChainOfThoughtHeader className="!text-[10px] !uppercase !tracking-[0.2em] !font-bold !text-zinc-500 py-1">
+                    System Intelligence Process
+                  </ChainOfThoughtHeader>
+                  <ChainOfThoughtContent className="!mt-3 space-y-3">
+                    {group.parts.map((part, pIdx) => {
+                      if (part.type === "reasoning") {
+                        return (
+                          <ChainOfThoughtStep
+                            key={pIdx}
+                            label="Reasoning"
+                            status={isMessageStreaming ? "active" : "complete"}
+                            className="text-zinc-400 font-mono text-[12px]"
+                          >
+                            <div className="bg-zinc-950/50 p-3 border border-white/5 rounded-none mt-1">
+                              {part.reasoning}
+                            </div>
+                          </ChainOfThoughtStep>
+                        );
+                      }
+
+                      const toolPart = part as any;
+                      const name = toolPart.toolName ?? toolPart.type?.split("-").slice(1).join("-") ?? "";
+                      const toolDone = toolPart.state === "output-available" || toolPart.state === "result";
+                      const toolErr = toolPart.state === "output-error";
+
+                      if (name === "createChart") {
+                        return (
+                          <ChainOfThoughtStep key={pIdx} label="Visualization Engine" status={toolDone ? "complete" : "active"}>
+                             <ChartToolPart part={toolPart} />
+                          </ChainOfThoughtStep>
+                        );
+                      }
+                      if (name === "run_cadence") {
+                        return (
+                          <ChainOfThoughtStep key={pIdx} label="Cadence Execution" status={toolDone ? "complete" : "active"}>
+                            <CadenceToolPart part={toolPart} />
+                          </ChainOfThoughtStep>
+                        );
+                      }
+                      if (name === "run_sql" || name === "runSQL" || name === "run_flowindex_sql" || name === "run_evm_sql") {
+                        return (
+                          <ChainOfThoughtStep key={pIdx} label="SQL Query Engine" status={toolDone ? "complete" : "active"}>
+                            <SqlToolPart part={toolPart} />
+                          </ChainOfThoughtStep>
+                        );
+                      }
+
+                      // Generic tool or web search
+                      const label = name.startsWith("web_search") ? "Web Search" : name.toUpperCase().replace(/_/g, " ");
+                      return (
+                        <ChainOfThoughtStep key={pIdx} label={label} status={toolDone ? "complete" : (toolErr ? "complete" : "active")}>
+                          <div className="mt-1 border border-white/5 bg-zinc-950/30 p-2 rounded-none">
+                            <div className="flex items-center gap-2 text-[10px] uppercase font-bold text-zinc-600">
+                               {toolDone ? <Check size={10} className="text-[var(--nothing-green)]" /> : toolErr ? <X size={10} className="text-red-500" /> : <Loader2 size={10} className="animate-spin" />}
+                               {toolDone ? "Completed" : toolErr ? "Failed" : "In Progress..."}
+                            </div>
+                            {toolDone && (
+                               <div className="mt-1 text-[11px] text-zinc-500 font-mono truncate">
+                                 {typeof toolPart.output === "string" ? toolPart.output.slice(0, 100) : JSON.stringify(toolPart.output).slice(0, 100)}...
+                               </div>
+                            )}
+                          </div>
+                        </ChainOfThoughtStep>
+                      );
+                    })}
+                  </ChainOfThoughtContent>
+                </ChainOfThought>
               );
             }
 
-            if (part.type === "text") {
+            // group.type === "text"
+            return group.parts.map((part, pIdx) => {
               if (!part.text.trim()) return null;
-              // Compaction summaries — Claude condensed old context
-              const isCompaction =
-                (part.providerMetadata?.anthropic as { type?: string } | undefined)
-                  ?.type === "compaction";
+              const isCompaction = (part.providerMetadata?.anthropic as { type?: string } | undefined)?.type === "compaction";
               if (isCompaction) {
                 return (
                   <div
-                    key={i}
+                    key={`${gIdx}-${pIdx}`}
                     className="flex items-center gap-2 py-2 px-3 my-2 text-[10px] uppercase font-bold tracking-widest text-zinc-500 bg-zinc-900 border border-white/5 rounded-none"
                   >
                     <Sparkles size={10} className="shrink-0" />
@@ -848,97 +942,11 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideToo
                   </div>
                 );
               }
-              return <MessageResponse key={i} streaming={isMessageStreaming}>{part.text}</MessageResponse>;
-            }
-
-            if (
-              part.type === "tool-invocation" ||
-              part.type === "dynamic-tool" ||
-              part.type.startsWith("tool-")
-            ) {
-              if (hideTools) return null;
-              const toolPart = part as any;
-              const name =
-                toolPart.toolName ??
-                toolPart.type?.split("-").slice(1).join("-") ?? "";
-              if (name === "createChart") {
-                return <ChartToolPart key={i} part={toolPart} />;
-              }
-              if (name === "run_cadence") {
-                return <CadenceToolPart key={i} part={toolPart} />;
-              }
-              if (name === "run_sql" || name === "runSQL" || name === "run_flowindex_sql" || name === "run_evm_sql") {
-                return <SqlToolPart key={i} part={toolPart} />;
-              }
-              // web_search / fetch_api — compact status line
-              if (name === "web_search" || name === "web_search_20250305" || name === "fetch_api") {
-                const label = name.startsWith("web_search") ? "Web Query" : `Fetch ${toolPart.args?.url || toolPart.input?.url || "API"}`;
-                const done = toolPart.state === "output-available" || toolPart.state === "result";
-                const err = toolPart.state === "output-error";
-                return (
-                  <div key={i} className="flex items-center gap-2 py-2 px-3 my-2 text-[10px] uppercase font-bold tracking-widest text-zinc-500 bg-zinc-900 border border-white/5 rounded-none">
-                    {!done && !err ? (
-                      <span className="inline-block w-2.5 h-2.5 border border-zinc-500 border-t-transparent rounded-none animate-spin" />
-                    ) : err ? (
-                      <span className="text-red-500 text-[10px]">✕</span>
-                    ) : (
-                      <Check size={10} className="text-[var(--nothing-green)]" />
-                    )}
-                    <span className="truncate">{done ? (name.startsWith("web_search") ? "Web Query Complete" : "API Synchronized") : label}...</span>
-                  </div>
-                );
-              }
-              // Generic tool fallback — expandable details
-              const toolDone = toolPart.state === "output-available" || toolPart.state === "result";
-              const toolErr = toolPart.state === "output-error";
-              const toolOutput = toolDone ? toolPart.output : toolErr ? (toolPart.errorText || "Execution Failure") : null;
-              const toolInput = toolPart.input ?? toolPart.args;
-              const hasDetails = toolInput || toolOutput;
-              const friendlyName = name.replace(/_/g, " ").toUpperCase();
-              const inputSummary = toolInput
-                ? typeof toolInput === "string"
-                  ? toolInput.slice(0, 60)
-                  : (() => { const s = JSON.stringify(toolInput); return s.length > 80 ? s.slice(0, 77) + "..." : s; })()
-                : "";
-              const truncateOutput = (v: unknown) => {
-                const s = typeof v === "string" ? v : JSON.stringify(v, null, 2);
-                return s.length > 2000 ? s.slice(0, 2000) + "\n...[truncated]" : s;
-              };
-              return (
-                <details key={i} className="my-2 rounded-none border border-white/5 overflow-hidden">
-                  <summary className="flex items-center gap-3 py-2 px-3 text-[10px] uppercase font-bold tracking-widest text-zinc-500 bg-zinc-900 cursor-pointer hover:bg-zinc-800 transition-colors select-none">
-                    {!toolDone && !toolErr ? (
-                      <span className="inline-block w-2.5 h-2.5 border border-zinc-500 border-t-transparent rounded-none animate-spin shrink-0" />
-                    ) : toolErr ? (
-                      <span className="text-red-500 text-[10px] shrink-0">✕</span>
-                    ) : (
-                      <Check size={10} className="text-[var(--nothing-green)] shrink-0" />
-                    )}
-                    <span className="truncate">{friendlyName}</span>
-                    {inputSummary && <span className="text-zinc-600 truncate ml-2 font-mono lowercase tracking-normal font-normal">{inputSummary}</span>}
-                  </summary>
-                  {hasDetails && (
-                    <div className="px-4 py-3 text-[11px] font-mono space-y-2 bg-black text-zinc-400 max-h-[250px] overflow-auto border-t border-white/5">
-                      {toolInput && (
-                        <div>
-                          <span className="text-zinc-600 uppercase text-[9px] tracking-widest block mb-1">Input Data</span>
-                          <pre className="whitespace-pre-wrap break-words text-zinc-300 bg-white/[0.02] p-2">{typeof toolInput === "string" ? toolInput : JSON.stringify(toolInput, null, 2)}</pre>
-                        </div>
-                      )}
-                      {toolOutput && (
-                        <div>
-                          <span className="text-zinc-600 uppercase text-[9px] tracking-widest block mb-1">System Output</span>
-                          <pre className={`whitespace-pre-wrap break-words p-2 ${toolErr ? "text-red-500 bg-red-500/5" : "text-zinc-300 bg-white/[0.02]"}`}>{truncateOutput(toolOutput)}</pre>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </details>
-              );
-            }
-
-            return null;
+              return <MessageResponse key={`${gIdx}-${pIdx}`} streaming={isMessageStreaming}>{part.text}</MessageResponse>;
+            });
           })}
+
+          {/* Render Sources at the end if any */}
           {(() => {
             const sources: { title: string; url: string }[] = [];
             for (const part of message.parts) {
@@ -961,7 +969,7 @@ function ChatMessage({ message, isStreaming: isMessageStreaming = false, hideToo
             if (sources.length === 0) return null;
             const unique = [...new Map(sources.map((s) => [s.url, s])).values()];
             return (
-              <Sources>
+              <Sources className="mt-4 pt-4 border-t border-white/5">
                 <SourcesTrigger count={unique.length} className="!text-[10px] !uppercase !tracking-widest !font-bold !text-zinc-500" />
                 <SourcesContent className="!bg-zinc-950 !border-white/5 !rounded-none">
                   {unique.map((s) => (
@@ -1006,33 +1014,56 @@ function SqlToolPart({ part }: { part: any }) {
   const isEvm = toolName === "run_evm_sql";
 
   return (
-    <div className="space-y-1">
-      {sql && (
-        <CollapsibleCode
-          code={sql}
-          language="sql"
-          label={isEvm ? "EVM SQL Query" : "SQL Query"}
-          icon={
-            <>
-              <Database size={11} className="text-[var(--flow-green)]" />
-              {!isDone && !isError && <Loader2 size={10} className="animate-spin text-zinc-400" />}
-            </>
-          }
-        />
-      )}
-      {!sql && !isDone && !isError && (
-        <div className="flex items-center gap-2 py-1">
-          <Database size={12} className="text-[var(--flow-green)]" />
-          <Loader2 size={12} className="animate-spin text-zinc-400" />
-        </div>
-      )}
-      {hasError && (
-        <div className="px-3 py-2 text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-sm">
-          {isError ? (part.errorText || "Query failed") : result?.error}
-        </div>
-      )}
-      {hasData && <SqlResultTable result={result} />}
-    </div>
+    <Sandbox className="border-white/5 bg-black !rounded-none !mb-4">
+      <SandboxHeader
+        title={isEvm ? "EVM DATA_STREAM" : "FLOWINDEX DATA_STREAM"}
+        state={part.state}
+        className="px-4 py-2.5 bg-zinc-950/50"
+      />
+      <SandboxContent>
+        <SandboxTabs defaultValue="result">
+          <SandboxTabsBar className="bg-zinc-950/80">
+            <SandboxTabsList>
+              <SandboxTabsTrigger value="query" className="text-[10px] uppercase tracking-widest px-4 py-2">Query</SandboxTabsTrigger>
+              <SandboxTabsTrigger value="result" className="text-[10px] uppercase tracking-widest px-4 py-2">Result</SandboxTabsTrigger>
+            </SandboxTabsList>
+          </SandboxTabsBar>
+          <SandboxTabContent value="query">
+            <div className="p-0">
+              <SyntaxHighlighter
+                language="sql"
+                style={vscDarkPlus}
+                customStyle={{ margin: 0, padding: "16px", fontSize: "12px", lineHeight: "1.6", background: "#050505", borderRadius: 0 }}
+                wrapLongLines
+              >
+                {sql || ""}
+              </SyntaxHighlighter>
+            </div>
+          </SandboxTabContent>
+          <SandboxTabContent value="result">
+            <div className="min-h-[100px]">
+              {hasError && (
+                <div className="px-4 py-3 text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 m-4">
+                  {isError ? (part.errorText || "Query failed") : result?.error}
+                </div>
+              )}
+              {hasData && <SqlResultTable result={result} className="border-0" />}
+              {!isDone && !isError && (
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-600 gap-3">
+                  <Loader2 size={24} className="animate-spin text-[var(--nothing-green)]" />
+                  <span className="text-[10px] uppercase tracking-[0.2em] font-bold">Executing Query...</span>
+                </div>
+              )}
+              {isDone && !hasError && !hasData && (
+                <div className="py-12 text-center text-[10px] text-zinc-600 uppercase tracking-widest font-bold">
+                  Zero Rows Returned
+                </div>
+              )}
+            </div>
+          </SandboxTabContent>
+        </SandboxTabs>
+      </SandboxContent>
+    </Sandbox>
   );
 }
 
@@ -1044,36 +1075,55 @@ function CadenceToolPart({ part }: { part: any }) {
   const script: string | undefined = (part.input?.script as string) ?? (part.args?.script as string);
 
   return (
-    <div className="space-y-1">
-      {script && (
-        <CollapsibleCode
-          code={script}
-          language="cadence"
-          label="Cadence Script"
-          icon={
-            <>
-              <Sparkles size={11} className="text-purple-400" />
-              {!isDone && !isError && <Loader2 size={10} className="animate-spin text-zinc-400" />}
-            </>
-          }
-        />
-      )}
-      {!script && !isDone && !isError && (
-        <div className="flex items-center gap-2 py-1">
-          <Sparkles size={12} className="text-purple-400" />
-          <Loader2 size={12} className="animate-spin text-zinc-400" />
-        </div>
-      )}
-      {hasError && (
-        <div className="px-3 py-2 text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-sm">
-          {isError ? (part.errorText || "Script failed") : result?.error}
-        </div>
-      )}
-      {isDone && !hasError && result?.result && (
-        <div className="px-3 py-2 text-[12px] text-zinc-300 bg-zinc-900 border border-white/10 rounded-sm font-mono whitespace-pre-wrap">
-          {typeof result.result === "string" ? result.result : JSON.stringify(result.result, null, 2)}
-        </div>
-      )}
-    </div>
+    <Sandbox className="border-white/5 bg-black !rounded-none !mb-4">
+      <SandboxHeader
+        title="CADENCE MODULE"
+        state={part.state}
+        className="px-4 py-2.5 bg-zinc-950/50"
+      />
+      <SandboxContent>
+        <SandboxTabs defaultValue="result">
+          <SandboxTabsBar className="bg-zinc-950/80">
+            <SandboxTabsList>
+              <SandboxTabsTrigger value="script" className="text-[10px] uppercase tracking-widest px-4 py-2">Script</SandboxTabsTrigger>
+              <SandboxTabsTrigger value="result" className="text-[10px] uppercase tracking-widest px-4 py-2">Output</SandboxTabsTrigger>
+            </SandboxTabsList>
+          </SandboxTabsBar>
+          <SandboxTabContent value="script">
+            <div className="p-0">
+              <SyntaxHighlighter
+                language="swift"
+                style={vscDarkPlus}
+                customStyle={{ margin: 0, padding: "16px", fontSize: "12px", lineHeight: "1.6", background: "#050505", borderRadius: 0 }}
+                wrapLongLines
+              >
+                {script || ""}
+              </SyntaxHighlighter>
+            </div>
+          </SandboxTabContent>
+          <SandboxTabContent value="result">
+            <div className="min-h-[100px]">
+              {hasError && (
+                <div className="px-4 py-3 text-[12px] text-red-400 bg-red-500/10 border border-red-500/20 m-4">
+                  {isError ? (part.errorText || "Script failed") : result?.error}
+                </div>
+              )}
+              {isDone && !hasError && result?.result && (
+                <div className="px-4 py-3 text-[12px] text-zinc-300 bg-zinc-900 border border-white/5 m-4 font-mono whitespace-pre-wrap">
+                  {typeof result.result === "string" ? result.result : JSON.stringify(result.result, null, 2)}
+                </div>
+              )}
+              {!isDone && !isError && (
+                <div className="flex flex-col items-center justify-center py-12 text-zinc-600 gap-3">
+                  <Loader2 size={24} className="animate-spin text-purple-400" />
+                  <span className="text-[10px] uppercase tracking-[0.2em] font-bold">Running Script...</span>
+                </div>
+              )}
+            </div>
+          </SandboxTabContent>
+        </SandboxTabs>
+      </SandboxContent>
+    </Sandbox>
   );
 }
+
