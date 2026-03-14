@@ -20,7 +20,9 @@ RUN cd ai/chat/web && bun install
 
 # Build shared packages (generate dist/ via tsup)
 RUN cd packages/flow-passkey && bun run build \
- && cd ../auth-core && bun run build
+ && cd ../auth-core && bun run build \
+ && cd ../flowtoken && bun run build \
+ && cd ../flow-ui && bun run build
 
 # Copy app source and build
 COPY ai/chat/web/ ./ai/chat/web/
