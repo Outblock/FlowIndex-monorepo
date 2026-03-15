@@ -16,10 +16,10 @@ type EVMSubTab = 'transactions' | 'internal' | 'transfers' | 'tokens' | 'nfts';
 interface EVMViewEmbedProps {
     evmAddress: string;
     flowAddress: string;
-    viewSwitcher?: React.ReactNode;
+    onSwitchToCadence?: () => void;
 }
 
-export function EVMViewEmbed({ evmAddress, flowAddress, viewSwitcher }: EVMViewEmbedProps) {
+export function EVMViewEmbed({ evmAddress, flowAddress, onSwitchToCadence }: EVMViewEmbedProps) {
     const [addressInfo, setAddressInfo] = useState<BSAddress | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<EVMSubTab>('transactions');
@@ -115,13 +115,25 @@ export function EVMViewEmbed({ evmAddress, flowAddress, viewSwitcher }: EVMViewE
                 </GlassCard>
             </div>
 
-            {/* VM View Switcher */}
-            {viewSwitcher}
-
             {/* Tabs & Content */}
             <div className="space-y-6">
-                {/* Mobile Tab Selector */}
-                <div className="md:hidden sticky top-2 z-50">
+                {/* Mobile: VM switcher + tab selector */}
+                <div className="md:hidden sticky top-2 z-50 space-y-1.5">
+                    {onSwitchToCadence && (
+                        <div className="flex gap-1">
+                            <button
+                                onClick={onSwitchToCadence}
+                                className="flex-1 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-white/10"
+                            >
+                                Cadence
+                            </button>
+                            <button
+                                className="flex-1 px-3 py-2 text-[10px] font-bold uppercase tracking-widest bg-violet-500/80 text-white"
+                            >
+                                EVM
+                            </button>
+                        </div>
+                    )}
                     <select
                         value={activeTab}
                         onChange={(e) => setActiveTab(e.target.value as EVMSubTab)}
@@ -136,6 +148,24 @@ export function EVMViewEmbed({ evmAddress, flowAddress, viewSwitcher }: EVMViewE
                 {/* Desktop Tab Bar */}
                 <div className="hidden md:block sticky top-4 z-50">
                     <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-lg border border-zinc-200 dark:border-white/10 p-1.5 inline-flex flex-wrap gap-1 max-w-full overflow-x-auto">
+                        {/* VM Switcher */}
+                        {onSwitchToCadence && (
+                            <>
+                                <button
+                                    onClick={onSwitchToCadence}
+                                    className="relative px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap text-zinc-500 hover:text-nothing-green-dark dark:hover:text-nothing-green transition-colors"
+                                >
+                                    Cadence
+                                </button>
+                                <button
+                                    className="relative px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap bg-violet-500/80 text-white shadow-sm"
+                                >
+                                    EVM
+                                </button>
+                                <div className="w-px self-stretch bg-zinc-200 dark:bg-zinc-700 mx-1" />
+                            </>
+                        )}
+                        {/* Content Tabs */}
                         {tabs.map(({ id, label, icon: Icon }) => {
                             const isActive = activeTab === id;
                             return (

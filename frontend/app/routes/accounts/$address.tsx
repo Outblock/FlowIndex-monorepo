@@ -302,35 +302,7 @@ function AccountDetail() {
     const stakedValue = [...(onChainData?.staking?.nodeInfos || []), ...(onChainData?.staking?.delegatorInfos || [])]
         .reduce((sum, info) => sum + Number(info.tokensStaked || 0), 0);
 
-    // Cadence / EVM view switcher — only rendered for COA accounts
-    const viewSwitcher = onChainData?.coaAddress ? (
-        <div className="inline-flex items-center gap-1 mb-4">
-            <button
-                onClick={() => navigate({ search: { view: undefined } as any, replace: true })}
-                className={cn(
-                    "inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
-                    searchView !== 'evm'
-                        ? "bg-nothing-green text-black shadow-sm"
-                        : "text-zinc-400 dark:text-zinc-500 hover:text-nothing-green-dark dark:hover:text-nothing-green border border-zinc-200 dark:border-zinc-700"
-                )}
-            >
-                <span className={cn("w-1.5 h-1.5 shrink-0", searchView !== 'evm' ? "bg-black/20" : "bg-nothing-green")} />
-                Cadence
-            </button>
-            <button
-                onClick={() => navigate({ search: { view: 'evm' } as any, replace: true })}
-                className={cn(
-                    "inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
-                    searchView === 'evm'
-                        ? "bg-violet-600 text-white dark:bg-violet-500 shadow-sm"
-                        : "text-zinc-400 dark:text-zinc-500 hover:text-violet-600 dark:hover:text-violet-400 border border-zinc-200 dark:border-zinc-700"
-                )}
-            >
-                <span className={cn("w-1.5 h-1.5 shrink-0", searchView === 'evm' ? "bg-white/30" : "bg-violet-500")} />
-                EVM
-            </button>
-        </div>
-    ) : null;
+    const hasCOA = !!onChainData?.coaAddress;
 
     return (
         <div className="min-h-screen bg-gray-50/50 dark:bg-black text-zinc-900 dark:text-white font-mono transition-colors duration-300 selection:bg-nothing-green selection:text-black">
@@ -575,13 +547,25 @@ function AccountDetail() {
                             </GlassCard>
                         </div>
 
-                        {/* VM View Switcher */}
-                        {viewSwitcher}
-
                         {/* Tabs & Content */}
                         <div className="space-y-6">
-                            {/* Mobile Tab Selector */}
-                            <div className="md:hidden sticky top-2 z-50">
+                            {/* Mobile: VM switcher + tab selector */}
+                            <div className="md:hidden sticky top-2 z-50 space-y-1.5">
+                                {hasCOA && (
+                                    <div className="flex gap-1">
+                                        <button
+                                            className="flex-1 px-3 py-2 text-[10px] font-bold uppercase tracking-widest bg-nothing-green/80 text-black"
+                                        >
+                                            Cadence
+                                        </button>
+                                        <button
+                                            onClick={() => navigate({ search: { view: 'evm' } as any, replace: true })}
+                                            className="flex-1 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-white/10"
+                                        >
+                                            EVM
+                                        </button>
+                                    </div>
+                                )}
                                 <select
                                     value={activeTab}
                                     onChange={(e) => setActiveTab(e.target.value as AccountTab)}
@@ -596,6 +580,24 @@ function AccountDetail() {
                             {/* Desktop Floating Tab Bar */}
                             <div className="hidden md:block sticky top-4 z-50">
                                 <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-lg border border-zinc-200 dark:border-white/10 p-1.5 inline-flex flex-wrap gap-1 max-w-full overflow-x-auto relative">
+                                    {/* VM Switcher (only for COA) */}
+                                    {hasCOA && (
+                                        <>
+                                            <button
+                                                className="relative px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap bg-nothing-green/80 text-black shadow-sm"
+                                            >
+                                                Cadence
+                                            </button>
+                                            <button
+                                                onClick={() => navigate({ search: { view: 'evm' } as any, replace: true })}
+                                                className="relative px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap text-zinc-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                                            >
+                                                EVM
+                                            </button>
+                                            <div className="w-px self-stretch bg-zinc-200 dark:bg-zinc-700 mx-1" />
+                                        </>
+                                    )}
+                                    {/* Content Tabs */}
                                     {tabs.map(({ id, label, icon: Icon }) => {
                                         const isActive = activeTab === id;
                                         return (
@@ -642,7 +644,7 @@ function AccountDetail() {
                     <EVMViewEmbed
                         evmAddress={onChainData.coaAddress.startsWith('0x') ? onChainData.coaAddress : `0x${onChainData.coaAddress}`}
                         flowAddress={normalizedAddress}
-                        viewSwitcher={viewSwitcher}
+                        onSwitchToCadence={() => navigate({ search: { view: undefined } as any, replace: true })}
                     />
                 )}
             </div>

@@ -197,8 +197,23 @@ export function EVMAccountPage({ address, flowAddress, isCOA, initialTab }: EVMA
 
         {/* Tabs */}
         <div className="space-y-6">
-          {/* Mobile Tab Selector */}
-          <div className="md:hidden sticky top-2 z-50">
+          {/* Mobile: VM switcher + tab selector */}
+          <div className="md:hidden sticky top-2 z-50 space-y-1.5">
+            {isCOA && flowAddress && (
+              <div className="flex gap-1">
+                <Link
+                  to={`/accounts/${flowAddress}` as any}
+                  className="flex-1 px-3 py-2 text-[10px] text-center font-bold uppercase tracking-widest text-zinc-400 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-white/10"
+                >
+                  Cadence
+                </Link>
+                <button
+                  className="flex-1 px-3 py-2 text-[10px] font-bold uppercase tracking-widest bg-violet-500/80 text-white"
+                >
+                  EVM
+                </button>
+              </div>
+            )}
             <select
               value={activeTab}
               onChange={(e) => handleTabChange(e.target.value as EVMTab)}
@@ -213,6 +228,24 @@ export function EVMAccountPage({ address, flowAddress, isCOA, initialTab }: EVMA
           {/* Desktop Tab Bar */}
           <div className="hidden md:block sticky top-4 z-50">
             <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-lg border border-zinc-200 dark:border-white/10 p-1.5 inline-flex flex-wrap gap-1 max-w-full overflow-x-auto">
+              {/* VM Switcher (only for COA) */}
+              {isCOA && flowAddress && (
+                <>
+                  <Link
+                    to={`/accounts/${flowAddress}` as any}
+                    className="relative px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap text-zinc-500 hover:text-nothing-green-dark dark:hover:text-nothing-green transition-colors"
+                  >
+                    Cadence
+                  </Link>
+                  <button
+                    className="relative px-4 py-2 text-xs font-bold uppercase tracking-wider flex items-center gap-2 whitespace-nowrap bg-violet-500/80 text-white shadow-sm"
+                  >
+                    EVM
+                  </button>
+                  <div className="w-px self-stretch bg-zinc-200 dark:bg-zinc-700 mx-1" />
+                </>
+              )}
+              {/* Content Tabs */}
               {tabs.map(({ id, label, icon: Icon }) => {
                 const isActive = activeTab === id;
                 return (
