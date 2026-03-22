@@ -72,7 +72,7 @@ function getFlatItems(state: SearchState): FlatItem[] {
     if (state.previewData && state.previewType === 'tx') {
       const data = state.previewData as TxPreviewResponse;
       if (data.cadence) items.push({ route: `/txs/${data.cadence.id}`, label: 'Cadence Transaction' });
-      if (data.evm) items.push({ route: `/txs/${data.evm.hash}?view=evm`, label: 'EVM Transaction' });
+      if (data.evm) items.push({ route: `/txs/evm/${data.evm.hash}`, label: 'EVM Transaction' });
       if (data.scheduled) {
         items.push({ route: `/scheduled/${data.scheduled.scheduled_id}`, label: 'Scheduled Transaction' });
         // Also add a link to the tx detail page if no cadence entry already covers it
@@ -394,7 +394,7 @@ export const SearchDropdown = forwardRef<SearchDropdownHandle, SearchDropdownPro
                         <button
                           type="button"
                           data-index={idx}
-                          onClick={() => goTo(`/txs/${data.evm!.hash}?view=evm`)}
+                          onClick={() => goTo(`/txs/evm/${data.evm!.hash}`)}
                           className={`flex w-full flex-col gap-1 border-l-2 px-3 py-2.5 text-left transition-colors ${
                             activeIndex === idx
                               ? 'border-l-nothing-green bg-nothing-green/5'

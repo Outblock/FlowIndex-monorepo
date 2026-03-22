@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
 import { AddressLink, avatarVariant, colorsFromAddress } from '../../components/AddressLink';
 import Avatar from 'boring-avatars';
 import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
@@ -31,7 +31,6 @@ import { UsdValue } from '../../components/UsdValue';
 import { parseCadenceError } from '../../lib/parseCadenceError';
 import { sha256Hex, normalizedScriptHash } from '../../lib/normalizeScript';
 import { EVMTxDetail } from '@/components/evm/EVMTxDetail';
-import { getEVMTransaction } from '@/api/evm';
 import type { BSTransaction } from '@/types/blockscout';
 
 SyntaxHighlighter.registerLanguage('cadence', swift);
@@ -564,17 +563,9 @@ export const Route = createFileRoute('/txs/$txId')({
         try {
             const forceEVM = (search as any)?.view === 'evm';
 
-            // If ?view=evm, ONLY try Blockscout — never fall through to Cadence
+            // If ?view=evm, redirect to the dedicated EVM tx page
             if (forceEVM && /^0x[0-9a-fA-F]{64}$/.test(params.txId)) {
-                try {
-                    const evmTx = await getEVMTransaction(params.txId);
-                    if (evmTx?.hash) {
-                        return { transaction: null, evmTransaction: evmTx as BSTransaction, isEVM: true, error: null as string | null };
-                    }
-                } catch {
-                    // Blockscout failed
-                }
-                return { transaction: null, evmTransaction: null as BSTransaction | null, isEVM: false, error: 'EVM transaction not found in Blockscout' };
+                throw redirect({ to: '/txs/evm/$txId', params: { txId: params.txId } });
             }
 
             const baseUrl = await resolveApiBaseUrl();
@@ -601,35 +592,22 @@ export const Route = createFileRoute('/txs/$txId')({
             }
             // Backend's /flow/transaction/{id} already checks evm_tx_hashes
             // and evm_transactions tables for EVM hash → Cadence tx resolution.
-            // If it returned 404, the EVM hash isn't indexed yet — try Blockscout EVM proxy.
+            // If it returned 404 and txId looks like an EVM hash, redirect to the EVM page.
             if (res.status === 404 || !res.ok) {
-                // Fallback: if txId looks like an EVM hash, try Blockscout proxy
                 if (/^0x[0-9a-fA-F]{64}$/.test(params.txId)) {
-                    try {
-                        const evmTx = await getEVMTransaction(params.txId);
-                        if (evmTx?.hash) {
-                            return { transaction: null, evmTransaction: evmTx as BSTransaction, isEVM: true, error: null as string | null };
-                        }
-                    } catch {
-                        // EVM fetch failed too — fall through to not-found
-                    }
+                    throw redirect({ to: '/txs/evm/$txId', params: { txId: params.txId } });
                 }
                 return { transaction: null, evmTransaction: null as BSTransaction | null, isEVM: false, error: res.status === 404 ? 'Transaction not found' : 'Failed to load transaction details' };
             }
             return { transaction: null, evmTransaction: null as BSTransaction | null, isEVM: false, error: 'Failed to load transaction details' };
         } catch (e) {
+            // Re-throw redirects
+            if ((e as any)?.isRedirect || (e as any)?.status === 301 || (e as any)?.status === 302) throw e;
             const message = (e as any)?.message;
             console.error('Failed to load transaction data', { message });
-            // Also try EVM fallback on network errors
+            // If txId looks like an EVM hash, redirect to the EVM page
             if (/^0x[0-9a-fA-F]{64}$/.test(params.txId)) {
-                try {
-                    const evmTx = await getEVMTransaction(params.txId);
-                    if (evmTx?.hash) {
-                        return { transaction: null, evmTransaction: evmTx as BSTransaction, isEVM: true, error: null as string | null };
-                    }
-                } catch {
-                    // EVM fetch failed too
-                }
+                throw redirect({ to: '/txs/evm/$txId', params: { txId: params.txId } });
             }
             return { transaction: null, evmTransaction: null as BSTransaction | null, isEVM: false, error: 'Failed to load transaction details' };
         }
