@@ -1,9 +1,13 @@
 /**
- * FlowIndex API client — thin wrapper around the FlowIndex REST API.
+ * FlowIndex API client for agent-wallet.
  *
- * Default base URL is https://flowindex.io/api. The API routes live under
- * /api/flow/... on the public domain.
+ * Re-exports FlowIndexClient from @flowindex/api-client and extends it with
+ * agent-wallet-specific helpers: simulateTransaction and getFlowBalance.
  */
+export type { FlowIndexClientConfig, Block, Transaction, EvmTransaction, Account, EvmAddress, SearchResponse } from '@flowindex/api-client';
+export { FlowIndexApiError } from '@flowindex/api-client';
+import { FlowIndexClient as BaseFlowIndexClient } from '@flowindex/api-client';
+
 export interface JsonCdcValue {
   type: string;
   value: unknown;
@@ -54,13 +58,29 @@ export interface SimulateTransactionResponse {
   events: Array<{ type: string; payload: unknown }>;
 }
 
-export class FlowIndexClient {
-  constructor(
-    private baseUrl: string,
-    private simulatorUrl = 'https://simulator.flowindex.io/api',
-  ) {}
+/**
+ * Agent-wallet extended client. Accepts positional constructor args
+ * (baseUrl, simulatorUrl) to maintain backward compatibility with
+ * simulate/template.ts and existing tests.
+ *
+ * Adds simulateTransaction and getFlowBalance (convenience wrapper
+ * that extracts FlowToken from FT holdings) on top of the shared
+ * BaseFlowIndexClient from @flowindex/api-client.
+ */
+export class AgentWalletClient extends BaseFlowIndexClient {
+  private readonly agentBaseUrl: string;
+  private readonly simulatorUrl: string;
 
-  private async request(url: string, init?: RequestInit): Promise<unknown> {
+  constructor(
+    baseUrl: string,
+    simulatorUrl = 'https://simulator.flowindex.io/api',
+  ) {
+    super({ baseUrl });
+    this.agentBaseUrl = baseUrl.replace(/\/+$/, '');
+    this.simulatorUrl = simulatorUrl;
+  }
+
+  private async agentRequest(url: string, init?: RequestInit): Promise<unknown> {
     const resp = init ? await fetch(url, init) : await fetch(url);
     if (!resp.ok) {
       throw new Error(
@@ -70,25 +90,32 @@ export class FlowIndexClient {
     return resp.json();
   }
 
-  private async get(path: string): Promise<unknown> {
-    return this.request(`${this.baseUrl}${path}`);
+  private async agentGet(path: string): Promise<unknown> {
+    return this.agentRequest(`${this.agentBaseUrl}${path}`);
   }
 
-  private async post(url: string, body: unknown): Promise<unknown> {
-    return this.request(url, {
+  private async agentPost(url: string, body: unknown): Promise<unknown> {
+    return this.agentRequest(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
   }
 
-  async getAccount(address: string): Promise<unknown> {
-    return this.get(`/flow/account/${address}`);
+  /**
+   * Returns raw account response (not unwrapped) — same behavior as original client.
+   * Overrides the base getAccount which unwraps data[0].
+   */
+  override async getAccount(address: string): Promise<unknown> {
+    return this.agentGet(`/flow/account/${address}`);
   }
 
+  /**
+   * Returns FLOW balance by extracting FlowToken vault from FT holdings.
+   * Convenience method specific to agent-wallet.
+   */
   async getFlowBalance(address: string): Promise<unknown> {
-    // FLOW balance is included in the FT vaults response
-    const result = (await this.get(`/flow/account/${address}/ft`)) as {
+    const result = (await this.agentGet(`/flow/account/${address}/ft`)) as {
       data?: Array<{ token?: string; balance?: string }>;
     };
     const flowVault = result.data?.find((v) =>
@@ -101,20 +128,28 @@ export class FlowIndexClient {
   }
 
   async getFtBalances(address: string): Promise<unknown> {
-    return this.get(`/flow/account/${address}/ft`);
+    return this.agentGet(`/flow/account/${address}/ft`);
   }
 
   async getNftCollections(address: string): Promise<unknown> {
-    return this.get(`/flow/account/${address}/nft`);
+    return this.agentGet(`/flow/account/${address}/nft`);
   }
 
-  async getTransaction(txId: string): Promise<unknown> {
-    return this.get(`/flow/transaction/${txId}`);
+  /**
+   * Returns raw transaction response — same behavior as original client.
+   * The base getTransaction uses ?id= query param; original used /flow/transaction/:id.
+   */
+  override async getTransaction(txId: string): Promise<unknown> {
+    return this.agentGet(`/flow/transaction/${txId}`);
   }
 
   async simulateTransaction(
     request: SimulateTransactionRequest,
   ): Promise<SimulateTransactionResponse> {
-    return this.post(`${this.simulatorUrl}/simulate`, request) as Promise<SimulateTransactionResponse>;
+    return this.agentPost(`${this.simulatorUrl}/simulate`, request) as Promise<SimulateTransactionResponse>;
   }
 }
+
+// Re-export AgentWalletClient as FlowIndexClient for backward compatibility
+// with existing imports in simulate/template.ts and tests.
+export { AgentWalletClient as FlowIndexClient };

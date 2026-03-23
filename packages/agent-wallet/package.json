@@ -30,6 +30,7 @@
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js"
   },
   "dependencies": {
+    "@flowindex/api-client": "workspace:*",
     "@flowindex/flow-signer": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@onflow/fcl": "^1.21.9",
