@@ -33,6 +33,14 @@ jobs:
       - name: Build packages
         run: bun run build:packages
 
+      - name: Publish @flowindex/flow-passkey
+        working-directory: packages/flow-passkey
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npm view @flowindex/flow-passkey@$VERSION version 2>/dev/null && echo "Already published" || npm publish --access public
+
       - name: Publish @flowindex/flow-signer
         working-directory: packages/flow-signer
         env:
