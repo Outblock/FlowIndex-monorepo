@@ -7,7 +7,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const listenersRef = useRef(new Set<(data: any) => void>());
+    const subscribedAddressesRef = useRef(new Set<string>());
     const connectRef = useRef<(() => void) | null>(null);
+
+    const normalizeAddr = (addr: string) => addr.trim().toLowerCase().replace(/^0x/, '');
+
+    const sendToServer = useCallback((msg: object) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify(msg));
+        }
+    }, []);
 
     const notify = useCallback((payload: any) => {
         listenersRef.current.forEach((listener) => {
@@ -35,6 +44,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                 clearTimeout(reconnectTimeoutRef.current);
                 reconnectTimeoutRef.current = null;
             }
+            // Re-subscribe all tracked addresses on reconnect
+            subscribedAddressesRef.current.forEach((addr) => {
+                ws.send(JSON.stringify({ type: 'subscribe_address', address: addr }));
+            });
         };
 
         ws.onmessage = (event) => {
@@ -87,8 +100,22 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
+    const subscribeAddress = useCallback((address: string) => {
+        const addr = normalizeAddr(address);
+        if (!addr) return;
+        subscribedAddressesRef.current.add(addr);
+        sendToServer({ type: 'subscribe_address', address: addr });
+    }, [sendToServer]);
+
+    const unsubscribeAddress = useCallback((address: string) => {
+        const addr = normalizeAddr(address);
+        if (!addr) return;
+        subscribedAddressesRef.current.delete(addr);
+        sendToServer({ type: 'unsubscribe_address', address: addr });
+    }, [sendToServer]);
+
     const statusValue = useMemo(() => ({ isConnected }), [isConnected]);
-    const messageValue = useMemo(() => ({ subscribe }), [subscribe]);
+    const messageValue = useMemo(() => ({ subscribe, subscribeAddress, unsubscribeAddress }), [subscribe, subscribeAddress, unsubscribeAddress]);
 
     return (
         <WSStatusContext.Provider value={statusValue}>
