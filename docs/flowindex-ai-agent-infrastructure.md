@@ -78,7 +78,7 @@ graph TD
 | `run_evm_sql` | Direct SQL execution against EVM database |
 | `run_cadence` | Execute read-only Cadence scripts on mainnet |
 
-**Exposed via:** MCP server (port 8085) for direct agent integration, REST API (port 8084) for web/HTTP access.
+**Exposed via:** The **flow-data MCP server** — agents connect directly via MCP and use all tools natively, no REST calls or CLI needed.
 
 **Security:** Rate limiting (60 req/min), API key auth, admin key bypass, localhost bypass for internal calls.
 
