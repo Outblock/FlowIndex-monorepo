@@ -1,49 +1,47 @@
 # FlowIndex AI Agent Infrastructure
 
-## The Thesis
-
-On-chain scheduled transactions answer "Can the agent wake up?" — but that alone does not make a viable agent system. The question that matters for production autonomy is: **"Can the agent act correctly once awake?"**
-
-An on-chain body without perception, context, action tooling, simulation, and control boundaries is a concept, not a platform. What turns it into a platform is the **layer between off-chain intelligence and on-chain execution**.
-
-That is the layer we are building.
+The infrastructure layer between off-chain intelligence and on-chain execution — giving AI agents the perception, context, action tooling, simulation, and control boundaries they need to operate on Flow in production.
 
 ---
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        AI Agent (LLM)                               │
-│                Claude / GPT / Gemini / local models                 │
-└──────────────┬──────────────────────────────────────┬───────────────┘
-               │  MCP / REST / CLI                    │
-               ▼                                      ▼
-┌──────────────────────────┐    ┌──────────────────────────────────────┐
-│   Perception & Context   │    │      Action & Execution              │
-│                          │    │                                      │
-│  Indexer + Vanna AI      │    │  Agent Wallet (MCP)                  │
-│  (text-to-SQL → PG)     │    │  70 Cadence templates                │
-│  Cadence MCP (LSP)       │    │  EVM bridge + smart contracts        │
-│  Developer Portal        │    │  Preflight simulation                │
-│                          │    │  Two-step approval flow              │
-└──────────────────────────┘    └──────────────────────────────────────┘
-               │                              │
-               ▼                              ▼
-┌──────────────────────────┐    ┌──────────────────────────────────────┐
-│  Simulation & Validation │    │    Orchestration & Workflow           │
-│                          │    │                                      │
-│  Mainnet-fork emulator   │    │  Visual workflow builder              │
-│  Snapshot isolation      │    │  Block-based execution engine         │
-│  Event decoding          │    │  Trigger.dev scheduling               │
-│  Risk scoring            │    │  Multi-provider LLM routing           │
-└──────────────────────────┘    └──────────────────────────────────────┘
-               │                              │
-               ▼                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Flow Blockchain                                  │
-│           Cadence (native) + Flow EVM (545/747)                     │
-└─────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    Agent["AI Agent (LLM)<br/>Claude / GPT / Gemini / local models"]
+
+    subgraph Perception ["Perception & Context"]
+        Indexer["Indexer + Vanna AI<br/>(text-to-SQL → PostgreSQL)"]
+        CadenceMCP["Cadence MCP<br/>(LSP: type check, docs, symbols)"]
+        DevPortal["Developer Portal<br/>(API docs, llms.txt)"]
+    end
+
+    subgraph Action ["Action & Execution"]
+        Wallet["Agent Wallet MCP<br/>(27 tools, 70 Cadence templates)"]
+        EVM["EVM bridge +<br/>smart contracts"]
+        Approval["Two-step approval<br/>+ passkey signing"]
+    end
+
+    subgraph Simulation ["Simulation & Validation"]
+        Simulator["Mainnet-fork emulator<br/>(snapshot isolation)"]
+        EventDecode["Event decoding +<br/>risk scoring"]
+    end
+
+    subgraph Orchestration ["Orchestration & Workflow"]
+        Workflow["Visual workflow builder"]
+        Trigger["Trigger.dev scheduling"]
+        LLM["Multi-provider LLM routing"]
+    end
+
+    Flow["Flow Blockchain<br/>Cadence (native) + Flow EVM"]
+
+    Agent -->|MCP / REST| Perception
+    Agent -->|MCP| Action
+    Action -->|preflight| Simulation
+    Perception --> Flow
+    Action --> Flow
+    Simulation --> Flow
+    Orchestration --> Agent
 ```
 
 ---
@@ -303,5 +301,3 @@ Auto-deploys from `main` via GitHub Actions with path-based filtering.
 | **Action** | Agent Wallet (27 tools, 70 templates, 4 signing modes) | Production |
 | **Identity** | Passkey wallet, ERC-4337 smart accounts, COA bridging | Production |
 | **Orchestration** | Workflow builder, Trigger.dev scheduling | In Development |
-
-If scheduled transactions answer "Can the agent wake up?", this stack answers **"Can the agent perceive, reason, validate, and act correctly once awake?"**
