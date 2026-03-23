@@ -22,11 +22,11 @@ That is the layer we are building.
 ┌──────────────────────────┐    ┌──────────────────────────────────────┐
 │   Perception & Context   │    │      Action & Execution              │
 │                          │    │                                      │
-│  Indexer API             │    │  Agent Wallet (MCP)                  │
-│  AI Chat / Text-to-SQL   │    │  70 Cadence templates                │
+│  Indexer + Vanna AI      │    │  Agent Wallet (MCP)                  │
+│  (text-to-SQL → PG)     │    │  70 Cadence templates                │
 │  Cadence MCP (LSP)       │    │  EVM bridge + smart contracts        │
-│  CLI / API Client        │    │  Preflight simulation                │
-│  Developer Portal        │    │  Two-step approval flow              │
+│  Developer Portal        │    │  Preflight simulation                │
+│                          │    │  Two-step approval flow              │
 └──────────────────────────┘    └──────────────────────────────────────┘
                │                              │
                ▼                              ▼
@@ -48,13 +48,15 @@ That is the layer we are building.
 
 ---
 
-## 1. Indexer — Agent-Readable Chain State
+## 1. Indexer + AI Query Layer — Agent-Readable Chain State
 
-**What:** High-performance Go indexer with concurrent pipeline ingestion, serving both raw and derived blockchain data via REST API + WebSocket.
+**What:** High-performance Go indexer that ingests the entire Flow blockchain into PostgreSQL, paired with a Vanna AI layer that lets agents query the database directly via natural language — far more flexible and data-rich than any REST API.
 
-**Why agents need it:** LLMs cannot read raw blockchain state. The indexer transforms Flow's entire history — blocks, transactions, events, token transfers, NFT ownership, staking, DeFi positions, contract metadata — into structured, queryable API endpoints that agents can consume directly.
+**Why agents need it:** LLMs cannot read raw blockchain state. The indexer transforms Flow's full history into a comprehensive PostgreSQL schema — blocks, transactions, events, token transfers, NFT ownership, staking positions, DeFi activity, contract metadata, market prices, and more. Rather than constraining agents to pre-defined API endpoints, we expose this data through **Vanna AI (text-to-SQL)**, allowing agents to ask arbitrary questions against the full dataset and get back structured results.
 
-**Key capabilities:**
+**The key insight:** REST APIs return what their designers anticipated. SQL returns what the agent actually needs. An agent asking "Which wallets interacted with both IncrementFi and FlowSwap in the last 7 days?" would require custom API work on a traditional explorer. With our stack, it's a single natural language query that Vanna translates to SQL and executes directly.
+
+**Indexer capabilities:**
 
 | Capability | Detail |
 |---|---|
@@ -62,18 +64,9 @@ That is the layer we are building.
 | Full history | Backward ingester with spork-aware backfill across all Flow sporks |
 | Dual-chain | Native Cadence data + Flow EVM transactions, events, and contracts |
 | 17 workers | Token, EVM, staking, DeFi, NFT ownership, account keys, metrics, and more |
-| REST API | `/blocks`, `/transactions`, `/accounts/{address}`, `/ft`, `/nft`, `/staking`, `/defi`, `/contracts` |
-| WebSocket | `/ws` for live block and transaction streaming |
+| Comprehensive schema | `raw.*` (blocks, transactions, events) + `app.*` (derived: transfers, holdings, contracts, staking, DeFi, market prices) + `analytics.*` |
 
-**Agent integration:** Any agent with HTTP access can query chain state. The API client package (`@flowindex/api-client`) and CLI (`@flowindex/cli`) provide typed, ergonomic wrappers.
-
----
-
-## 2. AI Chat & Text-to-SQL — Natural Language Chain Queries
-
-**What:** Dual-target Vanna service (FlowIndex + Flow EVM Blockscout) that converts natural language questions into SQL, executes them, and returns structured results.
-
-**Why agents need it:** Raw SQL against a 200+ column blockchain schema is error-prone. The AI chat layer lets agents ask "What are the top 10 tokens by transfer volume this week?" and get correct, executable SQL + results — without knowing table names or join conditions.
+**AI query layer (Vanna):**
 
 **Key capabilities:**
 
@@ -93,7 +86,7 @@ That is the layer we are building.
 
 ---
 
-## 3. Agent Wallet — Identity, Authorization & Asset Control
+## 2. Agent Wallet — Identity, Authorization & Asset Control
 
 **What:** Production MCP server (`@flowindex/agent-wallet`) that gives AI agents a full Flow blockchain wallet with 27 tools, 70 Cadence templates, and multi-mode signing.
 
@@ -133,7 +126,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 4. Transaction Simulator — Pre-Execution Validation
+## 3. Transaction Simulator — Pre-Execution Validation
 
 **What:** Flow Emulator running in mainnet-fork mode with a Go API layer that provides isolated transaction simulation with snapshot rollback.
 
@@ -156,7 +149,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 5. Cadence MCP — Agent-Native Code Intelligence
+## 4. Cadence MCP — Agent-Native Code Intelligence
 
 **What:** MCP server providing Cadence Language Server Protocol capabilities — syntax checking, type information, symbol navigation, and documentation search — directly to AI agents.
 
@@ -188,7 +181,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 6. Cadence Runner — Interactive Playground
+## 5. Cadence Runner — Interactive Playground
 
 **What:** Web-based Cadence editor with Monaco, in-browser Language Server, AI chat assistant, and direct wallet integration for signing and submitting transactions.
 
@@ -203,7 +196,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 7. Workflow Builder — Reusable Execution Patterns
+## 6. Workflow Builder — Reusable Execution Patterns
 
 **What:** Visual, block-based workflow orchestrator with triggers, tools, and an execution engine backed by Trigger.dev.
 
@@ -218,7 +211,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 8. Developer Portal — Documentation & API Reference
+## 7. Developer Portal — Documentation & API Reference
 
 **What:** Fumadocs-based documentation site with Scalar interactive API explorer, serving guides, API reference, and OpenAPI spec.
 
@@ -231,7 +224,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 9. Wallet Infrastructure — Multi-Layer Identity
+## 8. Wallet Infrastructure — Multi-Layer Identity
 
 Beyond the agent wallet MCP server, the wallet infrastructure includes:
 
