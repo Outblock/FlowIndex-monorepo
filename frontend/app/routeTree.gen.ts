@@ -46,6 +46,7 @@ import { Route as DeveloperKeysRouteImport } from './routes/developer/keys'
 import { Route as DeveloperEndpointsRouteImport } from './routes/developer/endpoints'
 import { Route as DeveloperCallbackRouteImport } from './routes/developer/callback'
 import { Route as ContractsIdRouteImport } from './routes/contracts/$id'
+import { Route as ContractsEvmAddressRouteImport } from './routes/contracts/evm/$address'
 import { Route as BlocksHeightRouteImport } from './routes/blocks/$height'
 import { Route as AgentAuthRouteImport } from './routes/agent/auth'
 import { Route as AccountsAddressRouteImport } from './routes/accounts/$address'
@@ -241,6 +242,11 @@ const ContractsIdRoute = ContractsIdRouteImport.update({
   path: '/contracts/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ContractsEvmAddressRoute = ContractsEvmAddressRouteImport.update({
+  id: '/contracts/evm/$address',
+  path: '/contracts/evm/$address',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BlocksHeightRoute = BlocksHeightRouteImport.update({
   id: '/blocks/$height',
   path: '/blocks/$height',
@@ -304,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/agent/auth': typeof AgentAuthRoute
   '/blocks/$height': typeof BlocksHeightRoute
   '/contracts/$id': typeof ContractsIdRoute
+  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/callback': typeof DeveloperCallbackRoute
   '/developer/endpoints': typeof DeveloperEndpointsRoute
   '/developer/keys': typeof DeveloperKeysRoute
@@ -352,6 +359,7 @@ export interface FileRoutesByTo {
   '/agent/auth': typeof AgentAuthRoute
   '/blocks/$height': typeof BlocksHeightRoute
   '/contracts/$id': typeof ContractsIdRoute
+  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/callback': typeof DeveloperCallbackRoute
   '/developer/endpoints': typeof DeveloperEndpointsRoute
   '/developer/keys': typeof DeveloperKeysRoute
@@ -399,6 +407,7 @@ export interface FileRoutesById {
   '/agent/auth': typeof AgentAuthRoute
   '/blocks/$height': typeof BlocksHeightRoute
   '/contracts/$id': typeof ContractsIdRoute
+  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/callback': typeof DeveloperCallbackRoute
   '/developer/endpoints': typeof DeveloperEndpointsRoute
   '/developer/keys': typeof DeveloperKeysRoute
@@ -449,6 +458,7 @@ export interface FileRouteTypes {
     | '/agent/auth'
     | '/blocks/$height'
     | '/contracts/$id'
+    | '/contracts/evm/$address'
     | '/developer/callback'
     | '/developer/endpoints'
     | '/developer/keys'
@@ -497,6 +507,7 @@ export interface FileRouteTypes {
     | '/agent/auth'
     | '/blocks/$height'
     | '/contracts/$id'
+    | '/contracts/evm/$address'
     | '/developer/callback'
     | '/developer/endpoints'
     | '/developer/keys'
@@ -543,6 +554,7 @@ export interface FileRouteTypes {
     | '/agent/auth'
     | '/blocks/$height'
     | '/contracts/$id'
+    | '/contracts/evm/$address'
     | '/developer/callback'
     | '/developer/endpoints'
     | '/developer/keys'
@@ -592,6 +604,7 @@ export interface RootRouteChildren {
   AgentAuthRoute: typeof AgentAuthRoute
   BlocksHeightRoute: typeof BlocksHeightRoute
   ContractsIdRoute: typeof ContractsIdRoute
+  ContractsEvmAddressRoute: typeof ContractsEvmAddressRoute
   DeveloperCallbackRoute: typeof DeveloperCallbackRoute
   DeveloperEndpointsRoute: typeof DeveloperEndpointsRoute
   DeveloperKeysRoute: typeof DeveloperKeysRoute
@@ -883,6 +896,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContractsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/contracts/evm/$address': {
+      id: '/contracts/evm/$address'
+      path: '/contracts/evm/$address'
+      fullPath: '/contracts/evm/$address'
+      preLoaderRoute: typeof ContractsEvmAddressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/blocks/$height': {
       id: '/blocks/$height'
       path: '/blocks/$height'
@@ -994,6 +1014,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentAuthRoute: AgentAuthRoute,
   BlocksHeightRoute: BlocksHeightRoute,
   ContractsIdRoute: ContractsIdRoute,
+  ContractsEvmAddressRoute: ContractsEvmAddressRoute,
   DeveloperCallbackRoute: DeveloperCallbackRoute,
   DeveloperEndpointsRoute: DeveloperEndpointsRoute,
   DeveloperKeysRoute: DeveloperKeysRoute,
