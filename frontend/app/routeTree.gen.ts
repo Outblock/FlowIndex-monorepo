@@ -46,7 +46,6 @@ import { Route as DeveloperKeysRouteImport } from './routes/developer/keys'
 import { Route as DeveloperEndpointsRouteImport } from './routes/developer/endpoints'
 import { Route as DeveloperCallbackRouteImport } from './routes/developer/callback'
 import { Route as ContractsIdRouteImport } from './routes/contracts/$id'
-import { Route as ContractsEvmAddressRouteImport } from './routes/contracts/evm/$address'
 import { Route as BlocksHeightRouteImport } from './routes/blocks/$height'
 import { Route as AgentAuthRouteImport } from './routes/agent/auth'
 import { Route as AccountsAddressRouteImport } from './routes/accounts/$address'
@@ -55,6 +54,7 @@ import { Route as NftsNftTypeIndexRouteImport } from './routes/nfts/$nftType/ind
 import { Route as DeveloperSubscriptionsIndexRouteImport } from './routes/developer/subscriptions.index'
 import { Route as TxsEvmTxIdRouteImport } from './routes/txs/evm/$txId'
 import { Route as DeveloperSubscriptionsIdRouteImport } from './routes/developer/subscriptions.$id'
+import { Route as ContractsEvmAddressRouteImport } from './routes/contracts/evm/$address'
 import { Route as NftsNftTypeItemIdRouteImport } from './routes/nfts/$nftType/item/$id'
 
 const StatsRoute = StatsRouteImport.update({
@@ -242,11 +242,6 @@ const ContractsIdRoute = ContractsIdRouteImport.update({
   path: '/contracts/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContractsEvmAddressRoute = ContractsEvmAddressRouteImport.update({
-  id: '/contracts/evm/$address',
-  path: '/contracts/evm/$address',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BlocksHeightRoute = BlocksHeightRouteImport.update({
   id: '/blocks/$height',
   path: '/blocks/$height',
@@ -289,6 +284,11 @@ const DeveloperSubscriptionsIdRoute =
     path: '/$id',
     getParentRoute: () => DeveloperSubscriptionsRoute,
   } as any)
+const ContractsEvmAddressRoute = ContractsEvmAddressRouteImport.update({
+  id: '/contracts/evm/$address',
+  path: '/contracts/evm/$address',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NftsNftTypeItemIdRoute = NftsNftTypeItemIdRouteImport.update({
   id: '/item/$id',
   path: '/item/$id',
@@ -310,7 +310,6 @@ export interface FileRoutesByFullPath {
   '/agent/auth': typeof AgentAuthRoute
   '/blocks/$height': typeof BlocksHeightRoute
   '/contracts/$id': typeof ContractsIdRoute
-  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/callback': typeof DeveloperCallbackRoute
   '/developer/endpoints': typeof DeveloperEndpointsRoute
   '/developer/keys': typeof DeveloperKeysRoute
@@ -338,6 +337,7 @@ export interface FileRoutesByFullPath {
   '/transactions/': typeof TransactionsIndexRoute
   '/tx/': typeof TxIndexRoute
   '/txs/': typeof TxsIndexRoute
+  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/subscriptions/$id': typeof DeveloperSubscriptionsIdRoute
   '/txs/evm/$txId': typeof TxsEvmTxIdRoute
   '/developer/subscriptions/': typeof DeveloperSubscriptionsIndexRoute
@@ -359,7 +359,6 @@ export interface FileRoutesByTo {
   '/agent/auth': typeof AgentAuthRoute
   '/blocks/$height': typeof BlocksHeightRoute
   '/contracts/$id': typeof ContractsIdRoute
-  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/callback': typeof DeveloperCallbackRoute
   '/developer/endpoints': typeof DeveloperEndpointsRoute
   '/developer/keys': typeof DeveloperKeysRoute
@@ -385,6 +384,7 @@ export interface FileRoutesByTo {
   '/transactions': typeof TransactionsIndexRoute
   '/tx': typeof TxIndexRoute
   '/txs': typeof TxsIndexRoute
+  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/subscriptions/$id': typeof DeveloperSubscriptionsIdRoute
   '/txs/evm/$txId': typeof TxsEvmTxIdRoute
   '/developer/subscriptions': typeof DeveloperSubscriptionsIndexRoute
@@ -407,7 +407,6 @@ export interface FileRoutesById {
   '/agent/auth': typeof AgentAuthRoute
   '/blocks/$height': typeof BlocksHeightRoute
   '/contracts/$id': typeof ContractsIdRoute
-  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/callback': typeof DeveloperCallbackRoute
   '/developer/endpoints': typeof DeveloperEndpointsRoute
   '/developer/keys': typeof DeveloperKeysRoute
@@ -435,6 +434,7 @@ export interface FileRoutesById {
   '/transactions/': typeof TransactionsIndexRoute
   '/tx/': typeof TxIndexRoute
   '/txs/': typeof TxsIndexRoute
+  '/contracts/evm/$address': typeof ContractsEvmAddressRoute
   '/developer/subscriptions/$id': typeof DeveloperSubscriptionsIdRoute
   '/txs/evm/$txId': typeof TxsEvmTxIdRoute
   '/developer/subscriptions/': typeof DeveloperSubscriptionsIndexRoute
@@ -458,7 +458,6 @@ export interface FileRouteTypes {
     | '/agent/auth'
     | '/blocks/$height'
     | '/contracts/$id'
-    | '/contracts/evm/$address'
     | '/developer/callback'
     | '/developer/endpoints'
     | '/developer/keys'
@@ -486,6 +485,7 @@ export interface FileRouteTypes {
     | '/transactions/'
     | '/tx/'
     | '/txs/'
+    | '/contracts/evm/$address'
     | '/developer/subscriptions/$id'
     | '/txs/evm/$txId'
     | '/developer/subscriptions/'
@@ -507,7 +507,6 @@ export interface FileRouteTypes {
     | '/agent/auth'
     | '/blocks/$height'
     | '/contracts/$id'
-    | '/contracts/evm/$address'
     | '/developer/callback'
     | '/developer/endpoints'
     | '/developer/keys'
@@ -533,6 +532,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/tx'
     | '/txs'
+    | '/contracts/evm/$address'
     | '/developer/subscriptions/$id'
     | '/txs/evm/$txId'
     | '/developer/subscriptions'
@@ -554,7 +554,6 @@ export interface FileRouteTypes {
     | '/agent/auth'
     | '/blocks/$height'
     | '/contracts/$id'
-    | '/contracts/evm/$address'
     | '/developer/callback'
     | '/developer/endpoints'
     | '/developer/keys'
@@ -582,6 +581,7 @@ export interface FileRouteTypes {
     | '/transactions/'
     | '/tx/'
     | '/txs/'
+    | '/contracts/evm/$address'
     | '/developer/subscriptions/$id'
     | '/txs/evm/$txId'
     | '/developer/subscriptions/'
@@ -604,7 +604,6 @@ export interface RootRouteChildren {
   AgentAuthRoute: typeof AgentAuthRoute
   BlocksHeightRoute: typeof BlocksHeightRoute
   ContractsIdRoute: typeof ContractsIdRoute
-  ContractsEvmAddressRoute: typeof ContractsEvmAddressRoute
   DeveloperCallbackRoute: typeof DeveloperCallbackRoute
   DeveloperEndpointsRoute: typeof DeveloperEndpointsRoute
   DeveloperKeysRoute: typeof DeveloperKeysRoute
@@ -632,6 +631,7 @@ export interface RootRouteChildren {
   TransactionsIndexRoute: typeof TransactionsIndexRoute
   TxIndexRoute: typeof TxIndexRoute
   TxsIndexRoute: typeof TxsIndexRoute
+  ContractsEvmAddressRoute: typeof ContractsEvmAddressRoute
   TxsEvmTxIdRoute: typeof TxsEvmTxIdRoute
 }
 
@@ -896,13 +896,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContractsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contracts/evm/$address': {
-      id: '/contracts/evm/$address'
-      path: '/contracts/evm/$address'
-      fullPath: '/contracts/evm/$address'
-      preLoaderRoute: typeof ContractsEvmAddressRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/blocks/$height': {
       id: '/blocks/$height'
       path: '/blocks/$height'
@@ -959,6 +952,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeveloperSubscriptionsIdRouteImport
       parentRoute: typeof DeveloperSubscriptionsRoute
     }
+    '/contracts/evm/$address': {
+      id: '/contracts/evm/$address'
+      path: '/contracts/evm/$address'
+      fullPath: '/contracts/evm/$address'
+      preLoaderRoute: typeof ContractsEvmAddressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/nfts/$nftType/item/$id': {
       id: '/nfts/$nftType/item/$id'
       path: '/item/$id'
@@ -1014,7 +1014,6 @@ const rootRouteChildren: RootRouteChildren = {
   AgentAuthRoute: AgentAuthRoute,
   BlocksHeightRoute: BlocksHeightRoute,
   ContractsIdRoute: ContractsIdRoute,
-  ContractsEvmAddressRoute: ContractsEvmAddressRoute,
   DeveloperCallbackRoute: DeveloperCallbackRoute,
   DeveloperEndpointsRoute: DeveloperEndpointsRoute,
   DeveloperKeysRoute: DeveloperKeysRoute,
@@ -1042,6 +1041,7 @@ const rootRouteChildren: RootRouteChildren = {
   TransactionsIndexRoute: TransactionsIndexRoute,
   TxIndexRoute: TxIndexRoute,
   TxsIndexRoute: TxsIndexRoute,
+  ContractsEvmAddressRoute: ContractsEvmAddressRoute,
   TxsEvmTxIdRoute: TxsEvmTxIdRoute,
 }
 export const routeTree = rootRouteImport
