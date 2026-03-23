@@ -227,3 +227,67 @@ export interface AddressPreviewResponse {
   link: COALink | null;
   coa_link?: COALink | null; // backwards compat alias
 }
+
+// --- EVM Smart Contract Types ---
+
+export interface BSAddressParam {
+  hash: string;
+  name: string | null;
+  is_contract: boolean;
+  is_verified: boolean | null;
+  implementation_name: string | null;
+}
+
+export interface BSSmartContract {
+  address: BSAddressParam;
+  name: string | null;
+  compiler_version: string | null;
+  optimization_enabled: boolean | null;
+  optimization_runs: number | null;
+  evm_version: string | null;
+  verified_at: string | null;
+  is_verified: boolean;
+  source_code: string | null;
+  abi: any[] | null;
+  constructor_args: string | null;
+  creation_bytecode: string | null;
+  deployed_bytecode: string | null;
+  language: string | null;
+  license_type: string | null;
+  tx_count: number;
+  coin_balance: string | null;
+  additional_sources: Array<{
+    file_path: string;
+    source_code: string;
+  }> | null;
+}
+
+export interface BSSmartContractListItem {
+  address: BSAddressParam;
+  name: string | null;
+  compiler_version: string | null;
+  optimization_enabled: boolean | null;
+  is_verified: boolean;
+  language: string | null;
+  license_type: string | null;
+  tx_count: number;
+  coin_balance: string | null;
+  verified_at: string | null;
+}
+
+export interface BSSmartContractCounters {
+  smart_contracts: string;
+  verified_smart_contracts: string;
+  new_smart_contracts_24h: string;
+  verified_smart_contracts_24h: string;
+  new_verified_smart_contracts_24h: string;
+}
+
+export interface BSContractMethod {
+  type: string;
+  method_id: string;
+  name: string;
+  inputs: Array<{ name: string; type: string; value?: string }>;
+  outputs: Array<{ name: string; type: string; value?: string }>;
+  stateMutability: string;
+}

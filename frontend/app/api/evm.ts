@@ -11,6 +11,10 @@ import type {
   BSPaginatedResponse,
   TxPreviewResponse,
   AddressPreviewResponse,
+  BSSmartContract,
+  BSSmartContractListItem,
+  BSSmartContractCounters,
+  BSContractMethod,
 } from '@/types/blockscout';
 
 async function evmFetch<T>(path: string, params?: Record<string, string>, signal?: AbortSignal): Promise<T> {
@@ -112,4 +116,50 @@ export async function fetchSearchPreview(
   if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
   const json = await res.json();
   return json.data ?? json;
+}
+
+// --- Smart Contract endpoints ---
+
+export async function getEVMSmartContracts(
+  params?: Record<string, string>, signal?: AbortSignal
+): Promise<BSPaginatedResponse<BSSmartContractListItem>> {
+  return evmFetch('/smart-contracts', params, signal);
+}
+
+export async function getEVMSmartContractCounters(
+  signal?: AbortSignal
+): Promise<BSSmartContractCounters> {
+  return evmFetch('/smart-contracts/counters', undefined, signal);
+}
+
+export async function getEVMSmartContract(
+  address: string, signal?: AbortSignal
+): Promise<BSSmartContract> {
+  return evmFetch(`/smart-contracts/${address}`, undefined, signal);
+}
+
+export async function getEVMSmartContractMethodsRead(
+  address: string, signal?: AbortSignal
+): Promise<BSContractMethod[]> {
+  return evmFetch(`/smart-contracts/${address}/methods-read`, undefined, signal);
+}
+
+export async function getEVMSmartContractMethodsWrite(
+  address: string, signal?: AbortSignal
+): Promise<BSContractMethod[]> {
+  return evmFetch(`/smart-contracts/${address}/methods-write`, undefined, signal);
+}
+
+export async function queryEVMSmartContractReadMethod(
+  address: string, data: { method_id: string; args: string[] }, signal?: AbortSignal
+): Promise<any> {
+  const baseUrl = await resolveApiBaseUrl();
+  const res = await fetch(`${baseUrl}/flow/evm/smart-contracts/${address}/query-read-method`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Query failed: ${res.status}`);
+  return res.json();
 }
