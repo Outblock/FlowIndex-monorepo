@@ -9,11 +9,17 @@ The infrastructure layer between off-chain intelligence and on-chain execution �
 ```mermaid
 graph TD
     Agent["AI Agent (LLM)<br/>Claude / GPT / Gemini / local models"]
+    Dev["Developer"]
 
-    subgraph Perception ["Perception & Context"]
-        Indexer["Indexer + Vanna AI<br/>(text-to-SQL → PostgreSQL)"]
+    subgraph Data ["Data & Events"]
+        Indexer["Indexer<br/>(full chain → PostgreSQL)"]
+        EventBus["Event Bus<br/>(on-chain event triggers)"]
+    end
+
+    subgraph Context ["Context & Query"]
+        AIChat["AI Chat<br/>(session memory, habit learning)"]
+        FlowData["Flow Data MCP<br/>(text-to-SQL → PostgreSQL)"]
         CadenceMCP["Cadence MCP<br/>(LSP: type check, docs, symbols)"]
-        DevPortal["Developer Portal<br/>(API docs, llms.txt)"]
     end
 
     subgraph Action ["Action & Execution"]
@@ -35,40 +41,68 @@ graph TD
 
     Flow["Flow Blockchain<br/>Cadence (native) + Flow EVM"]
 
-    Agent -->|MCP / REST| Perception
-    Agent -->|MCP| Action
-    Action -->|preflight| Simulation
-    Perception --> Flow
+    Flow -->|blocks, events| Indexer
+    Indexer --> EventBus
+    EventBus -->|triggers| Orchestration
+    Dev --> AIChat
+    Agent -->|MCP| FlowData
+    Agent -->|MCP| CadenceMCP
+    Agent -->|MCP| Wallet
+    Wallet -->|preflight| Simulator
+    Orchestration --> Agent
+    FlowData --> Indexer
     Action --> Flow
     Simulation --> Flow
-    Orchestration --> Agent
 ```
 
 ---
 
-## 1. Indexer + AI Query Layer — Agent-Readable Chain State
+## 1. Indexer — Chain Data Foundation & Event Source
 
-**What:** High-performance Go indexer that ingests the entire Flow blockchain into PostgreSQL, paired with a Vanna AI layer that lets agents query the database directly via natural language — far more flexible and data-rich than any REST API.
+**What:** High-performance Go indexer that ingests the entire Flow blockchain into PostgreSQL — the data foundation that powers everything else in this stack.
 
-**Why agents need it:** LLMs cannot read raw blockchain state. The indexer transforms Flow's full history into a comprehensive PostgreSQL schema — blocks, transactions, events, token transfers, NFT ownership, staking positions, DeFi activity, contract metadata, market prices, and more. Rather than constraining agents to pre-defined API endpoints, we expose this data through **Vanna AI (text-to-SQL)**, allowing agents to ask arbitrary questions against the full dataset and get back structured results.
+**Why it matters:** The indexer is not just a data store. It serves two critical roles:
 
-**The key insight:** REST APIs return what their designers anticipated. SQL returns what the agent actually needs. An agent asking "Which wallets interacted with both IncrementFi and FlowSwap in the last 7 days?" would require custom API work on a traditional explorer. With our stack, it's a single natural language query that Vanna translates to SQL and executes directly.
+1. **Data layer** — Transforms Flow's full history into a comprehensive PostgreSQL schema that the AI Chat and text-to-SQL tools query against directly. Blocks, transactions, events, token transfers, NFT ownership, staking positions, DeFi activity, contract metadata, market prices — all structured and queryable.
+2. **Event source for workflows** — The indexer listens to on-chain events in real-time. This makes it a natural trigger for agent workflows: token transfers, contract deployments, DeFi swaps, NFT mints — any on-chain event can kick off a workflow pipeline.
 
-**Indexer capabilities:**
+**Capabilities:**
 
 | Capability | Detail |
 |---|---|
-| Real-time ingestion | Forward ingester with WebSocket live feed |
+| Real-time ingestion | Forward ingester with WebSocket live feed + event bus |
 | Full history | Backward ingester with spork-aware backfill across all Flow sporks |
 | Dual-chain | Native Cadence data + Flow EVM transactions, events, and contracts |
 | 17 workers | Token, EVM, staking, DeFi, NFT ownership, account keys, metrics, and more |
 | Comprehensive schema | `raw.*` (blocks, transactions, events) + `app.*` (derived: transfers, holdings, contracts, staking, DeFi, market prices) + `analytics.*` |
+| Webhook / event bus | On-chain events trigger webhooks and workflow pipelines |
 
-**AI query layer (Vanna):**
+---
 
-**Key capabilities:**
+## 2. AI Chat — Developer Assistant with Memory
 
-| Endpoint | Description |
+**What:** Conversational AI assistant for developers working with Flow blockchain data. Maintains session context and learns user preferences over time.
+
+**Why it matters:** Developers exploring on-chain data need more than one-shot queries. The AI Chat keeps session history, remembers what you were investigating, and builds up context about your workflow — so follow-up questions like "now filter that to the last 24 hours" or "show me the same for EVM" just work.
+
+**Key features:**
+- Session persistence with conversation history
+- User preference and habit memory across sessions
+- Context-aware follow-up queries
+- Dual-chain support (Cadence native + Flow EVM)
+- Web UI for interactive exploration
+
+---
+
+## 3. Flow Data MCP — Text-to-SQL for Agents
+
+**What:** MCP server (flow-data) that gives AI agents direct SQL access to the full FlowIndex and Flow EVM databases via natural language — far more flexible and data-rich than any REST API.
+
+**The key insight:** REST APIs return what their designers anticipated. SQL returns what the agent actually needs. An agent asking "Which wallets interacted with both IncrementFi and FlowSwap in the last 7 days?" would require custom API work on a traditional explorer. With flow-data MCP, it's a single natural language query that gets translated to SQL and executed directly.
+
+**MCP Tools:**
+
+| Tool | Description |
 |---|---|
 | `ask_flowindex_vanna` | NL → SQL → results for Cadence/native Flow data |
 | `ask_evm_vanna` | NL → SQL → results for Flow EVM (Blockscout) data |
@@ -78,13 +112,11 @@ graph TD
 | `run_evm_sql` | Direct SQL execution against EVM database |
 | `run_cadence` | Execute read-only Cadence scripts on mainnet |
 
-**Exposed via:** The **flow-data MCP server** — agents connect directly via MCP and use all tools natively, no REST calls or CLI needed.
-
 **Security:** Rate limiting (60 req/min), API key auth, admin key bypass, localhost bypass for internal calls.
 
 ---
 
-## 2. Agent Wallet — Identity, Authorization & Asset Control
+## 4. Agent Wallet — Identity, Authorization & Asset Control
 
 **What:** Production MCP server (`@flowindex/agent-wallet`) that gives AI agents a full Flow blockchain wallet with 27 tools, 70 Cadence templates, and multi-mode signing.
 
@@ -124,7 +156,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 3. Transaction Simulator — Pre-Execution Validation
+## 5. Transaction Simulator — Pre-Execution Validation
 
 **What:** Flow Emulator running in mainnet-fork mode with a Go API layer that provides isolated transaction simulation with snapshot rollback.
 
@@ -147,7 +179,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 4. Cadence MCP — Agent-Native Code Intelligence
+## 6. Cadence MCP — Agent-Native Code Intelligence
 
 **What:** MCP server providing Cadence Language Server Protocol capabilities — syntax checking, type information, symbol navigation, and documentation search — directly to AI agents.
 
@@ -179,7 +211,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 5. Cadence Runner — Interactive Playground
+## 7. Cadence Runner — Interactive Playground
 
 **What:** Web-based Cadence editor with Monaco, in-browser Language Server, AI chat assistant, and direct wallet integration for signing and submitting transactions.
 
@@ -194,14 +226,17 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 6. Workflow Builder — Reusable Execution Patterns
+## 8. Workflow Builder — Reusable Execution Patterns
 
 **What:** Visual, block-based workflow orchestrator with triggers, tools, and an execution engine backed by Trigger.dev.
 
 **Why agents need it:** Individual tool calls are useful. Composable, reusable workflows are powerful. The workflow builder lets agents (and humans) define multi-step execution patterns — "when X happens on-chain, simulate Y, get approval, then execute Z" — as persistent, triggerable workflows.
 
+**On-chain event triggers:** The indexer's event bus feeds directly into the workflow engine. Any on-chain event — token transfers, contract deployments, DeFi swaps, NFT mints, staking reward distributions — can trigger a workflow. This closes the loop: agents don't just react to schedules, they react to what's actually happening on-chain.
+
 **Architecture:**
 - Block-based visual UI (React + Zustand)
+- On-chain event triggers via indexer event bus / webhooks
 - Execution engine with deterministic replay
 - Multi-provider LLM integration (Anthropic, OpenAI, Google, etc.)
 - Trigger.dev for scheduling and background execution
@@ -209,7 +244,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 7. Developer Portal — Documentation & API Reference
+## 9. Developer Portal — Documentation & API Reference
 
 **What:** Fumadocs-based documentation site with Scalar interactive API explorer, serving guides, API reference, and OpenAPI spec.
 
@@ -222,7 +257,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 8. Wallet Infrastructure — Multi-Layer Identity
+## 10. Wallet Infrastructure — Multi-Layer Identity
 
 Beyond the agent wallet MCP server, the wallet infrastructure includes:
 
@@ -294,10 +329,11 @@ Auto-deploys from `main` via GitHub Actions with path-based filtering.
 
 | Layer | Component | Status |
 |---|---|---|
-| **Perception** | Indexer API (200+ endpoints), WebSocket live feed | Production |
-| **Context** | AI Chat / Text-to-SQL (FlowIndex + EVM), Developer Portal | Production |
+| **Data & Events** | Indexer (full chain → PostgreSQL, on-chain event triggers) | Production |
+| **Developer Context** | AI Chat (session memory, habit learning, conversational) | Production |
+| **Agent Data Access** | Flow Data MCP (text-to-SQL, direct SQL, Cadence scripts) | Production |
 | **Code Intelligence** | Cadence MCP (type checking, docs, symbols) | Production |
 | **Simulation** | Mainnet-fork emulator, snapshot isolation, risk scoring | Production |
 | **Action** | Agent Wallet (27 tools, 70 templates, 4 signing modes) | Production |
 | **Identity** | Passkey wallet, ERC-4337 smart accounts, COA bridging | Production |
-| **Orchestration** | Workflow builder, Trigger.dev scheduling | In Development |
+| **Orchestration** | Workflow builder, on-chain event triggers, Trigger.dev scheduling | In Development |
