@@ -35,25 +35,34 @@ func UpdateLiveStats(totalTxs, totalAddrs, totalContracts int64) {
 
 // --- WebSocket Hub ---
 
+type AddressMessage struct {
+	Addresses []string
+	Data      []byte
+}
+
 type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan []byte
-	register   chan *Client
-	unregister chan *Client
-	mutex      sync.Mutex
+	clients          map[*Client]bool
+	broadcast        chan []byte
+	addressBroadcast chan AddressMessage
+	register         chan *Client
+	unregister       chan *Client
+	mutex            sync.Mutex
 }
 
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub           *Hub
+	conn          *websocket.Conn
+	send          chan []byte
+	subscriptions map[string]bool
+	subMu         sync.Mutex
 }
 
 var hub = &Hub{
-	broadcast:  make(chan []byte),
-	register:   make(chan *Client),
-	unregister: make(chan *Client),
-	clients:    make(map[*Client]bool),
+	broadcast:        make(chan []byte),
+	addressBroadcast: make(chan AddressMessage, 64),
+	register:         make(chan *Client),
+	unregister:       make(chan *Client),
+	clients:          make(map[*Client]bool),
 }
 
 func (h *Hub) run() {
@@ -81,6 +90,28 @@ func (h *Hub) run() {
 				}
 			}
 			h.mutex.Unlock()
+		case amsg := <-h.addressBroadcast:
+			h.mutex.Lock()
+			for client := range h.clients {
+				client.subMu.Lock()
+				matched := false
+				for _, addr := range amsg.Addresses {
+					if client.subscriptions[addr] {
+						matched = true
+						break
+					}
+				}
+				client.subMu.Unlock()
+				if matched {
+					select {
+					case client.send <- amsg.Data:
+					default:
+						close(client.send)
+						delete(h.clients, client)
+					}
+				}
+			}
+			h.mutex.Unlock()
 		}
 	}
 }
@@ -101,9 +132,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &Client{
-		hub:  hub,
-		conn: conn,
-		send: make(chan []byte, 256),
+		hub:           hub,
+		conn:          conn,
+		send:          make(chan []byte, 256),
+		subscriptions: make(map[string]bool),
 	}
 
 	hub.register <- client
@@ -128,12 +160,50 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	client.readPump()
+}
+
+// wsClientMessage is the JSON structure sent by WebSocket clients.
+type wsClientMessage struct {
+	Type    string `json:"type"`
+	Address string `json:"address"`
+}
+
+// readPump reads and processes incoming WebSocket messages from a client.
+func (c *Client) readPump() {
 	for {
-		_, _, err := conn.ReadMessage()
+		_, raw, err := c.conn.ReadMessage()
 		if err != nil {
 			break
 		}
+		var msg wsClientMessage
+		if err := json.Unmarshal(raw, &msg); err != nil {
+			continue
+		}
+		addr := normalizeWSAddress(msg.Address)
+		if addr == "" {
+			continue
+		}
+		switch msg.Type {
+		case "subscribe_address":
+			c.subMu.Lock()
+			if len(c.subscriptions) < 10 {
+				c.subscriptions[addr] = true
+			}
+			c.subMu.Unlock()
+		case "unsubscribe_address":
+			c.subMu.Lock()
+			delete(c.subscriptions, addr)
+			c.subMu.Unlock()
+		}
 	}
+}
+
+// normalizeWSAddress lowercases and strips 0x prefix from an address.
+func normalizeWSAddress(addr string) string {
+	addr = strings.TrimSpace(strings.ToLower(addr))
+	addr = strings.TrimPrefix(addr, "0x")
+	return addr
 }
 
 type BroadcastMessage struct {
@@ -300,6 +370,61 @@ func MakeBroadcastNewTransactions(repo *repository.Repository) func([]models.Tra
 			data, _ := json.Marshal(msg)
 			hub.broadcast <- data
 		}
+	}
+}
+
+// HasSubscribers returns true if any connected client is subscribed to at least
+// one of the given addresses. Callers use this to skip expensive DB lookups
+// when nobody is listening.
+func HasSubscribers(addresses []string) bool {
+	hub.mutex.Lock()
+	defer hub.mutex.Unlock()
+	for client := range hub.clients {
+		client.subMu.Lock()
+		for _, addr := range addresses {
+			if client.subscriptions[addr] {
+				client.subMu.Unlock()
+				return true
+			}
+		}
+		client.subMu.Unlock()
+	}
+	return false
+}
+
+// WSAddressTransfer represents a token transfer included in an address transaction notification.
+type WSAddressTransfer struct {
+	Type   string `json:"type"`
+	Token  string `json:"token"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+	Amount string `json:"amount,omitempty"`
+	NFTId  string `json:"nft_id,omitempty"`
+}
+
+// WSAddressTransaction is the per-address payload sent to subscribers.
+type WSAddressTransaction struct {
+	Address     string              `json:"address"`
+	Transaction WSTransaction       `json:"transaction"`
+	Roles       []string            `json:"roles"`
+	Transfers   []WSAddressTransfer `json:"transfers,omitempty"`
+}
+
+// BroadcastAddressTransaction sends an address-scoped transaction notification
+// to all clients subscribed to the given address.
+func BroadcastAddressTransaction(payload WSAddressTransaction) {
+	addr := normalizeWSAddress(payload.Address)
+	if addr == "" {
+		return
+	}
+	msg := BroadcastMessage{Type: "address_transaction", Payload: payload}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	hub.addressBroadcast <- AddressMessage{
+		Addresses: []string{addr},
+		Data:      data,
 	}
 }
 
