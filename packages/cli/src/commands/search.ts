@@ -20,24 +20,48 @@ export function registerSearchCommand(program: Command): void {
           return;
         }
 
-        const items = results.results ?? [];
-        if (items.length === 0) {
+        const { data } = results;
+        const contracts = data?.contracts ?? [];
+        const tokens = data?.tokens ?? [];
+        const hasResults = contracts.length > 0 || tokens.length > 0;
+
+        if (!hasResults) {
           console.log('No results found.');
           return;
         }
 
         console.log(`Search results for "${query}"\n`);
-        console.log(
-          formatTable(
-            ['Type', 'ID', 'Title', 'Details'],
-            items.map((r) => [
-              r.type,
-              r.id.length > 20 ? r.id.slice(0, 20) + '...' : r.id,
-              r.title,
-              r.subtitle ?? '',
-            ]),
-          ),
-        );
+
+        if (contracts.length > 0) {
+          console.log('Contracts:');
+          console.log(
+            formatTable(
+              ['Name', 'Address', 'Kind', 'Dependents'],
+              contracts.map((c) => [
+                c.name,
+                c.address.length > 20 ? c.address.slice(0, 20) + '...' : c.address,
+                c.kind ?? '',
+                String(c.dependent_count ?? ''),
+              ]),
+            ),
+          );
+        }
+
+        if (tokens.length > 0) {
+          if (contracts.length > 0) console.log('');
+          console.log('Tokens:');
+          console.log(
+            formatTable(
+              ['Symbol', 'Name', 'Address', 'Contract'],
+              tokens.map((t) => [
+                t.symbol,
+                t.name,
+                t.address.length > 20 ? t.address.slice(0, 20) + '...' : t.address,
+                t.contract_name,
+              ]),
+            ),
+          );
+        }
       }),
     );
 }

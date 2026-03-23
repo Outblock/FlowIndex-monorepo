@@ -28,37 +28,60 @@ describe('FlowIndexClient', () => {
   describe('getBlock', () => {
     it('fetches latest block when no height given', async () => {
       const block = { height: 100, id: 'abc', timestamp: '2026-01-01T00:00:00Z', tx_count: 5 };
-      mockJsonResponse({ data: [block], hasMore: true });
+      mockJsonResponse({ data: [block], _meta: { count: 1, limit: 1, offset: 0 } });
       const result = await client.getBlock();
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/block?limit=1',
+        'https://flowindex.io/api/flow/block?limit=1',
         expect.objectContaining({ method: 'GET' }),
       );
       expect(result).toEqual(block);
     });
 
-    it('fetches block by height', async () => {
-      const block = { height: 42, id: 'def' };
-      mockJsonResponse(block);
+    it('fetches block by height (returns data array)', async () => {
+      const block = { height: 42, id: 'def', timestamp: '2026-01-01T00:00:00Z', tx_count: 2 };
+      mockJsonResponse({ data: [block] });
       const result = await client.getBlock(42);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/block/42',
+        'https://flowindex.io/api/flow/block/42',
         expect.objectContaining({ method: 'GET' }),
       );
       expect(result).toEqual(block);
+    });
+
+    it('throws 404 when block by height returns empty data', async () => {
+      mockJsonResponse({ data: [] });
+      await expect(client.getBlock(999999999)).rejects.toThrow(FlowIndexApiError);
     });
   });
 
   describe('getTransaction', () => {
-    it('fetches a Cadence transaction', async () => {
-      const tx = { tx_id: 'abc123', status: 'Sealed' };
-      mockJsonResponse(tx);
+    it('fetches a Cadence transaction (returns data array)', async () => {
+      const tx = {
+        id: 'abc123',
+        status: 'SEALED',
+        block_height: 100,
+        timestamp: '2026-01-01T00:00:00Z',
+        fee: 0.001,
+        proposer: '0x1234',
+        payer: '0x1234',
+        authorizers: ['0x1234'],
+        error: '',
+        event_count: 3,
+        events: [],
+        transfer_summary: { ft: [], nft: [] },
+      };
+      mockJsonResponse({ data: [tx] });
       const result = await client.getTransaction('abc123');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/transaction/abc123',
+        'https://flowindex.io/api/flow/transaction?id=abc123',
         expect.any(Object),
       );
       expect(result).toEqual(tx);
+    });
+
+    it('throws 404 when transaction not found', async () => {
+      mockJsonResponse({ data: [] });
+      await expect(client.getTransaction('nonexistent')).rejects.toThrow(FlowIndexApiError);
     });
   });
 
@@ -68,7 +91,7 @@ describe('FlowIndexClient', () => {
       mockJsonResponse(tx);
       const result = await client.getEvmTransaction('0xabc');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/evm/transaction/0xabc',
+        'https://flowindex.io/api/flow/evm/transaction/0xabc',
         expect.any(Object),
       );
       expect(result).toEqual(tx);
@@ -76,15 +99,35 @@ describe('FlowIndexClient', () => {
   });
 
   describe('getAccount', () => {
-    it('fetches a Flow account', async () => {
-      const acct = { address: 'e467b9dd11fa00df', balance: 100 };
-      mockJsonResponse(acct);
+    it('fetches a Flow account (returns data array)', async () => {
+      const acct = {
+        address: '0xe467b9dd11fa00df',
+        flowBalance: 2342.07115664,
+        flowStorage: 183220.93,
+        contracts: ['FlowToken', 'EVM'],
+        keys: [
+          {
+            index: '0',
+            key: 'dfd3ae...',
+            signatureAlgorithm: 'ECDSA_secp256k1',
+            hashAlgorithm: 'SHA2_256',
+            weight: 1000,
+            revoked: false,
+          },
+        ],
+      };
+      mockJsonResponse({ data: [acct] });
       const result = await client.getAccount('e467b9dd11fa00df');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/account/e467b9dd11fa00df',
+        'https://flowindex.io/api/flow/account/e467b9dd11fa00df',
         expect.any(Object),
       );
       expect(result).toEqual(acct);
+    });
+
+    it('throws 404 when account not found', async () => {
+      mockJsonResponse({ data: [] });
+      await expect(client.getAccount('0000000000000000')).rejects.toThrow(FlowIndexApiError);
     });
   });
 
@@ -94,7 +137,7 @@ describe('FlowIndexClient', () => {
       mockJsonResponse(addr);
       const result = await client.getEvmAddress('0x1234abcd');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/evm/address/0x1234abcd',
+        'https://flowindex.io/api/flow/evm/address/0x1234abcd',
         expect.any(Object),
       );
       expect(result).toEqual(addr);
@@ -102,15 +145,20 @@ describe('FlowIndexClient', () => {
   });
 
   describe('search', () => {
-    it('searches with query', async () => {
-      const results = { results: [{ type: 'account', id: '0x1', title: 'Test' }] };
-      mockJsonResponse(results);
+    it('searches and returns contracts and tokens', async () => {
+      const response = {
+        data: {
+          contracts: [{ address: '1654653399040a61', name: 'FlowToken', kind: 'FT', dependent_count: 77853 }],
+          tokens: [{ address: '1654653399040a61', contract_name: 'FlowToken', name: 'FLOW Network Token', symbol: 'FLOW' }],
+        },
+      };
+      mockJsonResponse(response);
       const result = await client.search('FlowToken');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/search?q=FlowToken',
+        'https://flowindex.io/api/flow/search?q=FlowToken',
         expect.any(Object),
       );
-      expect(result).toEqual(results);
+      expect(result).toEqual(response);
     });
   });
 
@@ -131,7 +179,7 @@ describe('FlowIndexClient', () => {
       mockJsonResponse(holdings);
       const result = await client.getAccountFtHoldings('e467b9dd11fa00df');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/account/e467b9dd11fa00df/ft',
+        'https://flowindex.io/api/flow/account/e467b9dd11fa00df/ft',
         expect.any(Object),
       );
       expect(result).toEqual(holdings);
@@ -144,7 +192,7 @@ describe('FlowIndexClient', () => {
       mockJsonResponse(nfts);
       const result = await client.getAccountNftCollections('e467b9dd11fa00df');
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.flowindex.io/flow/account/e467b9dd11fa00df/nft',
+        'https://flowindex.io/api/flow/account/e467b9dd11fa00df/nft',
         expect.any(Object),
       );
       expect(result).toEqual(nfts);

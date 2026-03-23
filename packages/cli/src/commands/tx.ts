@@ -50,17 +50,19 @@ export function registerTxCommand(program: Command): void {
 }
 
 function printFlowTx(tx: Record<string, unknown>, showEvents?: boolean): void {
-  console.log(`Transaction ${tx.tx_id}\n`);
-  console.log(
-    formatKeyValue([
-      ['Status', String(tx.status ?? '')],
-      ['Block', String(tx.block_height ?? '')],
-      ['Timestamp', String(tx.timestamp ?? '')],
-      ['Payer', String(tx.payer ?? '')],
-      ['Authorizers', String((tx.authorizers as string[])?.join(', ') ?? '')],
-      ['Gas Used', String(tx.gas_used ?? '')],
-    ]),
-  );
+  console.log(`Transaction ${tx.id}\n`);
+  const pairs: [string, string][] = [
+    ['Status', String(tx.status ?? '')],
+    ['Block', String(tx.block_height ?? '')],
+    ['Timestamp', String(tx.timestamp ?? '')],
+  ];
+  if (tx.proposer) pairs.push(['Proposer', String(tx.proposer)]);
+  if (tx.payer) pairs.push(['Payer', String(tx.payer)]);
+  if (tx.authorizers) pairs.push(['Authorizers', String((tx.authorizers as string[])?.join(', ') ?? '')]);
+  if (tx.fee != null) pairs.push(['Fee', `${tx.fee} FLOW`]);
+  if (tx.gas_used != null) pairs.push(['Gas Used', String(tx.gas_used)]);
+  if (tx.error) pairs.push(['Error', String(tx.error)]);
+  console.log(formatKeyValue(pairs));
 
   if (tx.is_evm && tx.evm_hash) {
     console.log(`\n  EVM Hash     ${tx.evm_hash}`);

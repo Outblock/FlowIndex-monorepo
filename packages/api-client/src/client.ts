@@ -9,7 +9,7 @@ import type {
   SearchResponse,
 } from './types.js';
 
-const DEFAULT_BASE_URL = 'https://api.flowindex.io';
+const DEFAULT_BASE_URL = 'https://flowindex.io/api';
 
 export class FlowIndexClient {
   private readonly baseUrl: string;
@@ -32,7 +32,12 @@ export class FlowIndexClient {
 
   async getBlock(height?: number): Promise<Block> {
     if (height != null) {
-      return this.request<Block>(`/flow/block/${height}`);
+      // Block by height also returns { data: [...] }
+      const resp = await this.request<{ data: Block[] }>(`/flow/block/${height}`);
+      if (!resp.data || resp.data.length === 0) {
+        throw new FlowIndexApiError(404, `Block ${height} not found`);
+      }
+      return resp.data[0];
     }
     // /flow/block returns a list — fetch latest by requesting limit=1
     const list = await this.request<{ data: Block[] }>('/flow/block?limit=1');
@@ -43,7 +48,12 @@ export class FlowIndexClient {
   }
 
   async getTransaction(txId: string): Promise<Transaction> {
-    return this.request<Transaction>(`/flow/transaction/${txId}`);
+    // Transactions are fetched by query: /flow/transaction?id=<txId>
+    const resp = await this.request<{ data: Transaction[] }>(`/flow/transaction?id=${txId}`);
+    if (!resp.data || resp.data.length === 0) {
+      throw new FlowIndexApiError(404, `Transaction ${txId} not found`);
+    }
+    return resp.data[0];
   }
 
   async getEvmTransaction(hash: string): Promise<EvmTransaction> {
@@ -51,7 +61,11 @@ export class FlowIndexClient {
   }
 
   async getAccount(address: string): Promise<Account> {
-    return this.request<Account>(`/flow/account/${address}`);
+    const resp = await this.request<{ data: Account[] }>(`/flow/account/${address}`);
+    if (!resp.data || resp.data.length === 0) {
+      throw new FlowIndexApiError(404, `Account ${address} not found`);
+    }
+    return resp.data[0];
   }
 
   async getEvmAddress(address: string): Promise<EvmAddress> {

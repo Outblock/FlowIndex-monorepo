@@ -115,10 +115,13 @@ export function registerAccountCommand(program: Command): void {
 function printFlowAccount(acct: Record<string, unknown>): void {
   console.log(`Account ${acct.address}\n`);
   const pairs: [string, string][] = [
-    ['Balance', `${acct.balance ?? 0} FLOW`],
+    ['Balance', `${acct.flowBalance ?? 0} FLOW`],
   ];
+  if (acct.flowStorage != null) {
+    pairs.push(['Storage', `${acct.flowStorage} bytes`]);
+  }
   if (acct.contracts && Array.isArray(acct.contracts) && acct.contracts.length > 0) {
-    pairs.push(['Contracts', acct.contracts.join(', ')]);
+    pairs.push(['Contracts', (acct.contracts as string[]).join(', ')]);
   }
   if (acct.is_contract) {
     pairs.push(['Is Contract', 'Yes']);
@@ -130,7 +133,7 @@ function printFlowAccount(acct: Record<string, unknown>): void {
     console.log(`\n  Keys (${keys.length})`);
     keys.forEach((k) => {
       const status = k.revoked ? ' [REVOKED]' : '';
-      console.log(`  - #${k.index} weight=${k.weight} ${k.sign_algo}/${k.hash_algo}${status}`);
+      console.log(`  - #${k.index} weight=${k.weight} ${k.signatureAlgorithm}/${k.hashAlgorithm}${status}`);
     });
   }
 }

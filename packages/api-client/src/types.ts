@@ -11,21 +11,21 @@ export interface Block {
 
 // Transaction
 export interface Transaction {
-  tx_id: string;
+  id: string;
   block_height: number;
   block_id?: string;
   timestamp: string;
   status: string;
-  status_code: number;
-  error_message?: string;
-  script?: string;
-  arguments?: string[];
+  error?: string;
+  fee?: number;
+  proposer?: string;
   authorizers?: string[];
   payer?: string;
-  proposal_key_address?: string;
-  gas_limit?: number;
   gas_used?: number;
+  event_count?: number;
   events?: TransactionEvent[];
+  transfer_summary?: { ft: unknown[]; nft: unknown[] };
+  transaction_index?: number;
   is_evm?: boolean;
   evm_hash?: string;
 }
@@ -80,17 +80,18 @@ export interface EvmTokenTransfer {
 // Account
 export interface Account {
   address: string;
-  balance: number;
+  flowBalance: number;
+  flowStorage?: number;
   keys?: AccountKey[];
   contracts?: string[];
   is_contract?: boolean;
 }
 
 export interface AccountKey {
-  index: number;
-  public_key: string;
-  sign_algo: string;
-  hash_algo: string;
+  index: string;
+  key: string;
+  signatureAlgorithm: string;
+  hashAlgorithm: string;
   weight: number;
   revoked: boolean;
 }
@@ -111,15 +112,28 @@ export interface NftCollection {
 }
 
 // Search
-export interface SearchResult {
-  type: string;
-  id: string;
-  title: string;
-  subtitle?: string;
+export interface SearchContract {
+  address: string;
+  name: string;
+  kind?: string;
+  dependent_count?: number;
+}
+
+export interface SearchToken {
+  address: string;
+  contract_name: string;
+  name: string;
+  symbol: string;
 }
 
 export interface SearchResponse {
-  results: SearchResult[];
+  data: {
+    contracts?: SearchContract[];
+    tokens?: SearchToken[];
+    accounts?: unknown[];
+    blocks?: unknown[];
+    transactions?: unknown[];
+  };
 }
 
 // List response wrapper
