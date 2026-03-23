@@ -218,33 +218,7 @@ npx @flowindex/agent-wallet
 
 ---
 
-## 8. CLI & API Client — Programmatic Access
-
-**What:** TypeScript packages for programmatic and terminal access to FlowIndex data.
-
-### `@flowindex/cli`
-Terminal tool for querying Flow blockchain data:
-```bash
-flowindex block 12345678          # Get block by height
-flowindex tx <hash>               # Get transaction details
-flowindex account <address>       # Get account info (Flow + EVM)
-flowindex search "TopShot"        # Search contracts, tokens, NFTs
-flowindex config set-url <url>    # Configure API endpoint
-```
-
-### `@flowindex/api-client`
-Typed TypeScript client for embedding FlowIndex queries in any application:
-```typescript
-import { FlowIndexClient } from '@flowindex/api-client';
-
-const client = new FlowIndexClient({ baseUrl: 'https://flowindex.io/api' });
-const block = await client.getBlock(12345678);
-const account = await client.getAccount('0x1654653399040a61');
-```
-
----
-
-## 9. Developer Portal — Documentation & API Reference
+## 8. Developer Portal — Documentation & API Reference
 
 **What:** Fumadocs-based documentation site with Scalar interactive API explorer, serving guides, API reference, and OpenAPI spec.
 
@@ -257,7 +231,7 @@ const account = await client.getAccount('0x1654653399040a61');
 
 ---
 
-## 10. Wallet Infrastructure — Multi-Layer Identity
+## 9. Wallet Infrastructure — Multi-Layer Identity
 
 Beyond the agent wallet MCP server, the wallet infrastructure includes:
 
@@ -336,6 +310,5 @@ Auto-deploys from `main` via GitHub Actions with path-based filtering.
 | **Action** | Agent Wallet (27 tools, 70 templates, 4 signing modes) | Production |
 | **Identity** | Passkey wallet, ERC-4337 smart accounts, COA bridging | Production |
 | **Orchestration** | Workflow builder, Trigger.dev scheduling | In Development |
-| **Developer Tools** | CLI, API client, Runner playground | Production |
 
 If scheduled transactions answer "Can the agent wake up?", this stack answers **"Can the agent perceive, reason, validate, and act correctly once awake?"**
