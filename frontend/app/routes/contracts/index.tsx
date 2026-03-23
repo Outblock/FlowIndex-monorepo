@@ -11,6 +11,7 @@ import { Pagination } from '../../components/Pagination';
 import { formatRelativeTime } from '../../lib/time';
 import { useTimeTicker } from '../../hooks/useTimeTicker';
 import { VerifiedBadge } from '@flowindex/flow-ui';
+import { EVMContractsList } from '../../components/evm/EVMContractsList';
 
 const KIND_TABS = [
     { label: 'All', value: '' },
@@ -24,6 +25,7 @@ interface ContractsSearch {
     page?: number;
     query?: string;
     kind?: string;
+    tab?: string; // 'cadence' | 'evm'
 }
 
 export const Route = createFileRoute('/contracts/')({
@@ -33,6 +35,7 @@ export const Route = createFileRoute('/contracts/')({
             page: Number(search.page) || 1,
             query: (search.query as string) || '',
             kind: (search.kind as string) || '',
+            tab: (search.tab as string) || 'cadence',
         }
     },
     loader: async ({ location }) => {
@@ -105,8 +108,9 @@ function KindBadge({ kind }: { kind: string }) {
 
 function Contracts() {
     const { contracts, meta, page: initialPage, query: initialQuery, kind: initialKind, deferred } = Route.useLoaderData();
-    const { page: searchPage, query: searchQuery_, kind: searchKind } = Route.useSearch();
+    const { page: searchPage, query: searchQuery_, kind: searchKind, tab: searchTab } = Route.useSearch();
     const navigate = Route.useNavigate();
+    const activeTab = searchTab || 'cadence';
 
     const page = searchPage ?? initialPage ?? 1;
     const query = searchQuery_ ?? initialQuery ?? '';
@@ -218,6 +222,35 @@ function Contracts() {
                     </span>
                 </div>
             </motion.div>
+
+            {/* Network Tabs */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.03 }}
+                className="flex items-center gap-2"
+            >
+                {[
+                    { label: 'Cadence', value: 'cadence' },
+                    { label: 'EVM', value: 'evm' },
+                ].map((t) => (
+                    <button
+                        key={t.value}
+                        onClick={() => navigate({ search: { tab: t.value, page: 1, query: '', kind: '' } })}
+                        className={`px-5 py-2 text-sm font-semibold uppercase tracking-wider border-b-2 transition-colors ${
+                            activeTab === t.value
+                                ? 'border-nothing-green text-nothing-green-dark dark:text-nothing-green'
+                                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
+                        }`}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </motion.div>
+
+            {activeTab === 'evm' && <EVMContractsList />}
+
+            {activeTab === 'cadence' && <>
 
             {/* Filter */}
             <motion.form
@@ -397,6 +430,8 @@ function Contracts() {
                     />
                 </div>
             </div>
+
+            </>}
         </div>
     );
 }
