@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"flowscan-clone/internal/broadcast"
 	flowclient "flowscan-clone/internal/flow"
 	"flowscan-clone/internal/models"
 	"flowscan-clone/internal/repository"
@@ -41,6 +43,14 @@ func (w *MetaWorker) ProcessRange(ctx context.Context, fromHeight, toHeight uint
 	// because live/head backfills and range workers may overlap.
 	if err := w.repo.BackfillAddressTransactionsAndStatsRange(ctx, fromHeight, toHeight); err != nil {
 		return fmt.Errorf("backfill address tx/stats: %w", err)
+	}
+
+	// Phase 1 WS broadcast: notify address subscribers about payer/proposer/authorizer roles
+	if wsTxs, wsErr := w.repo.GetRawTransactionsInRange(ctx, fromHeight, toHeight); wsErr != nil {
+		// Non-fatal: just log
+		log.Printf("[meta_worker] ws broadcast: fetch txs failed: %v", wsErr)
+	} else {
+		broadcast.BroadcastPhase1Transactions(wsTxs)
 	}
 
 	events, err := w.repo.GetRawEventsInRange(ctx, fromHeight, toHeight)

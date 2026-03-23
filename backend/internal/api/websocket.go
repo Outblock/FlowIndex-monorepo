@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"flowscan-clone/internal/broadcast"
 	"flowscan-clone/internal/models"
 	"flowscan-clone/internal/repository"
 
@@ -510,6 +511,45 @@ func deriveCategoryFromImports(contractIDs []string) string {
 	return bestCategory
 }
 
+// sendAddressPayload converts a models.Transaction + roles/transfers into a
+// WSAddressTransaction and sends it via BroadcastAddressTransaction.
+func sendAddressPayload(address string, tx models.Transaction, roles []string, transfers []broadcast.TransferInfo) {
+	ts := tx.Timestamp
+	if ts.IsZero() {
+		ts = tx.CreatedAt
+	}
+	wsTx := WSTransaction{
+		ID:              tx.ID,
+		BlockHeight:     tx.BlockHeight,
+		Status:          tx.Status,
+		PayerAddress:    tx.PayerAddress,
+		ProposerAddress: tx.ProposerAddress,
+		Timestamp:       ts,
+		ExecutionStatus: tx.ExecutionStatus,
+		ErrorMessage:    tx.ErrorMessage,
+		IsEVM:           tx.IsEVM,
+		ScriptHash:      tx.ScriptHash,
+	}
+	var wsTransfers []WSAddressTransfer
+	for _, t := range transfers {
+		wsTransfers = append(wsTransfers, WSAddressTransfer{
+			Type: t.Type, Token: t.Token, From: t.From, To: t.To, Amount: t.Amount, NFTId: t.NFTId,
+		})
+	}
+	payload := WSAddressTransaction{
+		Address:     address,
+		Transaction: wsTx,
+		Roles:       roles,
+		Transfers:   wsTransfers,
+	}
+	BroadcastAddressTransaction(payload)
+}
+
 func init() {
 	go hub.run()
+
+	// Register broadcast hooks so the ingester package can trigger address
+	// notifications without importing api (breaking the import cycle).
+	broadcast.HasSubscribers = HasSubscribers
+	broadcast.SendAddressPayload = sendAddressPayload
 }
