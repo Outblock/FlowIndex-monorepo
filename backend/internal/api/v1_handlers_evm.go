@@ -287,6 +287,42 @@ func toEVMNativeTransferOutput(n repository.EVMNativeTransferRow, addrFilter str
 	}
 }
 
+// --- EVM Smart Contracts (proxy to Blockscout) ---
+
+func (s *Server) handleFlowListEVMSmartContracts(w http.ResponseWriter, r *http.Request) {
+	s.proxyBlockscout(w, r, "/api/v2/smart-contracts")
+}
+
+func (s *Server) handleFlowGetEVMSmartContractCounters(w http.ResponseWriter, r *http.Request) {
+	s.proxyBlockscout(w, r, "/api/v2/smart-contracts/counters")
+}
+
+func (s *Server) handleFlowGetEVMSmartContract(w http.ResponseWriter, r *http.Request) {
+	address := normalizeAddr(mux.Vars(r)["address"])
+	s.proxyBlockscout(w, r, "/api/v2/smart-contracts/0x"+address)
+}
+
+func (s *Server) handleFlowGetEVMSmartContractMethodsRead(w http.ResponseWriter, r *http.Request) {
+	address := normalizeAddr(mux.Vars(r)["address"])
+	s.proxyBlockscout(w, r, "/api/v2/smart-contracts/0x"+address+"/methods-read")
+}
+
+func (s *Server) handleFlowGetEVMSmartContractMethodsWrite(w http.ResponseWriter, r *http.Request) {
+	address := normalizeAddr(mux.Vars(r)["address"])
+	s.proxyBlockscout(w, r, "/api/v2/smart-contracts/0x"+address+"/methods-write")
+}
+
+func (s *Server) handleFlowPostEVMSmartContractQueryRead(w http.ResponseWriter, r *http.Request) {
+	address := normalizeAddr(mux.Vars(r)["address"])
+	s.proxyBlockscoutWithBody(w, r, "/api/v2/smart-contracts/0x"+address+"/query-read-method")
+}
+
+func (s *Server) handleFlowPostEVMSmartContractVerify(w http.ResponseWriter, r *http.Request) {
+	address := normalizeAddr(mux.Vars(r)["address"])
+	verifyType := mux.Vars(r)["type"]
+	s.proxyBlockscoutWithBody(w, r, "/api/v2/smart-contracts/0x"+address+"/verification/via/"+verifyType)
+}
+
 func evmTransferDirection(addrFilter, from, to string) string {
 	addrFilter = strings.ToLower(addrFilter)
 	if addrFilter != "" {

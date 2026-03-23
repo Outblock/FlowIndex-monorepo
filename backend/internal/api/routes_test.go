@@ -110,9 +110,17 @@ var specExcludedRoutes = map[string]bool{
 	"/flow/evm/search":                                   true,
 	"/flow/search/preview":                               true,
 	// Scheduled transaction handler/search routes (new, not yet in spec)
-	"/flow/scheduled-handler":                true,
-	"/flow/scheduled-handler/{owner}": true,
-	"/flow/scheduled-transaction/search":     true,
+	"/flow/scheduled-handler":            true,
+	"/flow/scheduled-handler/{owner}":    true,
+	"/flow/scheduled-transaction/search": true,
+	// EVM Smart Contract proxy routes
+	"/flow/evm/smart-contracts":                                   true,
+	"/flow/evm/smart-contracts/counters":                          true,
+	"/flow/evm/smart-contracts/{address}":                         true,
+	"/flow/evm/smart-contracts/{address}/methods-read":            true,
+	"/flow/evm/smart-contracts/{address}/methods-write":           true,
+	"/flow/evm/smart-contracts/{address}/query-read-method":       true,
+	"/flow/evm/smart-contracts/{address}/verification/via/{type}": true,
 }
 
 // TestAllRoutesInSpec ensures every registered public route has an OpenAPI spec entry.
