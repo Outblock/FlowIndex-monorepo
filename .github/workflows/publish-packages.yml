@@ -49,6 +49,14 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           npm view @flowindex/flow-signer@$VERSION version 2>/dev/null && echo "Already published" || npm publish --access public
 
+      - name: Publish @flowindex/evm-wallet
+        working-directory: packages/evm-wallet
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          npm view @flowindex/evm-wallet@$VERSION version 2>/dev/null && echo "Already published" || npm publish --access public
+
       - name: Publish @flowindex/agent-wallet
         working-directory: packages/agent-wallet
         env:

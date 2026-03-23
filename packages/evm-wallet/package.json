@@ -4,6 +4,13 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
@@ -23,5 +30,11 @@
   "peerDependenciesMeta": {
     "@walletconnect/web3wallet": { "optional": true },
     "@walletconnect/core": { "optional": true }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "nx": {
+    "tags": ["package"]
   }
 }
