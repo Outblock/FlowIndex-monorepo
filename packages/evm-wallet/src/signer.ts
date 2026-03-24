@@ -1,6 +1,7 @@
 import { type Hex, encodeAbiParameters, toHex } from "viem"
 
 export function derToRS(der: Uint8Array): { r: bigint; s: bigint } {
+  const P256_N = BigInt("0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551")
   let offset = 2
   if (der[offset] !== 0x02) throw new Error("Expected 0x02 tag for r")
   offset++
@@ -17,7 +18,8 @@ export function derToRS(der: Uint8Array): { r: bigint; s: bigint } {
   const toHexStr = (bytes: Uint8Array) =>
     Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")
   const r = BigInt("0x" + toHexStr(rBytes))
-  const s = BigInt("0x" + toHexStr(sBytes))
+  let s = BigInt("0x" + toHexStr(sBytes))
+  if (s > P256_N / 2n) s = P256_N - s
   return { r, s }
 }
 
