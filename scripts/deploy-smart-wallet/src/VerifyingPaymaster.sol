@@ -54,10 +54,10 @@ contract VerifyingPaymaster {
     event Deposited(uint256 amount);
     event Staked(uint256 amount, uint32 unstakeDelay);
 
-    constructor(address _entryPoint, address _verifyingSigner) {
+    constructor(address _entryPoint, address _verifyingSigner, address _owner) {
         entryPoint = _entryPoint;
         verifyingSigner = _verifyingSigner;
-        owner = msg.sender;
+        owner = _owner;
     }
 
     /**

@@ -9,17 +9,19 @@ Foundry project for deploying Coinbase Smart Wallet + VerifyingPaymaster to Flow
 | `DeployFactory.s.sol` | CoinbaseSmartWallet + CoinbaseSmartWalletFactory | ERC-4337 smart account with passkey (P-256) support |
 | `DeployPaymaster.s.sol` | VerifyingPaymaster | Gas sponsoring — trusted signer approves UserOps |
 
-## Deployed Addresses (Flow-EVM Testnet, chain 545)
+## Deployed Addresses (CREATE2 — same on Testnet 545 & Mainnet 747)
 
 | Contract | Address |
 |----------|---------|
-| CoinbaseSmartWallet (impl) | `0x0d956a72774534DE5bFc0dA88Fca589ba2378De0` |
-| CoinbaseSmartWalletFactory | `0xAc396ed9a5E949C685C3799657E26fE1d6fFf7E7` |
-| VerifyingPaymaster | `0x348C96e048A6A01B1bD75b6218b65986717CC15a` |
+| CoinbaseSmartWallet (impl) | `0x3e3Ea3318aff863f051998239f4a7eE1554714Ea` |
+| CoinbaseSmartWalletFactory | `0x69d8889778D1baAE4D9D84ad13367cBA570e46e6` |
+| VerifyingPaymaster | `0x78c7b2f6313a7615504b28197b80abb9c6696395` |
 
-Already deployed (canonical, no action needed):
+Canonical (pre-deployed, no action needed):
 - EntryPoint v0.7: `0x0000000071727De22E5E9d8BAf0edAc6f37da032`
 - CREATE2 Deployer: `0x4e59b44847b379578588920cA78FbF26c0B4956C`
+
+Salt: `0x000...0f10b1` — all contracts deployed via CREATE2 deployer for deterministic cross-network addresses.
 
 ## Setup
 
