@@ -19,7 +19,7 @@ describe("signer", () => {
     it("finds byte offset of challenge in clientDataJSON", () => {
       const clientDataJSON = '{"type":"webauthn.get","challenge":"dGVzdA","origin":"https://example.com"}'
       const idx = findChallengeIndex(clientDataJSON)
-      const expected = clientDataJSON.indexOf('"challenge":"') + '"challenge":"'.length
+      const expected = clientDataJSON.indexOf('"challenge"')
       expect(idx).toBe(expected)
     })
   })
@@ -28,7 +28,7 @@ describe("signer", () => {
     it("finds byte offset of type in clientDataJSON", () => {
       const clientDataJSON = '{"type":"webauthn.get","challenge":"dGVzdA","origin":"https://example.com"}'
       const idx = findTypeIndex(clientDataJSON)
-      const expected = clientDataJSON.indexOf('"type":"') + '"type":"'.length
+      const expected = clientDataJSON.indexOf('"type"')
       expect(idx).toBe(expected)
     })
   })

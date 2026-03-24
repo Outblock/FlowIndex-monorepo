@@ -22,17 +22,15 @@ export function derToRS(der: Uint8Array): { r: bigint; s: bigint } {
 }
 
 export function findChallengeIndex(clientDataJSON: string): number {
-  const needle = '"challenge":"'
-  const idx = clientDataJSON.indexOf(needle)
+  const idx = clientDataJSON.indexOf('"challenge"')
   if (idx === -1) throw new Error("challenge not found in clientDataJSON")
-  return idx + needle.length
+  return idx
 }
 
 export function findTypeIndex(clientDataJSON: string): number {
-  const needle = '"type":"'
-  const idx = clientDataJSON.indexOf(needle)
+  const idx = clientDataJSON.indexOf('"type"')
   if (idx === -1) throw new Error("type not found in clientDataJSON")
-  return idx + needle.length
+  return idx
 }
 
 export function encodeWebAuthnSignature(params: {
@@ -48,19 +46,39 @@ export function encodeWebAuthnSignature(params: {
 
   const signatureData = encodeAbiParameters(
     [
-      { type: "bytes" },
-      { type: "string" },
-      { type: "uint256" },
-      { type: "uint256" },
-      { type: "uint256" },
-      { type: "uint256" },
+      {
+        type: "tuple",
+        components: [
+          { name: "authenticatorData", type: "bytes" },
+          { name: "clientDataJSON", type: "string" },
+          { name: "challengeIndex", type: "uint256" },
+          { name: "typeIndex", type: "uint256" },
+          { name: "r", type: "uint256" },
+          { name: "s", type: "uint256" },
+        ],
+      },
     ],
-    [toHex(authenticatorData), clientDataJSON, challengeIndex, typeIndex, r, s],
+    [{
+      authenticatorData: toHex(authenticatorData),
+      clientDataJSON,
+      challengeIndex,
+      typeIndex,
+      r,
+      s,
+    }],
   )
 
   return encodeAbiParameters(
-    [{ type: "uint256" }, { type: "bytes" }],
-    [ownerIndex, signatureData],
+    [
+      {
+        type: "tuple",
+        components: [
+          { name: "ownerIndex", type: "uint256" },
+          { name: "signatureData", type: "bytes" },
+        ],
+      },
+    ],
+    [{ ownerIndex, signatureData }],
   )
 }
 
