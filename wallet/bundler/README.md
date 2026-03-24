@@ -30,7 +30,7 @@ URL pattern follows Pimlico convention: `/{chainId}/rpc` and `/{chainId}/paymast
 | EntryPoint v0.7 | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
 | CoinbaseSmartWallet (impl) | `0x3e3Ea3318aff863f051998239f4a7eE1554714Ea` |
 | CoinbaseSmartWalletFactory | `0x69d8889778D1baAE4D9D84ad13367cBA570e46e6` |
-| VerifyingPaymaster | `0x78c7b2f6313a7615504b28197b80abb9c6696395` |
+| VerifyingPaymaster | `0x6160d63ca23b9364e44daf9ca2acd72e374eaef5` |
 
 ## Wallet Addresses (shared across testnet & mainnet)
 
@@ -119,12 +119,12 @@ The executor wallet needs FLOW on both testnet and mainnet. The paymaster contra
 ```bash
 # Check paymaster deposit at EntryPoint (testnet)
 cast call 0x0000000071727De22E5E9d8BAf0edAc6f37da032 \
-  "balanceOf(address)(uint256)" 0x78c7b2f6313a7615504b28197b80abb9c6696395 \
+  "balanceOf(address)(uint256)" 0x6160d63ca23b9364e44daf9ca2acd72e374eaef5 \
   --rpc-url https://testnet.evm.nodes.onflow.org
 
 # Check paymaster deposit at EntryPoint (mainnet)
 cast call 0x0000000071727De22E5E9d8BAf0edAc6f37da032 \
-  "balanceOf(address)(uint256)" 0x78c7b2f6313a7615504b28197b80abb9c6696395 \
+  "balanceOf(address)(uint256)" 0x6160d63ca23b9364e44daf9ca2acd72e374eaef5 \
   --rpc-url https://mainnet.evm.nodes.onflow.org
 ```
 

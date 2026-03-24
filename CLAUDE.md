@@ -220,7 +220,7 @@ The frontend is a **TanStack Start SSR app** (NOT a plain React SPA). Source cod
 - EntryPoint v0.7: `0x0000000071727De22E5E9d8BAf0edAc6f37da032` (canonical, pre-deployed)
 - CoinbaseSmartWalletFactory: `0x69d8889778D1baAE4D9D84ad13367cBA570e46e6`
 - CoinbaseSmartWallet (impl): `0x3e3Ea3318aff863f051998239f4a7eE1554714Ea`
-- VerifyingPaymaster: `0x78c7b2f6313a7615504b28197b80abb9c6696395`
+- VerifyingPaymaster: `0x6160d63ca23b9364e44daf9ca2acd72e374eaef5`
 
 **Key package:** `packages/evm-wallet/` — ERC-4337 client SDK (factory, signer, bundler-client, UserOp construction, EIP-1193 provider, WalletConnect v2). Exports `getBundlerUrl(chainId)` and `getPaymasterUrl(chainId)` helpers.
 

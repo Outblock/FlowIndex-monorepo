@@ -15,7 +15,8 @@ contract DeployPaymaster is Script {
         // Deploy paymaster
         VerifyingPaymaster paymaster = new VerifyingPaymaster(
             entryPoint,
-            verifyingSigner
+            verifyingSigner,
+            vm.addr(deployerKey)
         );
         console.log("Paymaster:", address(paymaster));
 

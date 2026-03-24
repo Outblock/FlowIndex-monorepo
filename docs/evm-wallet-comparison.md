@@ -11,7 +11,7 @@ We currently use **Coinbase Smart Wallet** (CoinbaseSmartWalletFactory) deployed
 | EntryPoint v0.7 | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
 | CoinbaseSmartWalletFactory | `0x69d8889778D1baAE4D9D84ad13367cBA570e46e6` |
 | CoinbaseSmartWallet (impl) | `0x3e3Ea3318aff863f051998239f4a7eE1554714Ea` |
-| VerifyingPaymaster | `0x78c7b2f6313a7615504b28197b80abb9c6696395` |
+| VerifyingPaymaster | `0x6160d63ca23b9364e44daf9ca2acd72e374eaef5` |
 
 Infrastructure: Alto bundler + paymaster signer at `bundler.flowindex.io/{chainId}/rpc` and `/{chainId}/paymaster`.
 

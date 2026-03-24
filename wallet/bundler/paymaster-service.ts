@@ -9,7 +9,7 @@ import {
 } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 
-const PAYMASTER_ADDRESS: Address = (process.env.PAYMASTER_ADDRESS || "0x78c7b2f6313a7615504b28197b80abb9c6696395") as Address
+const PAYMASTER_ADDRESS: Address = (process.env.PAYMASTER_ADDRESS || "0x6160d63ca23b9364e44daf9ca2acd72e374eaef5") as Address
 const PAYMASTER_SIGNER_KEY =
   process.env.PAYMASTER_SIGNER_KEY ||
   "0x17d377392e3cc989464bb287984ea61060f1373effdf125de4d09e9b03af200b"
