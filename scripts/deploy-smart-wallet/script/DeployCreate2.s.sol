@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import {Script, console} from "forge-std/Script.sol";
-import {CoinbaseSmartWalletFactory} from "smart-wallet/src/CoinbaseSmartWalletFactory.sol";
-import {CoinbaseSmartWallet} from "smart-wallet/src/CoinbaseSmartWallet.sol";
+import {CoinbaseSmartWalletFactory} from "../src/CoinbaseSmartWalletFactory.sol";
+import {CoinbaseSmartWallet} from "../src/CoinbaseSmartWallet.sol";
 
 /**
  * @title DeployCreate2

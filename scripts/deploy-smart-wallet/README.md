@@ -13,8 +13,8 @@ Foundry project for deploying Coinbase Smart Wallet + VerifyingPaymaster to Flow
 
 | Contract | Address |
 |----------|---------|
-| CoinbaseSmartWallet (impl) | `0x3e3Ea3318aff863f051998239f4a7eE1554714Ea` |
-| CoinbaseSmartWalletFactory | `0x69d8889778D1baAE4D9D84ad13367cBA570e46e6` |
+| CoinbaseSmartWallet (impl) | `0x8fc3Ff55d9cb304141097d5f5e57D4699f773b08` |
+| CoinbaseSmartWalletFactory | `0x8E4333c6878A32F49611670EAD1793597392C48f` |
 | VerifyingPaymaster | `0x6160d63ca23b9364e44daf9ca2acd72e374eaef5` |
 
 Canonical (pre-deployed, no action needed):

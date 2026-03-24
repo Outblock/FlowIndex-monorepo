@@ -24,7 +24,7 @@ export const flowEvmTestnet = defineChain({
 
 export const ENTRYPOINT_V07_ADDRESS = "0x0000000071727De22E5E9d8BAf0edAc6f37da032" as const
 // Deployed via CREATE2 — same address on testnet (545) and mainnet (747)
-export const FACTORY_ADDRESS = "0x69d8889778D1baAE4D9D84ad13367cBA570e46e6" as const
+export const FACTORY_ADDRESS = "0x8E4333c6878A32F49611670EAD1793597392C48f" as const
 // Deployed via CREATE2 — same address on testnet (545) and mainnet (747)
 export const PAYMASTER_ADDRESS = "0x6160d63ca23b9364e44daf9ca2acd72e374eaef5" as const
 
