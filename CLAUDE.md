@@ -206,12 +206,15 @@ The frontend is a **TanStack Start SSR app** (NOT a plain React SPA). Source cod
 
 **VM:** `flowindex-bundler` (GCE e2-micro, COS, us-central1-a, `10.128.0.6`)
 **DNS:** `bundler.flowindex.io` (static IP `136.112.57.126`)
+**URL pattern:** Pimlico-style `/{chainId}/rpc` and `/{chainId}/paymaster`
 
-| Service | Port | URL |
-|---------|------|-----|
-| Alto Bundler | 4337 | `https://bundler.flowindex.io` |
-| Paymaster Signer | 4338 | `https://bundler.flowindex.io/paymaster` |
-| Caddy (TLS) | 443 | Routes to above |
+| Container | Port | URL |
+|-----------|------|-----|
+| `alto-testnet` | 4337 | `https://bundler.flowindex.io/545/rpc` |
+| `alto-mainnet` | 4347 | `https://bundler.flowindex.io/747/rpc` |
+| `paymaster-testnet` | 4338 | `https://bundler.flowindex.io/545/paymaster` |
+| `paymaster-mainnet` | 4348 | `https://bundler.flowindex.io/747/paymaster` |
+| `caddy` | 443 | TLS + path routing via `wallet/bundler/Caddyfile` |
 
 **Deployed Contracts (CREATE2 — same on Testnet 545 & Mainnet 747):**
 - EntryPoint v0.7: `0x0000000071727De22E5E9d8BAf0edAc6f37da032` (canonical, pre-deployed)
@@ -219,9 +222,9 @@ The frontend is a **TanStack Start SSR app** (NOT a plain React SPA). Source cod
 - CoinbaseSmartWallet (impl): `0x3e3Ea3318aff863f051998239f4a7eE1554714Ea`
 - VerifyingPaymaster: `0x78c7b2f6313a7615504b28197b80abb9c6696395`
 
-**Key package:** `packages/evm-wallet/` — ERC-4337 client SDK (factory, signer, bundler-client, UserOp construction, EIP-1193 provider, WalletConnect v2)
+**Key package:** `packages/evm-wallet/` — ERC-4337 client SDK (factory, signer, bundler-client, UserOp construction, EIP-1193 provider, WalletConnect v2). Exports `getBundlerUrl(chainId)` and `getPaymasterUrl(chainId)` helpers.
 
-**CI/CD:** `deploy-infra.yml` (separate from `deploy.yml`) — triggers on `wallet/bundler/**` or `packages/evm-wallet/**` changes
+**CI/CD:** `deploy-infra.yml` (manual workflow_dispatch) — deploys bundler, paymaster, and Caddy config to VM
 
 ## Workers (17 types)
 
