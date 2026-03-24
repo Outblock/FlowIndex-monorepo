@@ -74,7 +74,15 @@ async function handleRequest(req: Request): Promise<Response> {
     const body = await req.json()
     const userOp = body.userOp
     if (!userOp?.sender) {
-      return Response.json({ error: "missing userOp" }, { status: 400 })
+      return Response.json({ error: "missing userOp.sender" }, { status: 400 })
+    }
+
+    // Ensure required fields have defaults
+    const required = ["nonce", "accountGasLimits", "preVerificationGas", "gasFees"] as const
+    for (const field of required) {
+      if (userOp[field] === undefined || userOp[field] === null) {
+        userOp[field] = field === "nonce" || field === "preVerificationGas" ? "0x0" : ("0x" + "00".repeat(32)) as Hex
+      }
     }
 
     // Valid for 10 minutes
@@ -106,8 +114,11 @@ async function handleRequest(req: Request): Promise<Response> {
       { headers: { "Access-Control-Allow-Origin": "*" } },
     )
   } catch (e: any) {
-    console.error("[paymaster] Error:", e.message)
-    return Response.json({ error: e.message }, { status: 500 })
+    console.error("[paymaster] Error:", e.message, e.stack)
+    return Response.json(
+      { error: e.message, hint: "Ensure userOp has: sender, nonce, initCode, callData, accountGasLimits, preVerificationGas, gasFees" },
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } },
+    )
   }
 }
 
