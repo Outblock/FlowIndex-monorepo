@@ -1,21 +1,21 @@
 bundler.flowindex.io {
-	# Testnet bundler (chain 545)
-	handle /545/rpc* {
+	# Testnet bundler (chain 545) — strip prefix, forward to Alto root
+	handle_path /545/rpc* {
 		reverse_proxy localhost:4337
 	}
 
 	# Mainnet bundler (chain 747)
-	handle /747/rpc* {
+	handle_path /747/rpc* {
 		reverse_proxy localhost:4347
 	}
 
 	# Testnet paymaster (chain 545)
-	handle /545/paymaster* {
+	handle_path /545/paymaster* {
 		reverse_proxy localhost:4338
 	}
 
 	# Mainnet paymaster (chain 747)
-	handle /747/paymaster* {
+	handle_path /747/paymaster* {
 		reverse_proxy localhost:4348
 	}
 
