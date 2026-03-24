@@ -5,12 +5,16 @@ import {
   createEvmWalletProvider,
   FACTORY_ADDRESS,
   flowEvmTestnet,
+  getBundlerUrl,
+  getPaymasterUrl,
 } from '@flowindex/evm-wallet';
 import type { EvmWalletProvider } from '@flowindex/evm-wallet';
 import type { PasskeyAccount } from '@flowindex/auth-core';
 
-const BUNDLER_URL = import.meta.env.VITE_BUNDLER_URL || 'https://bundler.flowindex.io';
-const PAYMASTER_URL = import.meta.env.VITE_PAYMASTER_URL || '';
+const CHAIN_ID = parseInt(import.meta.env.VITE_EVM_CHAIN_ID || '545');
+const BUNDLER_BASE = import.meta.env.VITE_BUNDLER_URL || 'https://bundler.flowindex.io';
+const BUNDLER_URL = getBundlerUrl(CHAIN_ID, BUNDLER_BASE);
+const PAYMASTER_URL = getPaymasterUrl(CHAIN_ID, BUNDLER_BASE);
 const EVM_RPC_URL = flowEvmTestnet.rpcUrls.default.http[0];
 
 export function useEvmWallet(account: PasskeyAccount | null) {

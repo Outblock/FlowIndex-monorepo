@@ -9,11 +9,11 @@ import {
 } from "viem"
 import { privateKeyToAccount } from "viem/accounts"
 
-const PAYMASTER_ADDRESS: Address = "0x348C96e048A6A01B1bD75b6218b65986717CC15a"
+const PAYMASTER_ADDRESS: Address = (process.env.PAYMASTER_ADDRESS || "0x78c7b2f6313a7615504b28197b80abb9c6696395") as Address
 const PAYMASTER_SIGNER_KEY =
   process.env.PAYMASTER_SIGNER_KEY ||
   "0x17d377392e3cc989464bb287984ea61060f1373effdf125de4d09e9b03af200b"
-const CHAIN_ID = 545 // Flow-EVM testnet
+const CHAIN_ID = parseInt(process.env.CHAIN_ID || "545")
 const PORT = parseInt(process.env.PAYMASTER_PORT || "4338")
 
 const signer = privateKeyToAccount(PAYMASTER_SIGNER_KEY as Hex)
@@ -112,6 +112,6 @@ async function handleRequest(req: Request): Promise<Response> {
 }
 
 const server = Bun.serve({ port: PORT, fetch: handleRequest })
-console.log(`[paymaster] Signing service running on port ${PORT}`)
+console.log(`[paymaster] Signing service running on port ${PORT} (chain ${CHAIN_ID})`)
 console.log(`[paymaster] Signer: ${signer.address}`)
 console.log(`[paymaster] Paymaster: ${PAYMASTER_ADDRESS}`)

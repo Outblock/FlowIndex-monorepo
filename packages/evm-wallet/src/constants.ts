@@ -28,6 +28,18 @@ export const FACTORY_ADDRESS = "0x69d8889778D1baAE4D9D84ad13367cBA570e46e6" as c
 // Deployed via CREATE2 — same address on testnet (545) and mainnet (747)
 export const PAYMASTER_ADDRESS = "0x78c7b2f6313a7615504b28197b80abb9c6696395" as const
 
+export const BUNDLER_BASE_URL = "https://bundler.flowindex.io" as const
+
+/** Build bundler RPC URL for a given chain ID: `{base}/{chainId}/rpc` */
+export function getBundlerUrl(chainId: number, baseUrl = BUNDLER_BASE_URL): string {
+  return `${baseUrl}/${chainId}/rpc`
+}
+
+/** Build paymaster URL for a given chain ID: `{base}/{chainId}/paymaster` */
+export function getPaymasterUrl(chainId: number, baseUrl = BUNDLER_BASE_URL): string {
+  return `${baseUrl}/${chainId}/paymaster`
+}
+
 export const FACTORY_ABI = [
   {
     name: "getAddress",
