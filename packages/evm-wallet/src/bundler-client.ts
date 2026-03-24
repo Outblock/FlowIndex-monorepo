@@ -149,7 +149,10 @@ export function createBundlerClient(bundlerUrl: string) {
     async sendUserOperation(userOp: PackedUserOperation, entryPoint: Address): Promise<Hex> {
       return rpc<Hex>("eth_sendUserOperation", [toBundlerRpcUserOp(userOp), entryPoint])
     },
-    async estimateUserOperationGas(userOp: Partial<PackedUserOperation>, entryPoint: Address): Promise<GasEstimate> {
+    async estimateUserOperationGas(
+      userOp: Partial<PackedUserOperation> & Record<string, any>,
+      entryPoint: Address,
+    ): Promise<GasEstimate> {
       return rpc<GasEstimate>("eth_estimateUserOperationGas", [toBundlerRpcUserOp(userOp), entryPoint])
     },
     async getUserOperationReceipt(userOpHash: Hex): Promise<UserOpReceipt | null> {

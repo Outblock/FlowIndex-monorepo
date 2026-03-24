@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { derToRS, findChallengeIndex, findTypeIndex, encodeWebAuthnSignature } from "../src/signer"
+import { computeReplaySafeHash, derToRS, findChallengeIndex, findTypeIndex, encodeWebAuthnSignature } from "../src/signer"
 
 describe("signer", () => {
   describe("derToRS", () => {
@@ -11,6 +11,21 @@ describe("signer", () => {
       )
       const { r, s } = derToRS(der)
       expect(r).toBe(1n)
+      expect(s).toBe(2n)
+    })
+
+    it("normalizes high-s signatures to low-s", () => {
+      const n = BigInt("0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551")
+      const highS = n - 2n
+      const der = new Uint8Array(
+        Array.from(Buffer.from(
+          "3045" +
+          "0220" + "0000000000000000000000000000000000000000000000000000000000000001" +
+          "0221" + "00" + highS.toString(16).padStart(64, "0"),
+          "hex",
+        )),
+      )
+      const { s } = derToRS(der)
       expect(s).toBe(2n)
     })
   })
@@ -44,6 +59,17 @@ describe("signer", () => {
       })
       expect(result).toMatch(/^0x[0-9a-f]+$/i)
       expect(result.length).toBeGreaterThan(200)
+    })
+  })
+
+  describe("computeReplaySafeHash", () => {
+    it("wraps a hash with the Coinbase Smart Wallet EIP-712 domain", () => {
+      const result = computeReplaySafeHash(
+        "0x" + "11".repeat(32),
+        "0x1234567890123456789012345678901234567890",
+        545,
+      )
+      expect(result).toMatch(/^0x[0-9a-f]{64}$/i)
     })
   })
 })

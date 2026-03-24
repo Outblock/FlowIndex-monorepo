@@ -4,9 +4,9 @@ import {
   toHex,
 } from "viem"
 import { createBundlerClient } from "./bundler-client"
-import { buildUserOperation, type CallParams } from "./user-op"
-import { signUserOpWithPasskey } from "./signer"
-import { ENTRYPOINT_V07_ADDRESS, computeUserOpHash } from "./constants"
+import { isSmartWalletDeployed } from "./factory"
+import { deploySmartWallet, sendSmartWalletTransaction, type CallParams } from "./user-op"
+import { signMessageWithPasskey, signTypedDataWithPasskey } from "./signer"
 
 type EventName = "accountsChanged" | "chainChanged" | "disconnect"
 type EventHandler = (...args: any[]) => void
@@ -85,45 +85,61 @@ export function createEvmWalletProvider(config: EvmWalletProviderConfig) {
 
       if (method === "eth_sendTransaction") {
         const [tx] = params ?? []
+        const deployed = isDeployed || await isSmartWalletDeployed(smartWalletAddress, { rpcUrl })
         const call: CallParams = {
           target: tx.to as Address,
           value: tx.value ? BigInt(tx.value) : 0n,
           data: (tx.data ?? "0x") as Hex,
         }
 
-        const userOp = await buildUserOperation({
+        const result = await sendSmartWalletTransaction({
           sender: smartWalletAddress,
           call,
           publicKeySec1Hex,
-          isDeployed,
           rpcUrl,
           bundlerClient,
+          chainId,
+          credentialId,
+          isDeployed: deployed,
           paymasterUrl,
         })
 
-        const userOpHash = computeUserOpHash(userOp, ENTRYPOINT_V07_ADDRESS, chainId)
-
-        userOp.signature = await signUserOpWithPasskey(userOpHash, credentialId)
-
-        const opHash = await bundlerClient.sendUserOperation(userOp, ENTRYPOINT_V07_ADDRESS)
-
-        if (!isDeployed) isDeployed = true
-
-        let receipt = null
-        for (let i = 0; i < 60; i++) {
-          await new Promise((r) => setTimeout(r, 2000))
-          receipt = await bundlerClient.getUserOperationReceipt(opHash)
-          if (receipt) break
-        }
-
-        return receipt?.receipt.transactionHash ?? opHash
+        isDeployed = true
+        return result.transactionHash ?? result.userOpHash
       }
 
       if (method === "personal_sign" || method === "eth_signTypedData_v4") {
         if (!isDeployed) {
-          throw new Error("Wallet must be deployed before signing messages. Send a transaction first.")
+          const deployed = await isSmartWalletDeployed(smartWalletAddress, { rpcUrl })
+          if (!deployed) {
+            await deploySmartWallet({
+              sender: smartWalletAddress,
+              publicKeySec1Hex,
+              credentialId,
+              rpcUrl,
+              bundlerClient,
+              chainId,
+              paymasterUrl,
+            })
+          }
+          isDeployed = true
         }
-        throw new Error(`${method} not yet implemented`)
+
+        if (method === "personal_sign") {
+          return signMessageWithPasskey(
+            extractPersonalSignMessage(params, smartWalletAddress),
+            credentialId,
+            smartWalletAddress,
+            chainId,
+          )
+        }
+
+        return signTypedDataWithPasskey(
+          extractTypedData(params, smartWalletAddress),
+          credentialId,
+          smartWalletAddress,
+          chainId,
+        )
       }
 
       if (method === "wallet_switchEthereumChain") {
@@ -145,3 +161,37 @@ export function createEvmWalletProvider(config: EvmWalletProviderConfig) {
 }
 
 export type EvmWalletProvider = ReturnType<typeof createEvmWalletProvider>
+
+function extractPersonalSignMessage(params: any[] | undefined, account: Address): string | Hex {
+  const [first, second] = params ?? []
+  if (typeof first !== "string" && typeof second !== "string") {
+    throw new Error("personal_sign requires message params")
+  }
+
+  if (typeof first === "string" && first.toLowerCase() === account.toLowerCase()) {
+    return second as string | Hex
+  }
+
+  if (typeof second === "string" && second.toLowerCase() === account.toLowerCase()) {
+    return first as string | Hex
+  }
+
+  return first as string | Hex
+}
+
+function extractTypedData(params: any[] | undefined, account: Address): any {
+  const [first, second] = params ?? []
+  let typedDataParam = second
+
+  if (typeof first === "string" && first.toLowerCase() === account.toLowerCase()) {
+    typedDataParam = second
+  } else if (typeof second === "string" && second.toLowerCase() === account.toLowerCase()) {
+    typedDataParam = first
+  }
+
+  if (!typedDataParam) {
+    throw new Error("eth_signTypedData_v4 requires typed data params")
+  }
+
+  return typeof typedDataParam === "string" ? JSON.parse(typedDataParam) : typedDataParam
+}

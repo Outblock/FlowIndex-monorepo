@@ -51,6 +51,15 @@ export async function getSmartWalletAddress(
   return address
 }
 
+export async function isSmartWalletDeployed(
+  address: Address,
+  opts: { rpcUrl: string },
+): Promise<boolean> {
+  const client = createPublicClient({ transport: http(opts.rpcUrl) })
+  const code = await client.getCode({ address })
+  return !!code && code !== "0x"
+}
+
 export function buildInitCode(
   sec1Hex: string,
   opts?: { factoryAddress?: Address; nonce?: bigint },

@@ -1,6 +1,7 @@
 import {
   type Address,
   type Hex,
+  type Hash,
   encodeFunctionData,
   pad,
   concat,
@@ -8,9 +9,10 @@ import {
   createPublicClient,
   http,
 } from "viem"
-import { SMART_WALLET_ABI, ENTRYPOINT_ABI, ENTRYPOINT_V07_ADDRESS } from "./constants"
+import { computeUserOpHash, SMART_WALLET_ABI, ENTRYPOINT_ABI, ENTRYPOINT_V07_ADDRESS } from "./constants"
 import { buildInitCode } from "./factory"
-import type { BundlerClient, PackedUserOperation, GasEstimate } from "./bundler-client"
+import { WEBAUTHN_STUB_SIGNATURE, signUserOpWithPasskey } from "./signer"
+import type { BundlerClient, PackedUserOperation, UserOpReceipt } from "./bundler-client"
 
 export interface CallParams {
   target: Address
@@ -60,6 +62,30 @@ export function buildBatchCallData(calls: CallParams[]): Hex {
   })
 }
 
+async function requestPaymasterAndData(
+  paymasterUrl: string | undefined,
+  userOp: {
+    sender: Address
+    nonce: Hex
+    initCode: Hex
+    callData: Hex
+    accountGasLimits: Hex
+    preVerificationGas: Hex
+    gasFees: Hex
+    signature: Hex
+  },
+): Promise<Hex> {
+  if (!paymasterUrl) return "0x"
+
+  const response = await fetch(paymasterUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userOp: { ...userOp, paymasterAndData: "0x" } }),
+  })
+  const data = await response.json()
+  return (data.paymasterAndData ?? "0x") as Hex
+}
+
 /**
  * Build a complete unsigned UserOperation (v0.7 packed format).
  */
@@ -93,56 +119,181 @@ export async function buildUserOperation(opts: {
   })
 
   const initCode: Hex = isDeployed ? "0x" : buildInitCode(publicKeySec1Hex)
-
   const callData = Array.isArray(call) ? buildBatchCallData(call) : buildCallData(call)
-
-  const dummySignature = ("0x" + "ff".repeat(65)) as Hex
-  const gasEstimate: GasEstimate = await bundlerClient.estimateUserOperationGas(
-    {
-      sender,
-      nonce: toHex(nonce),
-      initCode,
-      callData,
-      signature: dummySignature,
-      paymasterAndData: "0x",
-      accountGasLimits: packGasLimits(500000n, 500000n),
-      preVerificationGas: toHex(100000n),
-      gasFees: packGasFees(0n, 1000000n),
-    },
-    entryPoint,
-  )
 
   const block = await client.getBlock()
   const baseFee = block.baseFeePerGas ?? 1n
   const maxFeePerGas = baseFee * 2n > 1000000n ? baseFee * 2n : 1000000n
   const maxPriorityFeePerGas = 0n
+  const initialAccountGasLimits = packGasLimits(500000n, 500000n)
+  const initialPreVerificationGas = toHex(100000n)
+  const gasFees = packGasFees(maxPriorityFeePerGas, maxFeePerGas)
+
+  const preliminaryPaymasterAndData = await requestPaymasterAndData(opts.paymasterUrl, {
+    sender,
+    nonce: toHex(nonce),
+    initCode,
+    callData,
+    accountGasLimits: initialAccountGasLimits,
+    preVerificationGas: initialPreVerificationGas,
+    gasFees,
+    signature: WEBAUTHN_STUB_SIGNATURE,
+  })
+
+  const gasEstimate = await bundlerClient.estimateUserOperationGas(
+    {
+      sender,
+      nonce: toHex(nonce),
+      initCode,
+      callData,
+      signature: WEBAUTHN_STUB_SIGNATURE,
+      paymasterAndData: preliminaryPaymasterAndData,
+      callGasLimit: toHex(500000n),
+      verificationGasLimit: toHex(500000n),
+      preVerificationGas: initialPreVerificationGas,
+      maxFeePerGas: toHex(maxFeePerGas),
+      maxPriorityFeePerGas: toHex(maxPriorityFeePerGas),
+    },
+    entryPoint,
+  )
+
+  const accountGasLimits = packGasLimits(
+    BigInt(gasEstimate.verificationGasLimit),
+    BigInt(gasEstimate.callGasLimit),
+  )
+  const preVerificationGas = gasEstimate.preVerificationGas as Hex
+  const paymasterAndData = await requestPaymasterAndData(opts.paymasterUrl, {
+    sender,
+    nonce: toHex(nonce),
+    initCode,
+    callData,
+    accountGasLimits,
+    preVerificationGas,
+    gasFees,
+    signature: WEBAUTHN_STUB_SIGNATURE,
+  })
 
   const result: PackedUserOperation = {
     sender,
     nonce: toHex(nonce),
     initCode,
     callData,
-    accountGasLimits: packGasLimits(
-      BigInt(gasEstimate.verificationGasLimit),
-      BigInt(gasEstimate.callGasLimit),
-    ),
-    preVerificationGas: gasEstimate.preVerificationGas,
-    gasFees: packGasFees(maxPriorityFeePerGas, maxFeePerGas),
-    paymasterAndData: "0x",
+    accountGasLimits,
+    preVerificationGas,
+    gasFees,
+    paymasterAndData,
     signature: "0x",
   }
 
-  if (opts.paymasterUrl) {
-    const pmResponse = await fetch(opts.paymasterUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userOp: result }),
-    })
-    const pmData = await pmResponse.json()
-    if (pmData.paymasterAndData) {
-      result.paymasterAndData = pmData.paymasterAndData
-    }
+  return result
+}
+
+export async function submitUserOperation(
+  bundlerClient: BundlerClient,
+  userOp: PackedUserOperation,
+  entryPoint: Address = ENTRYPOINT_V07_ADDRESS,
+): Promise<Hash> {
+  return bundlerClient.sendUserOperation(userOp, entryPoint)
+}
+
+export async function waitForUserOperationReceipt(opts: {
+  bundlerClient: BundlerClient
+  userOpHash: Hash
+  timeoutMs?: number
+  pollIntervalMs?: number
+}): Promise<UserOpReceipt> {
+  const { bundlerClient, userOpHash, timeoutMs = 60000, pollIntervalMs = 2000 } = opts
+  const start = Date.now()
+
+  while (Date.now() - start < timeoutMs) {
+    const receipt = await bundlerClient.getUserOperationReceipt(userOpHash)
+    if (receipt) return receipt
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
   }
 
-  return result
+  throw new Error(`UserOp ${userOpHash} not mined within ${timeoutMs}ms`)
+}
+
+export async function sendSmartWalletTransaction(opts: {
+  sender: Address
+  call: CallParams | CallParams[]
+  publicKeySec1Hex: string
+  credentialId: string
+  isDeployed: boolean
+  rpcUrl: string
+  bundlerClient: BundlerClient
+  chainId: number
+  entryPoint?: Address
+  paymasterUrl?: string
+  waitForReceipt?: boolean
+  timeoutMs?: number
+  pollIntervalMs?: number
+}): Promise<{ userOpHash: Hash; transactionHash?: Hash; receipt?: UserOpReceipt }> {
+  const {
+    sender,
+    call,
+    publicKeySec1Hex,
+    credentialId,
+    isDeployed,
+    rpcUrl,
+    bundlerClient,
+    chainId,
+    entryPoint = ENTRYPOINT_V07_ADDRESS,
+    paymasterUrl,
+    waitForReceipt = true,
+    timeoutMs,
+    pollIntervalMs,
+  } = opts
+
+  const userOp = await buildUserOperation({
+    sender,
+    call,
+    publicKeySec1Hex,
+    isDeployed,
+    rpcUrl,
+    bundlerClient,
+    entryPoint,
+    paymasterUrl,
+  })
+
+  const userOpHash = computeUserOpHash(userOp, entryPoint, chainId)
+  userOp.signature = await signUserOpWithPasskey(userOpHash, credentialId)
+
+  const submittedUserOpHash = await submitUserOperation(bundlerClient, userOp, entryPoint)
+
+  if (!waitForReceipt) {
+    return { userOpHash: submittedUserOpHash }
+  }
+
+  const receipt = await waitForUserOperationReceipt({
+    bundlerClient,
+    userOpHash: submittedUserOpHash,
+    timeoutMs,
+    pollIntervalMs,
+  })
+
+  return {
+    userOpHash: submittedUserOpHash,
+    transactionHash: receipt.receipt.transactionHash,
+    receipt,
+  }
+}
+
+export async function deploySmartWallet(opts: {
+  sender: Address
+  publicKeySec1Hex: string
+  credentialId: string
+  rpcUrl: string
+  bundlerClient: BundlerClient
+  chainId: number
+  entryPoint?: Address
+  paymasterUrl?: string
+  timeoutMs?: number
+  pollIntervalMs?: number
+}): Promise<{ userOpHash: Hash; transactionHash?: Hash; receipt?: UserOpReceipt }> {
+  return sendSmartWalletTransaction({
+    ...opts,
+    call: [],
+    isDeployed: false,
+  })
 }
