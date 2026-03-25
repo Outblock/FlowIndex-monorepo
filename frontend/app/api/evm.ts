@@ -5,6 +5,7 @@ import type {
   BSInternalTransaction,
   BSTokenTransfer,
   BSTokenBalance,
+  BSAddressNFT,
   BSLog,
   BSSearchResult,
   BSPageParams,
@@ -69,7 +70,7 @@ export async function getEVMAddressTokenBalances(
 
 export async function getEVMAddressNFTs(
   address: string, pageParams?: BSPageParams, signal?: AbortSignal
-): Promise<BSPaginatedResponse<BSTokenBalance>> {
+): Promise<BSPaginatedResponse<BSAddressNFT>> {
   return evmFetch(`/address/${address}/nft`, pageParamsToRecord(pageParams), signal);
 }
 
