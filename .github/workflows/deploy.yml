@@ -54,6 +54,10 @@ on:
         description: "Simulate Landing"
         type: boolean
         default: false
+      status:
+        description: "Status Page"
+        type: boolean
+        default: false
 
 env:
   PROJECT_ID: flowindex-mainnet
@@ -79,6 +83,7 @@ jobs:
       wallet: ${{ steps.result.outputs.wallet }}
       simulator: ${{ steps.result.outputs.simulator }}
       simulate-landing: ${{ steps.result.outputs.simulate-landing }}
+      status: ${{ steps.result.outputs.status }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -122,6 +127,7 @@ jobs:
           changed wallet ':(glob)wallet/src/**' ':(glob)wallet/Dockerfile' ':(glob)wallet/package.json' ':(glob)packages/**' '.github/workflows/deploy.yml'
           changed simulator ':(glob)simulate/emulator/**' ':(glob)simulate/api/**' '.github/workflows/deploy.yml'
           changed simulate-landing ':(glob)simulate/frontend/**'
+          changed status ':(glob)status/**'
       - name: Resolve outputs
         id: result
         run: |
@@ -137,6 +143,7 @@ jobs:
             echo "wallet=${{ inputs.all == true || inputs.wallet == true }}" >> $GITHUB_OUTPUT
             echo "simulator=${{ inputs.all == true || inputs.simulator == true }}" >> $GITHUB_OUTPUT
             echo "simulate-landing=${{ inputs.all == true || inputs.simulate-landing == true }}" >> $GITHUB_OUTPUT
+            echo "status=${{ inputs.all == true || inputs.status == true }}" >> $GITHUB_OUTPUT
             SIM=${{ inputs.all == true || inputs.sim-studio == true }}
             echo "sim-studio=${SIM}" >> $GITHUB_OUTPUT
             echo "sim-studio-images=${SIM}" >> $GITHUB_OUTPUT
@@ -152,6 +159,7 @@ jobs:
             echo "wallet=${{ steps.filter.outputs.wallet }}" >> $GITHUB_OUTPUT
             echo "simulator=${{ steps.filter.outputs.simulator }}" >> $GITHUB_OUTPUT
             echo "simulate-landing=${{ steps.filter.outputs.simulate-landing }}" >> $GITHUB_OUTPUT
+            echo "status=${{ steps.filter.outputs.status }}" >> $GITHUB_OUTPUT
             echo "sim-studio=${{ steps.filter.outputs.sim-studio }}" >> $GITHUB_OUTPUT
             echo "sim-studio-images=${{ steps.filter.outputs.sim-studio-images }}" >> $GITHUB_OUTPUT
             echo "sim-studio-seed=${{ steps.filter.outputs.sim-studio-seed }}" >> $GITHUB_OUTPUT
@@ -1470,3 +1478,64 @@ jobs:
             --cpu 1 \
             --min-instances 0 \
             --max-instances 3
+
+  build-status:
+    needs: changes
+    if: needs.changes.outputs.status == 'true'
+    concurrency:
+      group: deploy-status-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build & push status
+        uses: docker/build-push-action@v7
+        with:
+          context: status
+          file: status/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/status:latest
+            ${{ env.REGISTRY }}/status:${{ github.sha }}
+          cache-from: type=gha,scope=status
+          cache-to: type=gha,scope=status,mode=max
+
+      - name: Deploy status page on frontend VM
+        run: |
+          gcloud compute ssh flowindex-frontend --zone=us-central1-a --command='
+            docker-credential-gcr configure-docker --registries=us-central1-docker.pkg.dev 2>/dev/null || true; \
+            docker pull ${{ env.REGISTRY }}/status:${{ github.sha }} && \
+            docker stop gatus 2>/dev/null; docker rm gatus 2>/dev/null; \
+            mkdir -p /home/hao/gatus-data && \
+            docker run -d --restart=always --name gatus \
+              --network=host \
+              -v /home/hao/gatus-data:/data \
+              ${{ env.REGISTRY }}/status:${{ github.sha }}
+          '
+
+      - name: Update Caddy config for TLS
+        run: |
+          gcloud compute ssh flowindex-frontend --zone=us-central1-a --command="
+            cat > /home/hao/Caddyfile <<'CADDYEOF'
+          $(cat frontend/Caddyfile)
+          CADDYEOF
+            docker exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+          "

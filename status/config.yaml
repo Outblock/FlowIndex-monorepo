@@ -1,0 +1,110 @@
+web:
+  port: 3005
+
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+ui:
+  title: FlowIndex Status
+  header: FlowIndex Service Status
+
+endpoints:
+  # ── Core Services ──────────────────────────────────────────────
+  - name: Backend API
+    group: Core
+    url: https://flowindex.io/health
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+
+  - name: Backend Indexer
+    group: Core
+    url: https://flowindex.io/status
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].latest_height > 0"
+
+  - name: Frontend
+    group: Core
+    url: https://flowindex.io
+    interval: 30s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: PostgreSQL
+    group: Core
+    url: tcp://10.128.0.4:5432
+    interval: 30s
+    conditions:
+      - "[CONNECTED] == true"
+
+  # ── Apps ───────────────────────────────────────────────────────
+  - name: Runner
+    group: Apps
+    url: https://run.flowindex.io/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Wallet
+    group: Apps
+    url: https://wallet.flowindex.io
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: AI Chat
+    group: Apps
+    url: https://ai.flowindex.io
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Docs
+    group: Apps
+    url: https://docs.flowindex.io
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Studio
+    group: Apps
+    url: https://studio.flowindex.io
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # ── Simulator ──────────────────────────────────────────────────
+  - name: Simulator API
+    group: Simulator
+    url: http://10.128.0.5:9090/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].status == ok"
+
+  # ── ERC-4337 Bundler ───────────────────────────────────────────
+  - name: Bundler
+    group: Bundler
+    url: https://bundler.flowindex.io/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  # ── Auth ───────────────────────────────────────────────────────
+  - name: Supabase Auth
+    group: Auth
+    url: http://10.128.0.4:9999/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+
+  - name: Supabase Gateway
+    group: Auth
+    url: http://10.128.0.4:54321
+    interval: 60s
+    conditions:
+      - "[STATUS] != 0"
