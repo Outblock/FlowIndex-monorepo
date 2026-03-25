@@ -1,0 +1,39 @@
+{
+  "name": "@flowindex/wallet-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
+    "./api": { "import": "./dist/api/index.js", "types": "./dist/api/index.d.ts" },
+    "./crypto": { "import": "./dist/crypto/index.js", "types": "./dist/crypto/index.d.ts" },
+    "./hooks": { "import": "./dist/hooks/index.js", "types": "./dist/hooks/index.d.ts" },
+    "./utils": { "import": "./dist/utils/index.js", "types": "./dist/utils/index.d.ts" }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "^2.0.0",
+    "@noble/hashes": "^2.0.0",
+    "@scure/bip32": "^2.0.0",
+    "@scure/bip39": "^2.0.0",
+    "zustand": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0",
+    "@types/react": "^19.0.0"
+  },
+  "nx": { "tags": ["package"] }
+}
