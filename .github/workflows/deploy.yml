@@ -1524,10 +1524,9 @@ jobs:
             docker-credential-gcr configure-docker --registries=us-central1-docker.pkg.dev 2>/dev/null || true; \
             docker pull ${{ env.REGISTRY }}/status:${{ github.sha }} && \
             docker stop gatus 2>/dev/null; docker rm gatus 2>/dev/null; \
-            mkdir -p /home/hao/gatus-data && \
             docker run -d --restart=always --name gatus \
               --network=host \
-              -v /home/hao/gatus-data:/data \
+              -v gatus-data:/data \
               ${{ env.REGISTRY }}/status:${{ github.sha }}
           '
 
