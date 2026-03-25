@@ -89,3 +89,7 @@ analytics.flowindex.io {
 docs.flowindex.io {
 	reverse_proxy localhost:3004
 }
+
+status.flowindex.io {
+	reverse_proxy localhost:3005
+}
