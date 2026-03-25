@@ -13,7 +13,7 @@ endpoints:
   # ── Core Services ──────────────────────────────────────────────
   - name: Backend API
     group: Core
-    url: https://flowindex.io/health
+    url: http://10.128.0.4:8080/health
     interval: 30s
     conditions:
       - "[STATUS] == 200"
@@ -21,11 +21,11 @@ endpoints:
 
   - name: Backend Indexer
     group: Core
-    url: https://flowindex.io/status
+    url: http://10.128.0.4:8080/status
     interval: 60s
     conditions:
       - "[STATUS] == 200"
-      - "[BODY].latest_height > 0"
+      - "[BODY].behind <= 100"
 
   - name: Frontend
     group: Core
@@ -33,13 +33,6 @@ endpoints:
     interval: 30s
     conditions:
       - "[STATUS] == 200"
-
-  - name: PostgreSQL
-    group: Core
-    url: tcp://10.128.0.4:5432
-    interval: 30s
-    conditions:
-      - "[CONNECTED] == true"
 
   # ── Apps ───────────────────────────────────────────────────────
   - name: Runner
