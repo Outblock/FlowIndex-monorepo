@@ -89,6 +89,7 @@ export interface BSTokenTransfer {
 
 export interface BSToken {
   address: string;
+  address_hash?: string;
   name: string | null;
   symbol: string | null;
   decimals: string | null;
@@ -115,6 +116,29 @@ export interface BSTokenBalance {
   token_id: string | null;
   value: string;
   token_instance: BSNFTInstance | null;
+}
+
+/** Item returned by Blockscout /addresses/{address}/nft endpoint */
+export interface BSAddressNFT {
+  id: number;
+  image_url: string | null;
+  animation_url: string | null;
+  media_url: string | null;
+  media_type: string | null;
+  external_app_url: string | null;
+  is_unique: boolean | null;
+  metadata: {
+    name?: string;
+    image?: string;
+    image_url?: string;
+    description?: string;
+    animation_url?: string;
+    attributes?: Array<{ trait_type: string; value: string }>;
+    [key: string]: any;
+  } | null;
+  token: BSToken;
+  token_type: string;
+  value: string | number;
 }
 
 export interface BSLog {

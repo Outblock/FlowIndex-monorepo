@@ -3,28 +3,28 @@ import { Image as ImageIcon } from 'lucide-react';
 import { ImageWithFallback } from '@flowindex/flow-ui';
 import { getEVMAddressNFTs } from '@/api/evm';
 import { LoadMorePagination } from '@/components/LoadMorePagination';
-import type { BSTokenBalance, BSPageParams } from '@/types/blockscout';
+import { resolveIPFS } from '@/components/account/accountUtils';
+import type { BSAddressNFT, BSPageParams } from '@/types/blockscout';
 
 interface EVMNFTsTabProps {
     address: string;
 }
 
-function resolveImage(item: BSTokenBalance): string | null {
-    const meta = item.token_instance?.metadata;
-    if (!meta) return item.token.icon_url || null;
-    return meta.image || meta.image_url || item.token.icon_url || null;
+function resolveImage(item: BSAddressNFT): string | null {
+    const raw = item.image_url || item.metadata?.image || item.metadata?.image_url || item.token.icon_url || null;
+    if (!raw) return null;
+    return resolveIPFS(raw);
 }
 
-function resolveName(item: BSTokenBalance): string {
-    const meta = item.token_instance?.metadata;
-    if (meta?.name) return meta.name;
-    if (item.token.name && item.token_id) return `${item.token.name} #${item.token_id}`;
-    if (item.token_id) return `#${item.token_id}`;
+function resolveName(item: BSAddressNFT): string {
+    if (item.metadata?.name) return item.metadata.name;
+    if (item.token.name && item.id) return `${item.token.name} #${item.id}`;
+    if (item.id) return `#${item.id}`;
     return 'Unknown NFT';
 }
 
 export function EVMNFTsTab({ address }: EVMNFTsTabProps) {
-    const [items, setItems] = useState<BSTokenBalance[]>([]);
+    const [items, setItems] = useState<BSAddressNFT[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [nextPageParams, setNextPageParams] = useState<BSPageParams | null>(null);
@@ -91,7 +91,7 @@ export function EVMNFTsTab({ address }: EVMNFTsTabProps) {
 
                     return (
                         <div
-                            key={`${item.token.address}-${item.token_id}-${idx}`}
+                            key={`${item.token.address_hash || item.token.address}-${item.id}-${idx}`}
                             className="group border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden hover:border-violet-300 dark:hover:border-violet-700 transition-colors"
                         >
                             {/* Image */}
@@ -109,7 +109,7 @@ export function EVMNFTsTab({ address }: EVMNFTsTabProps) {
                                 )}
                                 {/* Token type badge */}
                                 <span className="absolute top-1.5 right-1.5 text-[9px] px-1.5 py-0.5 bg-black/60 text-white font-bold uppercase tracking-wider backdrop-blur-sm">
-                                    {item.token.type}
+                                    {item.token_type || item.token.type}
                                 </span>
                             </div>
 
@@ -117,8 +117,8 @@ export function EVMNFTsTab({ address }: EVMNFTsTabProps) {
                             <div className="p-2.5">
                                 <p className="text-xs font-medium truncate" title={name}>{name}</p>
                                 <p className="text-[10px] text-zinc-500 truncate mt-0.5" title={collection}>{collection}</p>
-                                {item.token_id && (
-                                    <p className="text-[10px] font-mono text-zinc-400 truncate mt-0.5">ID: {item.token_id}</p>
+                                {item.id && (
+                                    <p className="text-[10px] font-mono text-zinc-400 truncate mt-0.5">ID: {item.id}</p>
                                 )}
                             </div>
                         </div>
