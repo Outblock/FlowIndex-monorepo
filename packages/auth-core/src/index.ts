@@ -22,3 +22,6 @@ export { gotruePost, refreshAccessToken, buildOAuthRedirectUrl } from './gotrue'
 
 // Passkey auth client
 export { createPasskeyAuthClient } from './passkey-client';
+
+// Platform-adaptive token storage (web: localStorage, native: AsyncStorage)
+export { loadTokens, saveTokens, removeTokens } from './token-storage';
