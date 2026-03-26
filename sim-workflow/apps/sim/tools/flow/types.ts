@@ -367,3 +367,58 @@ export interface FlowSendParams {
   /** COA (Cadence Owned Account) EVM address associated with the proposer */
   coaAddr?: string
 }
+
+/** Parameters for listing Cadence templates */
+export interface FlowListTemplatesParams {
+  category?: string
+}
+
+/** Parameters for getting a single Cadence template */
+export interface FlowGetTemplateParams {
+  templateId: string
+}
+
+/** Cadence template metadata (from agent-wallet registry) */
+export interface CadenceTemplate {
+  name: string
+  category: string
+  type: 'transaction' | 'script'
+  description: string
+}
+
+/** Cadence template with full source */
+export interface CadenceTemplateDetail extends CadenceTemplate {
+  cadence: string
+  arguments: Array<{ name: string; type: string; description: string }>
+}
+
+/** Parameters for simulating a raw Cadence transaction */
+export interface FlowSimulateTransactionParams {
+  cadence: string
+  arguments?: string
+  network?: string
+  signerAddress?: string
+}
+
+/** Parameters for simulating a template-based transaction */
+export interface FlowSimulateTemplateParams {
+  templateId: string
+  arguments?: string
+  network?: string
+  signerAddress?: string
+}
+
+/** Simulator balance change */
+export interface SimulatorBalanceChange {
+  address: string
+  token: string
+  delta: string
+  before?: string
+  after?: string
+}
+
+/** Simulator event */
+export interface SimulatorEvent {
+  type: string
+  payload: unknown
+}
