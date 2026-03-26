@@ -55,6 +55,8 @@ import { FlowGetDefiPositionsBlock } from '@/blocks/blocks/flow_get_defi_positio
 import { FlowGetStakingInfoBlock } from '@/blocks/blocks/flow_get_staking_info'
 import { FlowExecuteScriptBlock } from '@/blocks/blocks/flow_execute_script'
 import { FlowSendTransactionBlock } from '@/blocks/blocks/flow_send_transaction'
+import { FlowSimulateBlock } from '@/blocks/blocks/flow_simulate'
+import { FlowTemplatesBlock } from '@/blocks/blocks/flow_templates'
 import { FlowTransferFlowBlock } from '@/blocks/blocks/flow_transfer_flow'
 import { FlowTransferFtBlock } from '@/blocks/blocks/flow_transfer_ft'
 import { FlowTransferNftBlock } from '@/blocks/blocks/flow_transfer_nft'
@@ -310,6 +312,8 @@ export const registry: Record<string, BlockConfig> = {
   flow_get_transaction: FlowGetTransactionBlock,
   flow_resolve_name: FlowResolveNameBlock,
   flow_send_transaction: FlowSendTransactionBlock,
+  flow_simulate: FlowSimulateBlock,
+  flow_templates: FlowTemplatesBlock,
   flow_transfer_flow: FlowTransferFlowBlock,
   flow_transfer_ft: FlowTransferFtBlock,
   flow_transfer_nft: FlowTransferNftBlock,
