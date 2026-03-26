@@ -459,7 +459,11 @@ import {
   flowIncrementFiTool,
   flowFlowIndexApiTool,
   flowFindProfileTool,
+  flowGetTemplateTool,
   flowGetTokenPriceTool,
+  flowListTemplatesTool,
+  flowSimulateTemplateTool,
+  flowSimulateTransactionTool,
 } from '@/tools/flow'
 import {
   firecrawlAgentTool,
@@ -2415,7 +2419,11 @@ export const tools: Record<string, ToolConfig> = {
   flow_increment_fi: flowIncrementFiTool,
   flow_flowindex_api: flowFlowIndexApiTool,
   flow_find_profile: flowFindProfileTool,
+  flow_get_template: flowGetTemplateTool,
   flow_get_token_price: flowGetTokenPriceTool,
+  flow_list_templates: flowListTemplatesTool,
+  flow_simulate_template: flowSimulateTemplateTool,
+  flow_simulate_transaction: flowSimulateTransactionTool,
   gong_list_calls: gongListCallsTool,
   gong_get_call: gongGetCallTool,
   gong_get_call_transcript: gongGetCallTranscriptTool,
