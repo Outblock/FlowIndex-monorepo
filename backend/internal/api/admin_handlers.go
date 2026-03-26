@@ -1346,7 +1346,7 @@ func (s *Server) handleAdminReprocessWorker(w http.ResponseWriter, r *http.Reque
 	case "evm_worker":
 		proc = ingester.NewEVMWorker(s.repo)
 	case "scheduled_worker":
-		proc = ingester.NewScheduledWorker(s.repo)
+		proc = ingester.NewScheduledWorker(s.repo, nil)
 	case "proposer_key_backfill":
 		// Prefer history client (has all spork nodes) over API client (mainnet28 only)
 		flowCli := s.historyClient

@@ -227,6 +227,40 @@ func (r *Repository) GetScheduledTransactionByID(ctx context.Context, id int64) 
 	return &st, nil
 }
 
+// GetScheduledTransactionsByIDs returns scheduled transactions for the given IDs.
+func (r *Repository) GetScheduledTransactionsByIDs(ctx context.Context, ids []int64) ([]models.ScheduledTransaction, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	q := `
+		SELECT scheduled_id, priority, expected_timestamp, execution_effort, fees,
+			encode(handler_owner, 'hex'), handler_type, handler_uuid, COALESCE(handler_public_path, ''),
+			scheduled_block, encode(scheduled_tx_id, 'hex'), scheduled_at,
+			status,
+			executed_block, CASE WHEN executed_tx_id IS NOT NULL THEN encode(executed_tx_id, 'hex') ELSE NULL END,
+			executed_at,
+			fees_returned, fees_deducted,
+			has_activity
+		FROM app.scheduled_transactions
+		WHERE scheduled_id = ANY($1)
+	`
+	rows, err := r.db.Query(ctx, q, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.ScheduledTransaction
+	for rows.Next() {
+		var st models.ScheduledTransaction
+		if err := scanScheduledTransaction(rows, &st); err != nil {
+			return nil, err
+		}
+		result = append(result, st)
+	}
+	return result, rows.Err()
+}
+
 // GetScheduledHandlerStats returns status counts for a given handler owner.
 func (r *Repository) GetScheduledHandlerStats(ctx context.Context, owner string) (map[string]int, error) {
 	ownerBytes, _ := hex.DecodeString(owner)

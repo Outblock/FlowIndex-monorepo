@@ -262,6 +262,9 @@ func main() {
 		log.Println("RAW_ONLY mode: all workers, derivers, and pollers disabled")
 	}
 
+	// Event bus — created unconditionally; only active if webhooks subscribe to it.
+	scheduledBus := eventbus.New()
+
 	// Live/head derivers: Blockscout-style "real-time head" materialization.
 	// These processors must be idempotent because they can overlap with backfills.
 	enableLiveDerivers := os.Getenv("ENABLE_LIVE_DERIVERS") != "false"
@@ -299,7 +302,7 @@ func main() {
 			processors = append(processors, ingester.NewDefiWorker(repo))
 		}
 		if enableScheduledWorker {
-			processors = append(processors, ingester.NewScheduledWorker(repo))
+			processors = append(processors, ingester.NewScheduledWorker(repo, scheduledBus))
 		}
 		// NOTE: daily_stats_worker and analytics_deriver_worker are intentionally
 		// excluded from live_deriver. They call RefreshDailyStatsRange which does a
@@ -362,7 +365,7 @@ func main() {
 		{"tx_metrics_worker", enableTxMetricsWorker, func() ingester.Processor { return ingester.NewTxMetricsWorker(repo) }},
 		{"staking_worker", enableStakingWorker, func() ingester.Processor { return ingester.NewStakingWorker(repo) }},
 		{"defi_worker", enableDefiWorker, func() ingester.Processor { return ingester.NewDefiWorker(repo) }},
-		{"scheduled_worker", enableScheduledWorker, func() ingester.Processor { return ingester.NewScheduledWorker(repo) }},
+		{"scheduled_worker", enableScheduledWorker, func() ingester.Processor { return ingester.NewScheduledWorker(repo, scheduledBus) }},
 		// NOTE: daily_stats_worker and analytics_deriver_worker are NOT in the deriver.
 		// They do full table scans on raw.transactions per affected date — too heavy for
 		// deriver pipelines. They run as standalone async workers instead.
@@ -606,7 +609,7 @@ func main() {
 			}
 
 			// EventBus + Matchers + Orchestrator
-			bus := eventbus.New()
+			bus := scheduledBus
 			matcherRegistry := matcher.NewRegistry()
 			matcher.RegisterAll(matcherRegistry)
 			subCache := webhooks.NewSubscriptionCache(whStore, 30*time.Second)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"flowscan-clone/internal/eventbus"
 	"flowscan-clone/internal/models"
 	"flowscan-clone/internal/repository"
 )
@@ -18,10 +19,11 @@ const schedulerAddress = "e467b9dd11fa00df"
 // and writes to app.scheduled_transactions.
 type ScheduledWorker struct {
 	repo *repository.Repository
+	bus  *eventbus.Bus // nil when webhooks are not configured
 }
 
-func NewScheduledWorker(repo *repository.Repository) *ScheduledWorker {
-	return &ScheduledWorker{repo: repo}
+func NewScheduledWorker(repo *repository.Repository, bus *eventbus.Bus) *ScheduledWorker {
+	return &ScheduledWorker{repo: repo, bus: bus}
 }
 
 func (w *ScheduledWorker) Name() string {
@@ -121,6 +123,38 @@ func (w *ScheduledWorker) ProcessRange(ctx context.Context, fromHeight, toHeight
 	if len(executed) > 0 {
 		if err := w.repo.UpdateScheduledTransactionsExecuted(ctx, executed); err != nil {
 			return fmt.Errorf("failed to update executed scheduled transactions: %w", err)
+		}
+	}
+
+	// Publish executed events to the event bus for webhook delivery.
+	// Safe to query has_activity here: UpdateScheduledTransactionsExecuted computes it
+	// inline via correlated subquery, and raw.events are already ingested before workers run.
+	if w.bus != nil && len(executed) > 0 {
+		ids := make([]int64, len(executed))
+		for i, e := range executed {
+			ids[i] = e.ScheduledID
+		}
+		fullRecords, err := w.repo.GetScheduledTransactionsByIDs(ctx, ids)
+		if err != nil {
+			// Non-fatal: log and continue — missing a webhook is better than blocking ingestion
+			fmt.Printf("[scheduled_worker] warning: failed to fetch records for webhook publishing: %v\n", err)
+		} else {
+			for i := range fullRecords {
+				var ts time.Time
+				var height uint64
+				if fullRecords[i].ExecutedAt != nil {
+					ts = *fullRecords[i].ExecutedAt
+				}
+				if fullRecords[i].ExecutedBlock != nil {
+					height = *fullRecords[i].ExecutedBlock
+				}
+				w.bus.Publish(eventbus.Event{
+					Type:      "scheduled.executed",
+					Height:    height,
+					Timestamp: ts,
+					Data:      &fullRecords[i],
+				})
+			}
 		}
 	}
 
