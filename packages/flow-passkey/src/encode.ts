@@ -2,7 +2,7 @@
  * Flow transaction encoding + passkey signing helpers.
  * Ported from onflow/passkey-wallet-tech.
  */
-import { sha256 as _sha256 } from '@noble/hashes/sha2';
+import { sha256 as _sha256 } from '@noble/hashes/sha2.js';
 import { SHA3 } from 'sha3';
 import { encode as rlpEncode } from '@onflow/rlp';
 import type { Voucher, Signable } from './types';

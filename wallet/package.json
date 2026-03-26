@@ -13,6 +13,7 @@
     "@flowindex/evm-wallet": "workspace:*",
     "@flowindex/flow-passkey": "workspace:*",
     "@flowindex/flow-ui": "workspace:*",
+    "@noble/hashes": "^2.0.1",
     "@onflow/fcl": "^1.21.9",
     "@supabase/supabase-js": "^2.98.0",
     "@walletconnect/core": "^2.23.8",
