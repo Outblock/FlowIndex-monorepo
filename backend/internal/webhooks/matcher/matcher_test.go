@@ -61,6 +61,7 @@ func TestAllMatchersRegistered(t *testing.T) {
 		"account.created",
 		"account.key_change",
 		"evm.transaction",
+		"scheduled.executed",
 	}
 
 	types := r.EventTypes()

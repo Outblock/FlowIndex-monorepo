@@ -40,7 +40,9 @@ var SupportedEventTypes = []string{
 	"defi.liquidity",
 	// EVM
 	"evm.transaction",
-	// Scheduled
+	// Scheduled transactions
+	"scheduled.executed",
+	// Balance monitor
 	"balance.check",
 }
 

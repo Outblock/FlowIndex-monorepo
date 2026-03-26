@@ -77,4 +77,5 @@ func RegisterAll(r *Registry) {
 	r.Register(&AccountKeyChangeMatcher{})
 	r.Register(&EVMTransactionMatcher{})
 	r.Register(&BalanceCheckMatcher{})
+	r.Register(&ScheduledExecutedMatcher{})
 }
