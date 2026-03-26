@@ -9,6 +9,7 @@ export const FLOW_TRIGGER_OPTIONS = [
   { label: 'EVM Transaction', id: 'flow_evm_tx' },
   { label: 'DeFi Event', id: 'flow_defi_event' },
   { label: 'Schedule', id: 'flow_schedule' },
+  { label: 'Scheduled TX', id: 'flow_scheduled_tx' },
   { label: 'Large Transfer', id: 'flow_large_transfer' },
   { label: 'Whale Activity', id: 'flow_whale_activity' },
   { label: 'Contract Deploy', id: 'flow_contract_deploy' },
