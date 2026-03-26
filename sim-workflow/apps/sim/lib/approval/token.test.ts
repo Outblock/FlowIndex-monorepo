@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.stubEnv('APPROVAL_SECRET', 'test-secret-key-for-hmac-testing-1234')
 
-import { buildCallbackUrls, generateToken, validateToken } from '@/lib/approval/token'
+import { buildCallbackUrls, generateToken, validateToken } from './token'
 
 describe('approval token', () => {
   it('generates a valid token', () => {

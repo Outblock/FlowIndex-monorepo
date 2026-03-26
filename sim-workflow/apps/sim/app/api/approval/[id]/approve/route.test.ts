@@ -19,7 +19,7 @@ vi.mock('@/lib/approval/service', () => ({
   approveTransaction: mockApproveTransaction,
 }))
 
-import { POST } from '@/app/api/approval/[id]/approve/route'
+import { POST } from './route'
 
 const BASE = 'http://localhost:3000'
 
