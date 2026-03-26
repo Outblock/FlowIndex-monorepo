@@ -422,3 +422,34 @@ export interface SimulatorEvent {
   type: string
   payload: unknown
 }
+
+/** Parameters for queuing a transaction for approval */
+export interface FlowQueueTransactionParams {
+  cadence: string
+  arguments?: string
+  network?: string
+  signerAddress?: string
+  templateId?: string
+  mode?: string
+  webhookUrl?: string
+  expiresIn?: string
+  signerPrivateKey?: string
+  signerMode?: string
+}
+
+/** Parameters for confirming a pending transaction */
+export interface FlowConfirmTransactionParams {
+  pendingId: string
+  execute?: string
+}
+
+/** Parameters for cancelling a pending transaction */
+export interface FlowCancelTransactionParams {
+  pendingId: string
+  reason?: string
+}
+
+/** Parameters for listing pending transactions */
+export interface FlowListPendingParams {
+  status?: string
+}
