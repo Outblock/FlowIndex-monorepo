@@ -124,6 +124,14 @@ export const FlowScheduleTriggerBlock = createFlowTriggerBlock({
   triggerLabel: 'Schedule',
 })
 
+export const FlowScheduledTxTriggerBlock = createFlowTriggerBlock({
+  type: 'flow_scheduled_tx_trigger',
+  name: 'Flow Scheduled TX',
+  description: 'Trigger on scheduled transaction executions on Flow',
+  triggerId: 'flow_scheduled_tx',
+  triggerLabel: 'Scheduled TX',
+})
+
 export const FlowLargeTransferTriggerBlock = createFlowTriggerBlock({
   type: 'flow_large_transfer_trigger',
   name: 'Flow Large Transfer',

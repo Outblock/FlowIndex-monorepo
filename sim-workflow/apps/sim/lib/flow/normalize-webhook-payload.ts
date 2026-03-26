@@ -135,5 +135,20 @@ export function formatFlowWebhookInput(
     }
   }
 
+  if (triggerId === 'flow_scheduled_tx') {
+    return {
+      scheduledId: typeof data.scheduled_id === 'number' ? data.scheduled_id : 0,
+      handlerOwner: normalizeFlowAddress(data.handler_owner),
+      handlerType: typeof data.handler_type === 'string' ? data.handler_type : '',
+      priority: typeof data.priority === 'string' ? data.priority : '',
+      executedTxId: typeof data.executed_tx_id === 'string' ? data.executed_tx_id : '',
+      blockHeight: normalized.blockHeight,
+      timestamp: normalized.timestamp,
+      isIdle: !data.has_activity,
+      data: normalized.data,
+      raw: normalized.raw,
+    }
+  }
+
   return normalized
 }
