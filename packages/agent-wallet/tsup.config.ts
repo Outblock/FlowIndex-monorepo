@@ -2,7 +2,7 @@ import { defineConfig } from 'tsup';
 import { cpSync } from 'fs';
 
 export default defineConfig({
-  entry: ['src/index.ts'],
+  entry: ['src/index.ts', 'src/templates/index.ts'],
   format: ['esm'],
   dts: true,
   clean: true,
