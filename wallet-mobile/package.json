@@ -4,6 +4,8 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
+    "eas-build-pre-install": "cd .. && npm install -g bun",
+    "eas-build-post-install": "cd ../packages/flow-passkey && npx tsup && cd ../auth-core && npx tsup && cd ../wallet-core && npx tsup && cd ../wallet-ui && npx tsup && cd ../evm-wallet && npx tsup",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
