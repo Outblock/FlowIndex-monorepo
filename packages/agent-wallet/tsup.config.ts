@@ -4,7 +4,7 @@ import { cpSync } from 'fs';
 export default defineConfig({
   entry: ['src/index.ts', 'src/templates/index.ts'],
   format: ['esm'],
-  dts: !process.env.CI,
+  dts: false,
   clean: true,
   sourcemap: true,
   onSuccess: async () => {
