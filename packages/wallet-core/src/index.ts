@@ -8,3 +8,4 @@ export { createSettingsStore } from './store/settings-store';
 export type { Network, SettingsState, SettingsStore } from './store/settings-store';
 export * from './cadence/index';
 export * from './providers/index';
+export * from './fcl/index';
