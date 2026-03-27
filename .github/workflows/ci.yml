@@ -40,6 +40,8 @@ jobs:
 
       - name: Build shared packages
         run: bun run build:packages
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: Lint
         working-directory: frontend
