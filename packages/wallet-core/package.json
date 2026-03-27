@@ -6,13 +6,13 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
-    "./api": { "import": "./dist/api/index.js", "types": "./dist/api/index.d.ts" },
-    "./crypto": { "import": "./dist/crypto/index.js", "types": "./dist/crypto/index.d.ts" },
-    "./hooks": { "import": "./dist/hooks/index.js", "types": "./dist/hooks/index.d.ts" },
-    "./utils": { "import": "./dist/utils/index.js", "types": "./dist/utils/index.d.ts" },
-    "./cadence": { "import": "./dist/cadence/index.js", "types": "./dist/cadence/index.d.ts" },
-    "./providers": { "import": "./dist/providers/index.js", "types": "./dist/providers/index.d.ts" }
+    ".": { "react-native": "./src/index.ts", "import": "./dist/index.js", "types": "./dist/index.d.ts" },
+    "./api": { "react-native": "./src/api/index.ts", "import": "./dist/api/index.js", "types": "./dist/api/index.d.ts" },
+    "./crypto": { "react-native": "./src/crypto/index.ts", "import": "./dist/crypto/index.js", "types": "./dist/crypto/index.d.ts" },
+    "./hooks": { "react-native": "./src/hooks/index.ts", "import": "./dist/hooks/index.js", "types": "./dist/hooks/index.d.ts" },
+    "./utils": { "react-native": "./src/utils/index.ts", "import": "./dist/utils/index.js", "types": "./dist/utils/index.d.ts" },
+    "./cadence": { "react-native": "./src/cadence/index.ts", "import": "./dist/cadence/index.js", "types": "./dist/cadence/index.d.ts" },
+    "./providers": { "react-native": "./src/providers/index.ts", "import": "./dist/providers/index.js", "types": "./dist/providers/index.d.ts" }
   },
   "scripts": {
     "build": "tsup",

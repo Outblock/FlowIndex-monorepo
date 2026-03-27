@@ -5,18 +5,17 @@
   "main": "expo-router/entry",
   "scripts": {
     "eas-build-pre-install": "cd .. && npm install -g bun && bun install",
-    "eas-build-post-install": "cd ../packages/flow-passkey && bun run build && cd ../auth-core && bun run build && cd ../wallet-core && bun run build && cd ../wallet-ui && bun run build && cd ../evm-wallet && bun run build",
+    "eas-build-post-install": "cd ../packages/flow-passkey && bun run build && cd ../auth-core && bun run build && cd ../wallet-core && bun run build",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
   "dependencies": {
+    "@babel/runtime": "^7.29.2",
     "@flowindex/auth-core": "workspace:*",
-    "@flowindex/evm-wallet": "workspace:*",
     "@flowindex/flow-passkey": "workspace:*",
     "@flowindex/wallet-core": "workspace:*",
-    "@flowindex/wallet-ui": "workspace:*",
     "@onflow/fcl": "^1.21.10",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@shopify/flash-list": "1.7.3",
