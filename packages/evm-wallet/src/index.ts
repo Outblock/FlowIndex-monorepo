@@ -5,3 +5,13 @@ export { createBundlerClient, type BundlerClient, type PackedUserOperation, type
 export { buildUserOperation, submitUserOperation, waitForUserOperationReceipt, sendSmartWalletTransaction, deploySmartWallet, buildCallData, buildBatchCallData, packGasLimits, packGasFees, type CallParams } from "./user-op"
 export { createEvmWalletProvider, type EvmWalletProvider, type EvmWalletProviderConfig } from "./provider"
 export { createWalletConnectManager, type WalletConnectManager, type WalletConnectConfig } from "./walletconnect"
+export {
+  signMessageWithPasskey as signMessageWithPasskeyPortable,
+  signTypedDataWithPasskey as signTypedDataWithPasskeyPortable,
+  sendTransactionWithPasskey,
+  type Network,
+  type SignMessageOptions,
+  type SignTypedDataOptions,
+  type SendTransactionOptions,
+  type SendTransactionResult,
+} from "./smart-wallet-signing"

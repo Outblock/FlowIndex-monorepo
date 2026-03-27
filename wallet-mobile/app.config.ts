@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'io.flowindex.wallet',
-    associatedDomains: ['webcredentials:flowindex.io'],
+    associatedDomains: ['webcredentials:flowindex.io', 'applinks:wallet.flowindex.io'],
     infoPlist: {
       NSFaceIDUsageDescription: 'Authenticate to access your wallet',
       NSCameraUsageDescription: 'Scan QR codes to connect with dApps',

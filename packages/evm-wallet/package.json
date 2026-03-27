@@ -25,11 +25,13 @@
   },
   "peerDependencies": {
     "@walletconnect/web3wallet": "^1.17.0",
-    "@walletconnect/core": "^2.18.0"
+    "@walletconnect/core": "^2.18.0",
+    "@flowindex/flow-passkey": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@walletconnect/web3wallet": { "optional": true },
-    "@walletconnect/core": { "optional": true }
+    "@walletconnect/core": { "optional": true },
+    "@flowindex/flow-passkey": { "optional": true }
   },
   "publishConfig": {
     "access": "public"

@@ -31,7 +31,11 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0a0a0a' } }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="send/index" options={{ presentation: 'modal', headerShown: true, headerTitle: 'Send FLOW', headerStyle: { backgroundColor: '#0a0a0a' }, headerTintColor: '#fff' }} />
+          <Stack.Screen name="send" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="approve" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="sign" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="fcl" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="wc" options={{ presentation: 'modal' }} />
         </Stack>
       </AuthGate>
     </AppProviders>

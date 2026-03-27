@@ -75,6 +75,14 @@ studio.flowindex.io {
 }
 
 wallet.flowindex.io {
+	handle /.well-known/apple-app-site-association {
+		header Content-Type application/json
+		respond `{"applinks":{"apps":[],"details":[{"appID":"444MY26W7F.io.flowindex.wallet","paths":["/fcl/*","/wc"]}]},"webcredentials":{"apps":["444MY26W7F.io.flowindex.wallet"]}}`
+	}
+	handle /.well-known/assetlinks.json {
+		header Content-Type application/json
+		respond `[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"io.flowindex.wallet","sha256_cert_fingerprints":["TODO_REPLACE_WITH_SIGNING_CERT"]}}]`
+	}
 	handle /functions/v1/* {
 		reverse_proxy 10.128.0.4:54321
 	}
