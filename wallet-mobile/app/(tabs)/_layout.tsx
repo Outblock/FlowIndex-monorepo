@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, Clock, Image, Settings } from 'lucide-react-native';
+import { Home, Clock, Image, Link2, Settings } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -33,6 +33,13 @@ export default function TabLayout() {
         options={{
           title: 'NFTs',
           tabBarIcon: ({ color, size }) => <Image size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="connect"
+        options={{
+          title: 'Connect',
+          tabBarIcon: ({ color, size }) => <Link2 size={size} color={color} />,
         }}
       />
       <Tabs.Screen
