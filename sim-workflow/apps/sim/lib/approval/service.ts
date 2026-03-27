@@ -128,6 +128,8 @@ export async function queueTransaction(
     sendWebhook(params.webhookUrl, {
       type: 'approval_requested',
       pendingId,
+      userId: params.userId,
+      workspaceId: params.workspaceId,
       mode: params.mode,
       summary: {
         templateId: params.templateId,
@@ -241,6 +243,8 @@ export async function approveTransaction(
     sendWebhook(tx.webhookUrl, {
       type: 'approval_resolved',
       pendingId,
+      userId: tx.userId,
+      workspaceId: tx.workspaceId,
       status: finalStatus,
       txId,
       resolvedBy,
@@ -288,6 +292,8 @@ export async function rejectTransaction(
     sendWebhook(tx.webhookUrl, {
       type: 'approval_resolved',
       pendingId,
+      userId: tx.userId,
+      workspaceId: tx.workspaceId,
       status: 'rejected',
       resolvedBy,
     })

@@ -2529,3 +2529,23 @@ export const jwks = pgTable('jwks', {
   privateKey: text('private_key').notNull(),
   createdAt: timestamp('created_at').notNull(),
 })
+
+export const notificationBinding = pgTable(
+  'notification_bindings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    channel: text('channel').notNull().default('telegram'),
+    channelUserId: text('channel_user_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('notification_bindings_user_workspace_channel_idx').on(
+      table.userId,
+      table.workspaceId,
+      table.channel
+    ),
+    index('notification_bindings_user_workspace_idx').on(table.userId, table.workspaceId),
+  ]
+)
