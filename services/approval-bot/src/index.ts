@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { handleApprovalWebhook } from './handlers/approval'
 import { handleTelegramWebhook } from './handlers/commands'
+import { setWebhook } from './telegram'
+import { cleanupExpired } from './db'
 
 const app = new Hono()
 const PORT = Number(process.env.PORT || 3100)
@@ -33,6 +35,19 @@ app.post('/webhook/approval', async (c) => {
 })
 
 console.log(`Approval bot starting on port ${PORT}`)
+
+// Register Telegram webhook on startup
+const BOT_WEBHOOK_URL = process.env.BOT_WEBHOOK_URL
+if (BOT_WEBHOOK_URL && process.env.TELEGRAM_BOT_TOKEN) {
+  setWebhook(`${BOT_WEBHOOK_URL}/telegram/webhook`, TELEGRAM_WEBHOOK_SECRET)
+    .then(() => console.log('Telegram webhook registered'))
+    .catch((err) => console.error('Failed to set webhook:', err))
+}
+
+// Cleanup expired pending approvals every 10 minutes
+setInterval(() => {
+  cleanupExpired().catch((err) => console.error('Cleanup failed:', err))
+}, 10 * 60 * 1000)
 
 export default {
   port: PORT,
