@@ -1,4 +1,6 @@
 import { Hono } from 'hono'
+import { handleApprovalWebhook } from './handlers/approval'
+import { handleTelegramWebhook } from './handlers/commands'
 
 const app = new Hono()
 const PORT = Number(process.env.PORT || 3100)
@@ -12,7 +14,8 @@ app.post('/telegram/webhook', async (c) => {
   if (secret !== TELEGRAM_WEBHOOK_SECRET) {
     return c.json({ error: 'Invalid secret' }, 401)
   }
-  // Will be implemented in Task 4
+  const update = await c.req.json()
+  await handleTelegramWebhook(update)
   return c.json({ ok: true })
 })
 
@@ -21,7 +24,11 @@ app.post('/webhook/approval', async (c) => {
   if (auth !== `Bearer ${STUDIO_BOT_TOKEN}`) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
-  // Will be implemented in Task 5
+  const payload = await c.req.json()
+  const result = await handleApprovalWebhook(payload)
+  if (!result.success) {
+    return c.json({ error: result.error }, result.status as 404)
+  }
   return c.json({ ok: true })
 })
 
