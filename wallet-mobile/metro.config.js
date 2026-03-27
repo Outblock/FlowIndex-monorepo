@@ -27,6 +27,7 @@ config.resolver.extraNodeModules = {
   url: require.resolve('react-native-url-polyfill'),
   events: require.resolve('events/'),
   process: require.resolve('process/browser'),
+  crypto: require.resolve('react-native-crypto'),
 };
 
 // Ensure monorepo packages are not treated as external
