@@ -18,6 +18,7 @@ COPY packages/testing/package.json ./packages/testing/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
 COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 COPY packages/flow-signer ./packages/flow-signer
+COPY packages/agent-wallet ./packages/agent-wallet
 
 # Install dependencies with hoisted layout for Docker compatibility
 # Using --linker=hoisted to avoid .bun directory symlinks that don't copy between stages

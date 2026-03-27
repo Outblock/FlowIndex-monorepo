@@ -25,6 +25,7 @@ COPY packages/testing/package.json ./packages/testing/package.json
 COPY packages/logger/package.json ./packages/logger/package.json
 COPY packages/tsconfig/package.json ./packages/tsconfig/package.json
 COPY packages/flow-signer ./packages/flow-signer
+COPY packages/agent-wallet ./packages/agent-wallet
 
 # Install turbo globally, then dependencies, then rebuild isolated-vm for Node.js
 # Use --linker=hoisted for flat node_modules layout (required for Docker multi-stage builds)
