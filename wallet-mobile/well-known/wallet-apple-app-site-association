@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "444MY26W7F.io.flowindex.wallet",
+        "paths": ["/fcl/*", "/wc"]
+      }
+    ]
+  }
+}
