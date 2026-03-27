@@ -1,8 +1,11 @@
 import { configureApiClient } from '@flowindex/wallet-core';
 import { WalletProvider } from '@flowindex/wallet-core';
 import { MobileAuthProvider, useMobileAuth } from './AuthProvider';
+import { WalletConnectProvider } from './WalletConnectProvider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WalletAccount, Network } from '@flowindex/wallet-core';
+
+export { useWalletConnect } from './WalletConnectProvider';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://flowindex.io/api';
 configureApiClient({ baseUrl: API_URL });
@@ -43,7 +46,9 @@ function WalletBridge({ children }: { children: React.ReactNode }) {
       loadNetwork={loadNetworkAsync}
       saveNetwork={saveNetwork}
     >
-      {children}
+      <WalletConnectProvider>
+        {children}
+      </WalletConnectProvider>
     </WalletProvider>
   );
 }
