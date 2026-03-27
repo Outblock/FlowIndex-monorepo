@@ -5,12 +5,28 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://flowindex.io/api",
+        "EXPO_PUBLIC_GOTRUE_URL": "https://run.flowindex.io/auth/v1",
+        "EXPO_PUBLIC_PASSKEY_AUTH_URL": "https://run.flowindex.io/functions/v1/passkey-auth"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://flowindex.io/api",
+        "EXPO_PUBLIC_GOTRUE_URL": "https://run.flowindex.io/auth/v1",
+        "EXPO_PUBLIC_PASSKEY_AUTH_URL": "https://run.flowindex.io/functions/v1/passkey-auth"
+      }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://flowindex.io/api",
+        "EXPO_PUBLIC_GOTRUE_URL": "https://run.flowindex.io/auth/v1",
+        "EXPO_PUBLIC_PASSKEY_AUTH_URL": "https://run.flowindex.io/functions/v1/passkey-auth"
+      }
+    }
   },
   "submit": {
     "production": {}
