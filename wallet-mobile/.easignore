@@ -1,0 +1,17 @@
+# Ignore non-essential files for EAS Build
+.git
+backend
+frontend
+runner
+simulate
+ai
+devportal
+studio
+scripts
+videos
+docs
+supabase
+sim-workflow
+wallet
+.github
+*.md

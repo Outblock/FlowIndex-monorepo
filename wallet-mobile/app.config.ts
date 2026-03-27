@@ -33,8 +33,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-local-authentication',
     'expo-camera',
     'expo-notifications',
-    'expo-haptics',
   ],
+  extra: {
+    eas: {
+      projectId: '56504bb5-aa2c-4a38-8cb1-7271f812a9b5',
+    },
+  },
   experiments: {
     typedRoutes: true,
   },
