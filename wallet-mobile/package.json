@@ -5,7 +5,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "eas-build-pre-install": "cd .. && npm install -g bun && bun install",
-    "eas-build-post-install": "cd ../packages/flow-passkey && bun run build && cd ../auth-core && bun run build && cd ../wallet-core && bun run build",
+    "eas-build-post-install": "cd ../packages/flow-passkey && bun run build && cd ../auth-core && bun run build && cd ../evm-wallet && bun run build && cd ../wallet-core && bun run build",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

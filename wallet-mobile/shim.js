@@ -1,4 +1,5 @@
 // Node.js polyfills for React Native — loaded before app entry
+import '@walletconnect/react-native-compat';
 import { Buffer } from 'buffer';
 import process from 'process';
 
