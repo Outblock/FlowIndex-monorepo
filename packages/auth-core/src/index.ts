@@ -14,8 +14,10 @@ export type {
 export { parseJwt, isExpired, secondsUntilExpiry, userFromToken } from './jwt';
 export type { UserFromTokenOptions } from './jwt';
 
-// Cookie / token storage helpers
-export { loadTokensFromCookie, loadStoredTokens, persistTokens, clearTokens } from './cookie';
+// Token storage helpers (platform-split: web vs native)
+export { loadStoredTokens, persistTokens, clearTokens } from './storage';
+// Web-only: direct cookie access (not available on native)
+export { loadTokensFromCookie } from './storage.web';
 
 // GoTrue helpers
 export { gotruePost, refreshAccessToken, buildOAuthRedirectUrl } from './gotrue';
