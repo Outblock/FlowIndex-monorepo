@@ -27,7 +27,11 @@
     "zustand": "^5.0.0"
   },
   "peerDependencies": {
-    "react": ">=18.0.0"
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react-dom": { "optional": true }
   },
   "devDependencies": {
     "tsup": "^8.5.0",
