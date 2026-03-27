@@ -33,7 +33,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-local-authentication',
     'expo-camera',
     'expo-notifications',
-    'expo-haptics',
   ],
   experiments: {
     typedRoutes: true,
