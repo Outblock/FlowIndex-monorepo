@@ -6,5 +6,8 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ['@flowindex/flow-passkey'],
+  external: ['@flowindex/flow-passkey', '@react-native-async-storage/async-storage'],
+  esbuildOptions(options) {
+    options.resolveExtensions = ['.web.ts', '.web.tsx', '.ts', '.tsx', '.js', '.jsx'];
+  },
 });

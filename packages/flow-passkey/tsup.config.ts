@@ -6,5 +6,9 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ['@onflow/fcl'],
+  external: ['@onflow/fcl', 'react-native-passkeys'],
+  noExternal: ['@noble/hashes'],
+  esbuildOptions(options) {
+    options.resolveExtensions = ['.web.ts', '.web.tsx', '.ts', '.tsx', '.js', '.jsx'];
+  },
 });

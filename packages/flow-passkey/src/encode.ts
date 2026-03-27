@@ -2,6 +2,7 @@
  * Flow transaction encoding + passkey signing helpers.
  * Ported from onflow/passkey-wallet-tech.
  */
+import { sha256 as _sha256 } from '@noble/hashes/sha2.js';
 import { SHA3 } from 'sha3';
 import { encode as rlpEncode } from '@onflow/rlp';
 import type { Voucher, Signable } from './types';
@@ -69,14 +70,10 @@ export const TRANSACTION_DOMAIN_TAG = rightPadHex(
 // -- SHA helpers --
 
 /**
- * SHA-256 hash using Web Crypto API.
+ * SHA-256 hash using @noble/hashes (sync, works on React Native).
  */
-export async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
-  const buf = bytes.buffer instanceof ArrayBuffer
-    ? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
-    : new Uint8Array(bytes).slice().buffer;
-  const digest = await crypto.subtle.digest('SHA-256', buf);
-  return new Uint8Array(digest);
+export function sha256(bytes: Uint8Array): Uint8Array {
+  return _sha256(bytes);
 }
 
 /**
