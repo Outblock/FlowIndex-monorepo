@@ -39,6 +39,7 @@ import { EvaluatorBlock } from '@/blocks/blocks/evaluator'
 import { ExaBlock } from '@/blocks/blocks/exa'
 import { FileBlock, FileV2Block, FileV3Block } from '@/blocks/blocks/file'
 import { FirecrawlBlock } from '@/blocks/blocks/firecrawl'
+import { FlowApprovalBlock } from '@/blocks/blocks/flow_approval'
 import { FlowGetAccountBlock } from '@/blocks/blocks/flow_get_account'
 import { FlowGetBalanceBlock } from '@/blocks/blocks/flow_get_balance'
 import { FlowGetBlockBlock } from '@/blocks/blocks/flow_get_block'
@@ -297,6 +298,7 @@ export const registry: Record<string, BlockConfig> = {
   firecrawl: FirecrawlBlock,
   fireflies: FirefliesBlock,
   fireflies_v2: FirefliesV2Block,
+  flow_approval: FlowApprovalBlock,
   flow_get_account: FlowGetAccountBlock,
   flow_get_balance: FlowGetBalanceBlock,
   flow_get_block: FlowGetBlockBlock,

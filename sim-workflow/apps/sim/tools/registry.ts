@@ -464,6 +464,10 @@ import {
   flowListTemplatesTool,
   flowSimulateTemplateTool,
   flowSimulateTransactionTool,
+  flowQueueTransactionTool,
+  flowConfirmTransactionTool,
+  flowCancelTransactionTool,
+  flowListPendingTool,
 } from '@/tools/flow'
 import {
   firecrawlAgentTool,
@@ -2424,6 +2428,10 @@ export const tools: Record<string, ToolConfig> = {
   flow_list_templates: flowListTemplatesTool,
   flow_simulate_template: flowSimulateTemplateTool,
   flow_simulate_transaction: flowSimulateTransactionTool,
+  flow_queue_transaction: flowQueueTransactionTool,
+  flow_confirm_transaction: flowConfirmTransactionTool,
+  flow_cancel_transaction: flowCancelTransactionTool,
+  flow_list_pending: flowListPendingTool,
   gong_list_calls: gongListCallsTool,
   gong_get_call: gongGetCallTool,
   gong_get_call_transcript: gongGetCallTranscriptTool,
