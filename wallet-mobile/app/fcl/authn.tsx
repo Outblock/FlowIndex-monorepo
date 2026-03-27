@@ -1,11 +1,13 @@
-import { View, Text, Pressable, ActivityIndicator, Image } from 'react-native';
+import { Alert, View, Text, Pressable, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { Globe } from 'lucide-react-native';
 import { useWallet, buildAuthnResponse } from '@flowindex/wallet-core';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://flowindex.io/api';
+function isValidCallback(url: string): boolean {
+  return url.startsWith('https://');
+}
 
 function formatAddress(addr?: string | null): string {
   if (!addr) return '';
@@ -40,6 +42,11 @@ export default function FclAuthnScreen() {
   }
 
   const handleApprove = async () => {
+    if (!isValidCallback(callback)) {
+      Alert.alert('Invalid Callback', 'The callback URL is not a valid HTTPS URL.');
+      return;
+    }
+
     if (!activeAccount || !flowAddress) {
       Linking.openURL(`${callback}?fclError=no_account`);
       router.back();
@@ -50,7 +57,7 @@ export default function FclAuthnScreen() {
     const response = buildAuthnResponse({
       address: flowAddress,
       keyId,
-      baseUrl: BASE_URL,
+      baseUrl: 'https://wallet.flowindex.io/fcl',
       network,
     });
 
@@ -60,6 +67,10 @@ export default function FclAuthnScreen() {
   };
 
   const handleReject = () => {
+    if (!isValidCallback(callback)) {
+      Alert.alert('Invalid Callback', 'The callback URL is not a valid HTTPS URL.');
+      return;
+    }
     Linking.openURL(`${callback}?fclError=user_rejected`);
     router.back();
   };

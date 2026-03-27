@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   Pressable,
@@ -65,9 +66,12 @@ export default function SignScreen() {
       if (typeof payload?.onApprove === 'function') {
         await payload.onApprove();
       }
-    } finally {
       remove(id);
       router.back();
+    } catch (err) {
+      setSigning(false);
+      Alert.alert('Signing Failed', (err as Error).message);
+      // Don't remove request - let user retry
     }
   };
 

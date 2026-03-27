@@ -63,7 +63,6 @@ const SUPPORTED_METHODS = [
   'eth_sendTransaction',
   'personal_sign',
   'eth_signTypedData_v4',
-  'eth_sign',
 ];
 const SUPPORTED_EVENTS = ['chainChanged', 'accountsChanged'];
 

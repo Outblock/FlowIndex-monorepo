@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useWallet } from '@flowindex/wallet-core';
@@ -8,12 +9,16 @@ import { useMobileAuth } from '../../providers/AuthProvider';
 
 const RP_ID = process.env.EXPO_PUBLIC_RP_ID || 'flowindex.io';
 
+function isValidCallback(url: string): boolean {
+  return url.startsWith('https://');
+}
+
 /** Decode a base64url string to a UTF-8 string */
 function base64UrlDecode(input: string): string {
   // Convert base64url to base64
   const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
-  return atob(padded);
+  return Buffer.from(padded, 'base64').toString('utf-8');
 }
 
 export default function FclAuthzScreen() {
@@ -28,7 +33,13 @@ export default function FclAuthzScreen() {
   const { passkeys } = useMobileAuth();
 
   useEffect(() => {
-    if (!callback || !signableB64) {
+    if (!callback || !signableB64 || !activeAccount) {
+      router.back();
+      return;
+    }
+
+    if (!isValidCallback(callback)) {
+      Alert.alert('Invalid Callback', 'The callback URL is not a valid HTTPS URL.');
       router.back();
       return;
     }

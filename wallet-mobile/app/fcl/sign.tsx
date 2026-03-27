@@ -1,10 +1,15 @@
 import { useEffect } from 'react';
+import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useWallet } from '@flowindex/wallet-core';
 import { signFlowTransaction } from '@flowindex/flow-passkey';
 import { usePendingRequests } from '../../stores/pending-requests';
 import { useMobileAuth } from '../../providers/AuthProvider';
+
+function isValidCallback(url: string): boolean {
+  return url.startsWith('https://');
+}
 
 const RP_ID = process.env.EXPO_PUBLIC_RP_ID || 'flowindex.io';
 
@@ -28,7 +33,13 @@ export default function FclSignScreen() {
   const { passkeys } = useMobileAuth();
 
   useEffect(() => {
-    if (!callback || !message) {
+    if (!callback || !message || !activeAccount) {
+      router.back();
+      return;
+    }
+
+    if (!isValidCallback(callback)) {
+      Alert.alert('Invalid Callback', 'The callback URL is not a valid HTTPS URL.');
       router.back();
       return;
     }
