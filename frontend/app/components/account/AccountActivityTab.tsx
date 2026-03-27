@@ -9,6 +9,8 @@ import {
     getFlowV1NftTransfer,
 } from '../../api/gen/find';
 import { Activity, ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Repeat, Clock, List, CalendarDays, Landmark, ChevronDown, ChevronRight } from 'lucide-react';
+import { useAddressTransactions } from '../../hooks/useAddressTransactions';
+import { NewTransactionsBadge } from './NewTransactionsBadge';
 import { normalizeAddress, formatShort } from './accountUtils';
 import { EVENT_LABELS, EVENT_COLORS } from './AccountStakingTab';
 import { AddressLink } from '../AddressLink';
@@ -99,6 +101,12 @@ export function AccountActivityTab({ address, initialTransactions, initialNextCu
     const didFetchRef = useRef(false);
     const [viewMode, setViewMode] = useState<ViewMode>('timeline');
 
+    // Live transaction updates
+    const { newTransactions, clearBuffer, bufferSize } = useAddressTransactions(address);
+    const [newTxIds, setNewTxIds] = useState<Set<string>>(new Set());
+    const listTopRef = useRef<HTMLDivElement | null>(null);
+    const [isAtTop, setIsAtTop] = useState(true);
+
     // Timeline state
     const [timelineTxs, setTimelineTxs] = useState<any[]>([]);
     const [timelineOffset, setTimelineOffset] = useState(0);
@@ -174,6 +182,87 @@ export function AccountActivityTab({ address, initialTransactions, initialNextCu
 
     // Token metadata — incrementally populated from transfer_summary in API responses
     const [tokenMeta, setTokenMeta] = useState<Map<string, TokenMetaEntry>>(() => new Map(tokenMetaCache));
+
+    // Detect if user is viewing the top of the list
+    useEffect(() => {
+        const el = listTopRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(
+            ([entry]) => setIsAtTop(entry.isIntersecting),
+            { threshold: 0 }
+        );
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+
+    // Live update: auto-prepend when at top, otherwise buffer for badge
+    useEffect(() => {
+        if (newTransactions.length === 0) return;
+        if (filterMode !== 'all') return;
+
+        const shouldAutoPrepend =
+            (viewMode === 'pages' && currentPage === 1 && isAtTop) ||
+            (viewMode === 'timeline' && isAtTop);
+
+        if (shouldAutoPrepend) {
+            const mapped = newTransactions.map(tx => ({
+                ...tx,
+                payer: tx.payer_address || tx.proposer_address,
+                proposer: tx.proposer_address,
+                blockHeight: tx.block_height,
+            }));
+
+            if (viewMode === 'pages') {
+                setTransactions(prev => dedup([...mapped, ...prev]));
+            } else {
+                setTimelineTxs(prev => dedup([...mapped, ...prev]));
+                setTimelineOffset(prev => prev + mapped.length);
+            }
+
+            // Highlight new txs for 3 seconds
+            const ids = mapped.map(t => t.id);
+            setNewTxIds(prev => new Set([...prev, ...ids]));
+            setTimeout(() => {
+                setNewTxIds(prev => {
+                    const next = new Set(prev);
+                    ids.forEach(id => next.delete(id));
+                    return next;
+                });
+            }, 3000);
+
+            clearBuffer();
+        }
+    }, [newTransactions, isAtTop, currentPage, viewMode, filterMode, clearBuffer]);
+
+    const handleNewTxBadgeClick = useCallback(() => {
+        const mapped = newTransactions.map(tx => ({
+            ...tx,
+            payer: tx.payer_address || tx.proposer_address,
+            proposer: tx.proposer_address,
+            blockHeight: tx.block_height,
+        }));
+
+        if (viewMode === 'pages') {
+            setCurrentPage(1);
+            setTransactions(prev => dedup([...mapped, ...prev]));
+        } else {
+            setTimelineTxs(prev => dedup([...mapped, ...prev]));
+            setTimelineOffset(prev => prev + mapped.length);
+        }
+
+        const ids = mapped.map(t => t.id);
+        setNewTxIds(prev => new Set([...prev, ...ids]));
+        setTimeout(() => {
+            setNewTxIds(prev => {
+                const next = new Set(prev);
+                ids.forEach(id => next.delete(id));
+                return next;
+            });
+        }, 3000);
+
+        clearBuffer();
+        listTopRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [newTransactions, viewMode, clearBuffer]);
 
     // Reset only when address changes (not on every initialTransactions reference change)
     const prevAddressRef = useRef(normalizedAddress);
@@ -1066,20 +1155,29 @@ export function AccountActivityTab({ address, initialTransactions, initialNextCu
                     </div>
                 )}
 
+                {/* Live update badge + anchor */}
+                {filterMode === 'all' && (
+                    <>
+                        <div ref={listTopRef} />
+                        {!isAtTop && <NewTransactionsBadge count={bufferSize} onClick={handleNewTxBadgeClick} />}
+                    </>
+                )}
+
                 {/* Unified activity feed — Pages mode */}
                 {filterMode === 'all' && viewMode === 'pages' && filteredTransactions.length > 0 && (
                     <div className="space-y-0">
                         {filteredTransactions.map((tx) => {
                             const txKey = `${tx.id}:${tx.block_height ?? tx.blockHeight ?? ''}`;
                             return (
-                                <ActivityRow
-                                    key={txKey}
-                                    tx={tx}
-                                    address={normalizedAddress}
-                                    expanded={expandedTxId === txKey}
-                                    onToggle={() => setExpandedTxId(prev => prev === txKey ? null : txKey)}
-                                    tokenMeta={tokenMeta}
-                                />
+                                <div key={txKey} className={newTxIds.has(tx.id) ? 'bg-emerald-500/10 transition-colors duration-1000' : ''}>
+                                    <ActivityRow
+                                        tx={tx}
+                                        address={normalizedAddress}
+                                        expanded={expandedTxId === txKey}
+                                        onToggle={() => setExpandedTxId(prev => prev === txKey ? null : txKey)}
+                                        tokenMeta={tokenMeta}
+                                    />
+                                </div>
                             );
                         })}
                     </div>
@@ -1107,13 +1205,15 @@ export function AccountActivityTab({ address, initialTransactions, initialNextCu
                                                 {section}
                                             </div>
                                         )}
-                                        <ActivityRow
-                                            tx={tx}
-                                            address={normalizedAddress}
-                                            expanded={expandedTxId === txKey}
-                                            onToggle={() => setExpandedTxId(prev => prev === txKey ? null : txKey)}
-                                            tokenMeta={tokenMeta}
-                                        />
+                                        <div className={newTxIds.has(tx.id) ? 'bg-emerald-500/10 transition-colors duration-1000' : ''}>
+                                            <ActivityRow
+                                                tx={tx}
+                                                address={normalizedAddress}
+                                                expanded={expandedTxId === txKey}
+                                                onToggle={() => setExpandedTxId(prev => prev === txKey ? null : txKey)}
+                                                tokenMeta={tokenMeta}
+                                            />
+                                        </div>
                                     </Fragment>
                                 );
                             });

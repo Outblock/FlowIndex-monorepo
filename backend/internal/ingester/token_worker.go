@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"flowscan-clone/internal/broadcast"
 	"flowscan-clone/internal/models"
 	"flowscan-clone/internal/repository"
 )
@@ -658,6 +659,25 @@ func (w *TokenWorker) ProcessRange(ctx context.Context, fromHeight, toHeight uin
 	if len(addrTxs) > 0 {
 		if err := w.repo.UpsertAddressTransactions(ctx, addrTxs); err != nil {
 			return fmt.Errorf("upsert address txs for transfers: %w", err)
+		}
+	}
+
+	// Phase 2 WS broadcast: notify address subscribers about FT/NFT transfer roles
+	if len(addrTxs) > 0 {
+		txIDs := make(map[string]bool)
+		for _, at := range addrTxs {
+			txIDs[at.TransactionID] = true
+		}
+		ids := make([]string, 0, len(txIDs))
+		for id := range txIDs {
+			ids = append(ids, id)
+		}
+		if rawTxs, err := w.repo.GetTransactionsByIDs(ctx, ids); err == nil {
+			txMap := make(map[string]models.Transaction)
+			for _, tx := range rawTxs {
+				txMap[tx.ID] = tx
+			}
+			broadcast.BroadcastPhase2Transactions(addrTxs, ftTransfers, nftTransfers, txMap)
 		}
 	}
 

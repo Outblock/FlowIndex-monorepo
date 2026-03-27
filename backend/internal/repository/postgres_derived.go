@@ -44,6 +44,48 @@ func (r *Repository) GetRawTransactionsInRange(ctx context.Context, fromHeight, 
 	return txs, nil
 }
 
+// GetTransactionsByIDs fetches raw transactions by their IDs.
+func (r *Repository) GetTransactionsByIDs(ctx context.Context, ids []string) ([]models.Transaction, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	// Convert hex string IDs to bytea for raw.transactions lookup
+	byteIDs := make([][]byte, len(ids))
+	for i, id := range ids {
+		byteIDs[i] = hexToBytes(id)
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT encode(id, 'hex') AS id, block_height,
+			COALESCE(encode(proposer_address, 'hex'), '') AS proposer_address,
+			COALESCE(encode(payer_address, 'hex'), '') AS payer_address,
+			COALESCE(ARRAY(SELECT encode(a, 'hex') FROM unnest(authorizers) a), ARRAY[]::text[]) AS authorizers,
+			COALESCE(status, '') AS status,
+			COALESCE(error_message, '') AS error_message,
+			COALESCE(is_evm, false) AS is_evm,
+			COALESCE(script_hash, '') AS script_hash,
+			timestamp
+		FROM raw.transactions
+		WHERE id = ANY($1)
+	`, byteIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var txs []models.Transaction
+	for rows.Next() {
+		var tx models.Transaction
+		if err := rows.Scan(
+			&tx.ID, &tx.BlockHeight, &tx.ProposerAddress, &tx.PayerAddress, &tx.Authorizers,
+			&tx.Status, &tx.ErrorMessage, &tx.IsEVM, &tx.ScriptHash,
+			&tx.Timestamp,
+		); err != nil {
+			return nil, err
+		}
+		txs = append(txs, tx)
+	}
+	return txs, rows.Err()
+}
+
 // UpsertAccountKeys inserts/updates account keys.
 func (r *Repository) UpsertAccountKeys(ctx context.Context, keys []models.AccountKey) error {
 	if len(keys) == 0 {
