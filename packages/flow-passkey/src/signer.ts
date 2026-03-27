@@ -2,8 +2,9 @@
  * Flow transaction signing with passkeys — FLIP-264 compatible.
  */
 import type { PasskeySignResult } from './types';
-import { bytesToHex, hexToBytes, base64UrlToBytes } from './utils';
+import { bytesToHex, hexToBytes } from './utils';
 import { sha256, derToP256Raw, buildExtensionData, encodeMessageFromSignable } from './encode';
+import { getPasskeyAssertion } from './webauthn';
 
 /**
  * Options for signing a Flow transaction with a passkey.
@@ -29,54 +30,27 @@ export async function signFlowTransaction(options: SignTransactionOptions): Prom
   const { messageHex, credentialId, rpId } = options;
 
   // SHA-256 hash the message
-  const challenge = await sha256(hexToBytes(messageHex));
+  const challenge = sha256(hexToBytes(messageHex));
 
-  // Get the correct ArrayBuffer for the challenge
-  const challengeBuffer = challenge.buffer instanceof ArrayBuffer
-    ? challenge.buffer.slice(challenge.byteOffset, challenge.byteOffset + challenge.byteLength)
-    : new Uint8Array(challenge).buffer;
-
-  // WebAuthn assertion
-  const credIdBytes = base64UrlToBytes(credentialId);
-  const credIdBuffer = credIdBytes.buffer.slice(credIdBytes.byteOffset, credIdBytes.byteOffset + credIdBytes.byteLength) as ArrayBuffer;
-
-  const assertion = await navigator.credentials.get({
-    publicKey: {
-      challenge: challengeBuffer as ArrayBuffer,
-      allowCredentials: [{
-        id: credIdBuffer,
-        type: 'public-key' as const,
-      }],
-      rpId,
-      userVerification: 'preferred',
-    },
-  }) as PublicKeyCredential | null;
-
-  if (!assertion) throw new Error('Passkey signing cancelled');
-
-  const response = assertion.response as AuthenticatorAssertionResponse;
+  // Get assertion via platform-adaptive WebAuthn
+  const assertion = await getPasskeyAssertion({
+    rpId,
+    challenge,
+    allowCredentials: [{ id: credentialId, type: 'public-key' }],
+  });
 
   // Convert DER signature to raw r||s (64 bytes)
-  const derSig = new Uint8Array(response.signature);
-  const rawSig = derToP256Raw(derSig);
+  const rawSig = derToP256Raw(assertion.signature);
   const signature = bytesToHex(rawSig);
 
   // Build FLIP-264 extension data
-  const authenticatorData = new Uint8Array(response.authenticatorData);
-  const clientDataJSON = new Uint8Array(response.clientDataJSON);
-  const extensionData = buildExtensionData(authenticatorData, clientDataJSON);
+  const extensionData = buildExtensionData(assertion.authenticatorData, assertion.clientDataJSON);
 
   return { signature, extensionData };
 }
 
 /**
  * Create an FCL-compatible authorization function using a passkey.
- *
- * Returns a function suitable for use as `fcl.authz` or in `fcl.authorization`:
- * ```ts
- * const authz = createPasskeyAuthz({ address: '0x1234', keyIndex: 0, credentialId, rpId });
- * await fcl.mutate({ cadence: '...', authz });
- * ```
  */
 export function createPasskeyAuthz(options: {
   address: string;

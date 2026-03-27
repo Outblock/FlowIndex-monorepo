@@ -6,5 +6,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ['@onflow/fcl'],
+  external: ['@onflow/fcl', 'react-native-passkeys'],
 });

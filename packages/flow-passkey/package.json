@@ -18,14 +18,19 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@noble/hashes": "^2.0.0",
     "@onflow/rlp": "^1.2.2",
     "sha3": "^2.1.4"
   },
   "peerDependencies": {
-    "@onflow/fcl": ">=1.0.0"
+    "@onflow/fcl": ">=1.0.0",
+    "react-native-passkeys": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "@onflow/fcl": {
+      "optional": true
+    },
+    "react-native-passkeys": {
       "optional": true
     }
   },
