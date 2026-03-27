@@ -1,4 +1,8 @@
 flowindex.io {
+	handle /.well-known/apple-app-site-association {
+		header Content-Type application/json
+		respond `{"webcredentials":{"apps":["444MY26W7F.io.flowindex.wallet"]}}`
+	}
 	handle /functions/v1/* {
 		reverse_proxy 10.128.0.4:54321
 	}
