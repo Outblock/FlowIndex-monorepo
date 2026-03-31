@@ -509,6 +509,9 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 			if ft.IsCrossVM {
 				item["is_cross_vm"] = true
 			}
+			if ft.IsBridgeFee {
+				item["is_bridge_fee"] = true
+			}
 			fromIsCOA := false
 			toIsCOA := false
 			if ft.FromAddress != "" {

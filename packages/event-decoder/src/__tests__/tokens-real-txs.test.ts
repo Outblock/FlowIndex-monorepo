@@ -105,4 +105,38 @@ describe('parseTokenEvents — real transaction fixtures', () => {
     expect(result.transfers[0].from_address).toContain('aaaaaaaaaaaaaaaa');
     expect(result.transfers[0].to_address).toContain('bbbbbbbbbbbbbbbb');
   });
+
+  it('bridge-from-EVM tx marks the small FLOW leg as bridge fee (96d55f50...)', () => {
+    // Tx: 96d55f50c0f2050ef648e9c88bfdbe619eadb7e9a75d97ee51328b003e0d11dc
+    const events: RawEvent[] = [
+      {"type":"A.1654653399040a61.FlowToken.TokensWithdrawn","payload":{"from":"8c228867db0e8644","amount":"0.00010000"},"event_index":0},
+      {"type":"A.f233dcee88fe0abe.FungibleToken.Withdrawn","payload":{"from":"8c228867db0e8644","type":"A.1654653399040a61.FlowToken.Vault","amount":"0.00010000","fromUUID":"234195977838588","balanceAfter":"20.00090000","withdrawnUUID":"174822351367203"},"event_index":1},
+      {"type":"A.1654653399040a61.FlowToken.TokensDeposited","payload":{"to":"1e4aa0b87d10b141","amount":"0.00010000"},"event_index":2},
+      {"type":"A.f233dcee88fe0abe.FungibleToken.Deposited","payload":{"to":"1e4aa0b87d10b141","type":"A.1654653399040a61.FlowToken.Vault","amount":"0.00010000","toUUID":"101155070742927","depositedUUID":"174822351367203","balanceAfter":"313.83442060"},"event_index":3},
+      {"type":"A.05b67ba314000b2d.TSHOT.TokensWithdrawn","payload":{"from":"1e4aa0b87d10b141","amount":"9.00000000"},"event_index":6},
+      {"type":"A.f233dcee88fe0abe.FungibleToken.Withdrawn","payload":{"from":"1e4aa0b87d10b141","type":"A.05b67ba314000b2d.TSHOT.Vault","amount":"9.00000000","fromUUID":"166026257105923","withdrawnUUID":"174822351367204","balanceAfter":"129706.28882580"},"event_index":7},
+      {"type":"A.1e4aa0b87d10b141.IFlowEVMTokenBridge.BridgedTokensFromEVM","payload":{"type":"A.05b67ba314000b2d.TSHOT.Vault","amount":"9000000000000000000","caller":"000000000000000000000002883577635116139b","bridgedUUID":"174822351367204","bridgeAddress":"1e4aa0b87d10b141","evmContractAddress":"c618a7356fcf601f694c51578cd94144deaee690"},"event_index":8},
+      {"type":"A.05b67ba314000b2d.TSHOT.TokensDeposited","payload":{"to":"8c228867db0e8644","amount":"9.00000000"},"event_index":9},
+      {"type":"A.f233dcee88fe0abe.FungibleToken.Deposited","payload":{"to":"8c228867db0e8644","type":"A.05b67ba314000b2d.TSHOT.Vault","amount":"9.00000000","toUUID":"16492675765522","depositedUUID":"174822351367204","balanceAfter":"10.21707428"},"event_index":10},
+      {"type":"A.1654653399040a61.FlowToken.TokensWithdrawn","payload":{"from":"319e67f2ef9d937f","amount":"0.00958000"},"event_index":11},
+      {"type":"A.f233dcee88fe0abe.FungibleToken.Withdrawn","payload":{"from":"319e67f2ef9d937f","type":"A.1654653399040a61.FlowToken.Vault","amount":"0.00958000","fromUUID":"228119691","withdrawnUUID":"174822351367205","balanceAfter":"1097.25698000"},"event_index":12},
+      {"type":"A.1654653399040a61.FlowToken.TokensDeposited","payload":{"to":"f919ee77447b7497","amount":"0.00958000"},"event_index":13},
+      {"type":"A.f233dcee88fe0abe.FungibleToken.Deposited","payload":{"to":"f919ee77447b7497","type":"A.1654653399040a61.FlowToken.Vault","amount":"0.00958000","toUUID":"0","depositedUUID":"174822351367205","balanceAfter":"2436.71606599"},"event_index":14},
+      {"type":"A.f919ee77447b7497.FlowFees.FeesDeducted","payload":{"amount":"0.00958000","executionEffort":"0.00000237","inclusionEffort":"1.00000000"},"event_index":15},
+    ];
+
+    const result = parseTokenEvents(events);
+    expect(result.transfers).toHaveLength(2);
+
+    const bridgeFee = result.transfers.find((t) => t.token.includes('FlowToken'));
+    expect(bridgeFee).toBeDefined();
+    expect(bridgeFee?.amount).toBe('0.00010000');
+    expect(bridgeFee?.to_address?.toLowerCase()).toContain('1e4aa0b87d10b141');
+    expect(bridgeFee?.is_bridge_fee).toBe(true);
+
+    const bridgedAsset = result.transfers.find((t) => t.token.includes('.TSHOT'));
+    expect(bridgedAsset).toBeDefined();
+    expect(bridgedAsset?.amount).toBe('9.00000000');
+    expect(bridgedAsset?.is_bridge_fee).toBeUndefined();
+  });
 });

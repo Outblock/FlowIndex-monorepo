@@ -319,6 +319,7 @@ export function parseTokenEvents(events: RawEvent[]): {
   // Scheduled/system txs can move FlowToken into FlowTransactionScheduler as fee escrow.
   // Those legs are operational bookkeeping, not user-facing asset flow.
   const scheduledFeeTransfers: { amount: string; recipient: string }[] = [];
+  const bridgeFromEVMAddresses = new Set<string>();
 
   // Context flags — scan all events once for evidence-based classification
   let hasStakingEvents = false;
@@ -326,6 +327,7 @@ export function parseTokenEvents(events: RawEvent[]): {
   let hasLostFound = false;
   let hasBurnEvent = false;   // explicit TokensBurned / TokensBurnt
   let hasMintEvent = false;   // explicit TokensMinted
+  let hasBridgeFromEVM = false;
 
   // Pre-scan for context flags before processing legs
   for (const event of events) {
@@ -339,6 +341,19 @@ export function parseTokenEvents(events: RawEvent[]): {
     if (cn === 'FlowFees' && en === 'FeesDeducted') hasFeesDeducted = true;
     if (en === 'TokensBurned' || en === 'TokensBurnt') hasBurnEvent = true;
     if (en === 'TokensMinted') hasMintEvent = true;
+    if (et.includes('IFlowEVMTokenBridge.BridgedTokensFromEVM')) {
+      hasBridgeFromEVM = true;
+      try {
+        const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+        const fields = parseCadenceEventFields(payload);
+        const bridgeAddress = normalizeFlowAddress(
+          String(fields?.bridgeAddress ?? event.contract_address ?? parseContractAddress(et)),
+        );
+        if (bridgeAddress) bridgeFromEVMAddresses.add(bridgeAddress);
+      } catch {
+        // Best-effort only; bridge fee detection falls back to other context.
+      }
+    }
     if (et.includes('FlowTransactionScheduler.Scheduled')) {
       try {
         const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
@@ -506,6 +521,13 @@ export function parseTokenEvents(events: RawEvent[]): {
   const ftTransfers: FTTransfer[] = [];
   const nftTransfers: NFTTransfer[] = [];
 
+  function isBridgeFeeTransfer(t: RawTransfer): boolean {
+    if (!hasBridgeFromEVM || t.isNFT || !t.token.includes('FlowToken')) return false;
+    const toNorm = normalizeFlowAddress(t.toAddress);
+    if (!toNorm || !bridgeFromEVMAddresses.has(toNorm)) return false;
+    return !!normalizeFlowAddress(t.fromAddress);
+  }
+
   for (const t of allTransfers) {
     const fromNorm = normalizeFlowAddress(t.fromAddress);
     const toNorm = normalizeFlowAddress(t.toAddress);
@@ -543,6 +565,7 @@ export function parseTokenEvents(events: RawEvent[]): {
         amount: t.amount,
         event_index: t.eventIndex,
         transfer_type: transferType,
+        is_bridge_fee: isBridgeFeeTransfer(t) || undefined,
       });
     }
   }

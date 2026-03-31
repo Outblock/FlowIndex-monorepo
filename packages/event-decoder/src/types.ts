@@ -18,6 +18,7 @@ export interface FTTransfer {
   transfer_type: TransferType;
   evm_to_address?: string;
   evm_from_address?: string;
+  is_bridge_fee?: boolean;
 }
 
 export interface NFTTransfer {

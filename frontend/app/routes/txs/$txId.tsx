@@ -706,6 +706,13 @@ function FlowRow({ from, to, amount, symbol, logo, badge, usdPrice, addressBook,
 
 function renderTransferRowBadge(row: TxDetailDisplayTransferRow): React.ReactNode {
     const badges: React.ReactNode[] = [];
+    if (row.isBridgeFee) {
+        badges.push(
+            <span className="inline-flex items-center gap-1 text-[9px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                Fee
+            </span>
+        );
+    }
     if (row.layer === 'evm') {
         badges.push(
             <span className="inline-flex items-center gap-1 text-[9px] text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider">
@@ -1132,6 +1139,7 @@ function TransactionDetail() {
                     ...ft,
                     // Event-decoder transfer_type is source of truth (evidence-based)
                     transfer_type: derived.transfer_type || ft.transfer_type,
+                    is_bridge_fee: derived.is_bridge_fee ?? ft.is_bridge_fee,
                     evm_to_address: derived.evm_to_address || ft.evm_to_address,
                     evm_from_address: derived.evm_from_address || ft.evm_from_address,
                     to_address: ft.to_address || derived.to_address,
@@ -1158,6 +1166,7 @@ function TransactionDetail() {
                 approx_usd_price: ft.approx_usd_price ?? meta.approx_usd_price,
                 usd_value: ft.usd_value ?? meta.usd_value,
                 transfer_type: ft.transfer_type || meta.transfer_type,
+                is_bridge_fee: ft.is_bridge_fee ?? meta.is_bridge_fee,
                 evm_to_address: ft.evm_to_address || meta.evm_to_address,
                 evm_from_address: ft.evm_from_address || meta.evm_from_address,
             };

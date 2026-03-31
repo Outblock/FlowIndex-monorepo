@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"regexp"
 	"sort"
@@ -35,11 +36,13 @@ var stakingContracts = map[string]bool{
 // txEventContext holds pre-computed flags about what events exist in a transaction.
 // Used by canonicalizeFTTransfers to make better transfer_type decisions.
 type txEventContext struct {
-	HasStaking     bool
-	HasLostFound   bool
-	HasFees        bool // FlowFees.FeesDeducted present
-	HasBurnEvent   bool // explicit TokensBurned / Burner.TokensBurnt
-	HasMintEvent   bool // explicit TokensMinted
+	HasStaking             bool
+	HasLostFound           bool
+	HasFees                bool // FlowFees.FeesDeducted present
+	HasBurnEvent           bool // explicit TokensBurned / Burner.TokensBurnt
+	HasMintEvent           bool // explicit TokensMinted
+	HasBridgeFromEVM       bool
+	BridgeFromEVMAddresses map[string]struct{}
 }
 
 // eventContractName extracts the contract name (3rd segment) from a fully-qualified
@@ -52,6 +55,14 @@ func eventContractName(eventType string) string {
 	return ""
 }
 
+func eventContractAddress(eventType string) string {
+	parts := strings.Split(eventType, ".")
+	if len(parts) >= 2 {
+		return normalizeHexAddress(parts[1])
+	}
+	return ""
+}
+
 func eventName(eventType string) string {
 	parts := strings.Split(eventType, ".")
 	if len(parts) >= 4 {
@@ -60,9 +71,56 @@ func eventName(eventType string) string {
 	return ""
 }
 
+func jsonStringField(raw json.RawMessage, field string) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return ""
+	}
+	return jsonStringFieldValue(decoded, field)
+}
+
+func jsonStringFieldValue(value any, field string) string {
+	switch v := value.(type) {
+	case map[string]any:
+		if raw, ok := v[field]; ok {
+			if found := jsonScalarString(raw); found != "" {
+				return found
+			}
+		}
+		for _, child := range v {
+			if found := jsonStringFieldValue(child, field); found != "" {
+				return found
+			}
+		}
+	case []any:
+		for _, child := range v {
+			if found := jsonStringFieldValue(child, field); found != "" {
+				return found
+			}
+		}
+	}
+	return ""
+}
+
+func jsonScalarString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case map[string]any, []any:
+		return jsonStringFieldValue(v, "value")
+	default:
+		return ""
+	}
+}
+
 // buildTxEventContext scans events once and sets all context flags.
 func buildTxEventContext(events []models.Event) txEventContext {
-	var ctx txEventContext
+	ctx := txEventContext{
+		BridgeFromEVMAddresses: make(map[string]struct{}),
+	}
 	for _, e := range events {
 		cn := e.ContractName
 		if cn == "" {
@@ -86,6 +144,22 @@ func buildTxEventContext(events []models.Event) txEventContext {
 		if en == "TokensMinted" {
 			ctx.HasMintEvent = true
 		}
+		if strings.Contains(e.Type, "IFlowEVMTokenBridge.BridgedTokensFromEVM") {
+			ctx.HasBridgeFromEVM = true
+			bridgeAddress := normalizeHexAddress(jsonStringField(e.Values, "bridgeAddress"))
+			if bridgeAddress == "" {
+				bridgeAddress = normalizeHexAddress(jsonStringField(e.Payload, "bridgeAddress"))
+			}
+			if bridgeAddress == "" {
+				bridgeAddress = normalizeHexAddress(e.ContractAddress)
+			}
+			if bridgeAddress == "" {
+				bridgeAddress = eventContractAddress(e.Type)
+			}
+			if bridgeAddress != "" {
+				ctx.BridgeFromEVMAddresses[bridgeAddress] = struct{}{}
+			}
+		}
 	}
 	return ctx
 }
@@ -101,6 +175,7 @@ type canonicalFTTransfer struct {
 	EVMToAddress   string
 	EVMFromAddress string
 	IsCrossVM      bool
+	IsBridgeFee    bool
 }
 
 type parsedEVMExecution struct {
@@ -292,6 +367,17 @@ func isDuplicateMint(transfer canonicalFTTransfer, all []canonicalFTTransfer) bo
 	return false
 }
 
+func isBridgeFeeTransfer(transfer canonicalFTTransfer, ctx txEventContext) bool {
+	if !ctx.HasBridgeFromEVM || !strings.Contains(transfer.Token, "FlowToken") {
+		return false
+	}
+	if transfer.FromAddress == "" || transfer.ToAddress == "" {
+		return false
+	}
+	_, ok := ctx.BridgeFromEVMAddresses[transfer.ToAddress]
+	return ok
+}
+
 func canonicalizeFTTransfers(rows []repository.FTTransferRow, evmExecs []repository.EVMTransactionRecord, evtCtx ...txEventContext) []canonicalFTTransfer {
 	var ctx txEventContext
 	if len(evtCtx) > 0 {
@@ -358,6 +444,7 @@ func canonicalizeFTTransfers(rows []repository.FTTransferRow, evmExecs []reposit
 		if transfer.EVMFromAddress != "" {
 			transfer.IsCrossVM = true
 		}
+		transfer.IsBridgeFee = isBridgeFeeTransfer(transfer, ctx)
 
 		base = append(base, transfer)
 	}
@@ -373,6 +460,9 @@ func canonicalizeFTTransfers(rows []repository.FTTransferRow, evmExecs []reposit
 }
 
 func isOperationalNoiseSummaryTransfer(transfer canonicalFTTransfer, all []canonicalFTTransfer) bool {
+	if transfer.IsBridgeFee {
+		return true
+	}
 	if !strings.EqualFold(tokenSymbolFromIdentifier(transfer.Token), "FLOW") {
 		return false
 	}

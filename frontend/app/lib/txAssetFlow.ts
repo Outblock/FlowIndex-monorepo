@@ -8,6 +8,7 @@ type DetailTransfer = {
   approx_usd_price?: number;
   event_index?: number;
   from_address?: string;
+  is_bridge_fee?: boolean;
   is_cross_vm?: boolean;
   to_address?: string;
   to_coa_flow_address?: string;
@@ -39,6 +40,7 @@ export interface TxDetailDisplayTransferRow {
   count: number;
   eventIndex?: number;
   from: string;
+  isBridgeFee?: boolean;
   layer: TxDetailDisplayLayer;
   logo?: string;
   symbol: string;
@@ -272,6 +274,7 @@ function buildTransferListRows(transfers: DetailTransfer[]): TxDetailDisplayTran
       pushRow({
         amount,
         from: transfer.from_address || '',
+        isBridgeFee: transfer.is_bridge_fee,
         layer: 'cadence',
         logo,
         symbol,
@@ -282,6 +285,7 @@ function buildTransferListRows(transfers: DetailTransfer[]): TxDetailDisplayTran
       pushRow({
         amount,
         from: transfer.to_address,
+        isBridgeFee: transfer.is_bridge_fee,
         layer: 'evm',
         logo,
         symbol,
@@ -295,6 +299,7 @@ function buildTransferListRows(transfers: DetailTransfer[]): TxDetailDisplayTran
     pushRow({
       amount,
       from: transfer.from_address || '',
+      isBridgeFee: transfer.is_bridge_fee,
       layer: transfer.is_cross_vm ? 'cross_vm' : 'cadence',
       logo,
       symbol,
@@ -321,6 +326,7 @@ function buildRawTransferListRows(transfers: DetailTransfer[]): TxDetailDisplayT
       count: 1,
       eventIndex: Number(transfer.event_index || 0),
       from: transfer.from_address || '',
+      isBridgeFee: transfer.is_bridge_fee,
       layer: rawTransferLayer(transfer),
       logo: transfer.token_logo,
       symbol: tokenSymbol(transfer),
@@ -340,12 +346,25 @@ function isLikelyOperationalNoiseForSummary(
   transfer: DetailTransfer,
   allTransfers: DetailTransfer[],
 ): boolean {
+  if (transfer.is_bridge_fee) return true;
   const symbol = tokenSymbol(transfer);
   const amount = parseAmount(transfer.amount);
   if (symbol !== 'FLOW') return false;
   if (amount <= 0.001) return true;
   const hasNonFlow = allTransfers.some((candidate) => tokenSymbol(candidate) !== 'FLOW');
   return hasNonFlow && amount < 0.25 && !transfer.is_cross_vm;
+}
+
+function isMeaningfulAssetTransfer(
+  transfer: DetailTransfer,
+  allTransfers: DetailTransfer[],
+): boolean {
+  if (transfer.is_bridge_fee) return false;
+  const symbol = tokenSymbol(transfer);
+  if (symbol !== 'FLOW') return true;
+  const amount = parseAmount(transfer.amount);
+  const hasNonFlow = allTransfers.some((candidate) => tokenSymbol(candidate) !== 'FLOW');
+  return !(hasNonFlow && amount < 0.25 && !transfer.is_cross_vm);
 }
 
 function formatSummaryAmount(amount: number): string {
@@ -387,9 +406,12 @@ export function buildTxDetailAssetView(detail: any): TxDetailAssetView {
   const rawFtTransfers = (((baseDetail?.raw_ft_transfers || baseDetail?.ft_transfers || []) as DetailTransfer[]))
     .map((transfer) => ({ ...transfer }));
   const canonicalFtTransfers = canonicalizeFtTransfers(detail);
+  const meaningfulFtTransfers = canonicalFtTransfers.filter((transfer) =>
+    isMeaningfulAssetTransfer(transfer, canonicalFtTransfers),
+  );
   const canonicalTransaction = {
     ...baseDetail,
-    ft_transfers: canonicalFtTransfers,
+    ft_transfers: meaningfulFtTransfers,
   };
   const rawTransaction = {
     ...baseDetail,
@@ -397,13 +419,13 @@ export function buildTxDetailAssetView(detail: any): TxDetailAssetView {
   };
 
   return {
-    canonicalFtTransfers,
+    canonicalFtTransfers: meaningfulFtTransfers,
     canonicalTransaction,
     rawFtTransfers,
     rawTransaction,
     summaryLine: buildSummaryLineFromTransfers(canonicalFtTransfers),
     summaryTransaction: canonicalTransaction,
     rawTransferListRows: buildRawTransferListRows(rawFtTransfers),
-    transferListRows: buildTransferListRows(canonicalFtTransfers),
+    transferListRows: buildTransferListRows(meaningfulFtTransfers),
   };
 }
