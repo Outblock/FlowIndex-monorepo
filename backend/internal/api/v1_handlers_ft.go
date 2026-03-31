@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -225,8 +226,8 @@ func (s *Server) handleFlowFTHoldingsByToken(w http.ResponseWriter, r *http.Requ
 	}
 	total, err := s.repo.CountFTHoldingsByToken(r.Context(), tokenAddr, tokenName)
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, err.Error())
-		return
+		log.Printf("count ft holdings failed (token=%s.%s): %v", tokenAddr, tokenName, err)
+		total = int64(len(holdings))
 	}
 	if len(holdings) == 0 && tokenName != "" {
 		holdings, err = s.repo.ListFTHoldingsByToken(r.Context(), tokenAddr, "", limit, offset)
@@ -236,15 +237,16 @@ func (s *Server) handleFlowFTHoldingsByToken(w http.ResponseWriter, r *http.Requ
 		}
 		total, err = s.repo.CountFTHoldingsByToken(r.Context(), tokenAddr, "")
 		if err != nil {
-			writeAPIError(w, http.StatusInternalServerError, err.Error())
-			return
+			log.Printf("count ft holdings failed (token=%s): %v", tokenAddr, err)
+			total = int64(len(holdings))
 		}
 	}
 	out := make([]map[string]interface{}, 0, len(holdings))
 	for _, h := range holdings {
 		out = append(out, toFTHoldingOutput(h, 0))
 	}
-	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": total}, nil)
+	hasMore := hasMoreFromTotal(total, limit, offset, len(out))
+	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": total, "has_more": hasMore}, nil)
 }
 
 func (s *Server) handleFlowTopFTAccounts(w http.ResponseWriter, r *http.Request) {
@@ -257,14 +259,15 @@ func (s *Server) handleFlowTopFTAccounts(w http.ResponseWriter, r *http.Request)
 	}
 	total, err := s.repo.CountFTHoldingsByToken(r.Context(), tokenAddr, tokenName)
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, err.Error())
-		return
+		log.Printf("count ft holdings failed (token=%s.%s): %v", tokenAddr, tokenName, err)
+		total = int64(len(holdings))
 	}
 	out := make([]map[string]interface{}, 0, len(holdings))
 	for _, h := range holdings {
 		out = append(out, toFTHoldingOutput(h, 0))
 	}
-	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": total}, nil)
+	hasMore := hasMoreFromTotal(total, limit, offset, len(out))
+	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": total, "has_more": hasMore}, nil)
 }
 
 func (s *Server) handleFlowFTTokenPrices(w http.ResponseWriter, r *http.Request) {
