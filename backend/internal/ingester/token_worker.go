@@ -3,7 +3,9 @@ package ingester
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -170,7 +172,7 @@ func processTokenEvents(events []models.Event) processTokenEventsResult {
 
 	// Track which wrapper events get consumed during enrichment so we can
 	// promote unconsumed ones to real transfer legs later.
-	consumedDeposits := make(map[string]map[int]bool)  // txID → set of indices consumed
+	consumedDeposits := make(map[string]map[int]bool) // txID → set of indices consumed
 	consumedWithdrawals := make(map[string]map[int]bool)
 
 	// Enrich mint/burn legs with addresses from wrapper events
@@ -687,7 +689,11 @@ func (w *TokenWorker) ProcessRange(ctx context.Context, fromHeight, toHeight uin
 			out = append(out, t)
 		}
 		if err := w.repo.UpsertFTTokens(ctx, out); err != nil {
-			return fmt.Errorf("failed to upsert ft tokens: %w", err)
+			if shouldSkipTokenMetaUpsert(err) {
+				log.Printf("[token_worker] skipping ft token upsert (will retry later): %v", err)
+			} else {
+				return fmt.Errorf("failed to upsert ft tokens: %w", err)
+			}
 		}
 	}
 	if len(nftCollections) > 0 {
@@ -696,7 +702,11 @@ func (w *TokenWorker) ProcessRange(ctx context.Context, fromHeight, toHeight uin
 			out = append(out, c)
 		}
 		if err := w.repo.UpsertNFTCollections(ctx, out); err != nil {
-			return fmt.Errorf("failed to upsert nft collections: %w", err)
+			if shouldSkipTokenMetaUpsert(err) {
+				log.Printf("[token_worker] skipping nft collection upsert (will retry later): %v", err)
+			} else {
+				return fmt.Errorf("failed to upsert nft collections: %w", err)
+			}
 		}
 	}
 	if len(contracts) > 0 {
@@ -801,7 +811,7 @@ func isFeeVaultAddress(addr string) bool {
 // NOT token transfers. e.g. FlowIDTableStaking.TokensWithdrawn is a staking
 // event, not a FungibleToken transfer, even though it contains ".TokensWithdrawn".
 var stakingContracts = map[string]bool{
-	"FlowIDTableStaking":   true,
+	"FlowIDTableStaking":    true,
 	"FlowStakingCollection": true,
 	"LockedTokens":          true,
 	"FlowEpoch":             true,
@@ -1205,6 +1215,17 @@ func extractAddressFromFields(fields map[string]interface{}, keys ...string) str
 		}
 	}
 	return ""
+}
+
+func shouldSkipTokenMetaUpsert(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "context deadline exceeded") || strings.Contains(lower, "context canceled")
 }
 
 func parseContractAddress(eventType string) string {
