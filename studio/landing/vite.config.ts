@@ -23,6 +23,7 @@ export default defineConfig({
       'input-otp': path.join(nm, 'input-otp'),
       '@onflow/rlp': path.join(nm, '@onflow/rlp'),
       'sha3': path.join(nm, 'sha3'),
+      '@noble/hashes': path.join(nm, '@noble/hashes'),
     },
   },
   optimizeDeps: {

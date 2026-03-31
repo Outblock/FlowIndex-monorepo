@@ -77,6 +77,10 @@ ENV DATABASE_URL=${DATABASE_URL}
 ARG NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
+# Build workspace packages that export from dist/
+# Use bunx tsup directly (devDeps not installed; codegen output already in source)
+RUN cd packages/agent-wallet && bunx tsup
+
 RUN --mount=type=cache,id=next-cache,target=/app/apps/sim/.next/cache \
     cd apps/sim && bun run build
 
