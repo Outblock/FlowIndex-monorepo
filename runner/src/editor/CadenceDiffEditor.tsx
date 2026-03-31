@@ -13,15 +13,17 @@ interface CadenceDiffEditorProps {
   darkMode?: boolean;
   onAcceptAll: () => void;
   onRejectAll: () => void;
-  onAcceptHunk: (hunkOriginal: string, hunkModified: string) => void;
-  onRejectHunk: (hunkOriginal: string, hunkModified: string) => void;
+  onAcceptHunk: (hunk: DiffHunk) => void;
+  onRejectHunk: (hunk: DiffHunk) => void;
 }
 
-interface HunkInfo {
+export interface DiffHunk {
   originalStartLineNumber: number;
   originalEndLineNumber: number;
   modifiedStartLineNumber: number;
   modifiedEndLineNumber: number;
+  originalLineCount: number;
+  modifiedLineCount: number;
   originalText: string;
   modifiedText: string;
 }
@@ -39,7 +41,7 @@ export default function CadenceDiffEditor({
   const diffEditorRef = useRef<editor.IStandaloneDiffEditor | null>(null);
   const monacoRef = useRef<typeof import('monaco-editor') | null>(null);
   const zoneIdsRef = useRef<string[]>([]);
-  const [hunks, setHunks] = useState<HunkInfo[]>([]);
+  const [hunks, setHunks] = useState<DiffHunk[]>([]);
 
   // Stable refs for callbacks so zone widget buttons always call latest
   const onAcceptHunkRef = useRef(onAcceptHunk);
@@ -47,7 +49,7 @@ export default function CadenceDiffEditor({
   useEffect(() => { onAcceptHunkRef.current = onAcceptHunk; }, [onAcceptHunk]);
   useEffect(() => { onRejectHunkRef.current = onRejectHunk; }, [onRejectHunk]);
 
-  const extractHunks = useCallback((diffEditor: editor.IStandaloneDiffEditor): HunkInfo[] => {
+  const extractHunks = useCallback((diffEditor: editor.IStandaloneDiffEditor): DiffHunk[] => {
     const changes = diffEditor.getLineChanges();
     if (!changes) return [];
 
@@ -56,11 +58,17 @@ export default function CadenceDiffEditor({
     if (!origModel || !modModel) return [];
 
     return changes.map((change) => {
+      const originalLineCount = change.originalEndLineNumber > 0
+        ? change.originalEndLineNumber - change.originalStartLineNumber + 1
+        : 0;
+      const modifiedLineCount = change.modifiedEndLineNumber > 0
+        ? change.modifiedEndLineNumber - change.modifiedStartLineNumber + 1
+        : 0;
       let originalText = '';
       let modifiedText = '';
 
       // originalEndLineNumber === 0 means pure insertion (no original lines)
-      if (change.originalEndLineNumber > 0) {
+      if (originalLineCount > 0) {
         const lines: string[] = [];
         for (let i = change.originalStartLineNumber; i <= change.originalEndLineNumber; i++) {
           lines.push(origModel.getLineContent(i));
@@ -69,7 +77,7 @@ export default function CadenceDiffEditor({
       }
 
       // modifiedEndLineNumber === 0 means pure deletion (no modified lines)
-      if (change.modifiedEndLineNumber > 0) {
+      if (modifiedLineCount > 0) {
         const lines: string[] = [];
         for (let i = change.modifiedStartLineNumber; i <= change.modifiedEndLineNumber; i++) {
           lines.push(modModel.getLineContent(i));
@@ -82,6 +90,8 @@ export default function CadenceDiffEditor({
         originalEndLineNumber: change.originalEndLineNumber,
         modifiedStartLineNumber: change.modifiedStartLineNumber,
         modifiedEndLineNumber: change.modifiedEndLineNumber,
+        originalLineCount,
+        modifiedLineCount,
         originalText,
         modifiedText,
       };
@@ -108,9 +118,10 @@ export default function CadenceDiffEditor({
       for (const hunk of newHunks) {
         // Place the widget after the last modified line of the hunk
         // For deletions (modifiedEndLineNumber === 0), place after modifiedStartLineNumber
-        const afterLine = hunk.modifiedEndLineNumber > 0
-          ? hunk.modifiedEndLineNumber
-          : hunk.modifiedStartLineNumber;
+        const afterLine = Math.max(
+          1,
+          hunk.modifiedEndLineNumber > 0 ? hunk.modifiedEndLineNumber : hunk.modifiedStartLineNumber,
+        );
 
         const domNode = document.createElement('div');
         domNode.style.cssText = `
@@ -120,8 +131,7 @@ export default function CadenceDiffEditor({
         `;
 
         // Capture hunk values at creation time
-        const hunkOrig = hunk.originalText;
-        const hunkMod = hunk.modifiedText;
+        const hunkData = { ...hunk };
 
         const acceptBtn = document.createElement('button');
         acceptBtn.textContent = 'Accept';
@@ -144,7 +154,7 @@ export default function CadenceDiffEditor({
         acceptBtn.onclick = (e) => {
           e.preventDefault();
           e.stopPropagation();
-          onAcceptHunkRef.current(hunkOrig, hunkMod);
+          onAcceptHunkRef.current(hunkData);
         };
 
         const rejectBtn = document.createElement('button');
@@ -168,7 +178,7 @@ export default function CadenceDiffEditor({
         rejectBtn.onclick = (e) => {
           e.preventDefault();
           e.stopPropagation();
-          onRejectHunkRef.current(hunkOrig, hunkMod);
+          onRejectHunkRef.current(hunkData);
         };
 
         domNode.appendChild(acceptBtn);

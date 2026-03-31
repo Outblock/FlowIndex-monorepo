@@ -27,6 +27,7 @@ export default function CadenceEditor({
 }: CadenceEditorProps) {
   const internalRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const editorRef = externalEditorRef || internalRef;
+  const syncingExternalValueRef = useRef(false);
 
   // Keep stable refs so Monaco actions always call the latest version
   const onRunRef = useRef(onRun);
@@ -55,9 +56,28 @@ export default function CadenceEditor({
     onMonacoReady?.(monaco);
   }, [onMonacoReady]);
 
+  const syncEditorValue = useCallback((editorInstance: editor.IStandaloneCodeEditor, nextValue: string) => {
+    const model = editorInstance.getModel();
+    if (!model) return;
+    if (model.getValue() === nextValue) return;
+
+    const selections = editorInstance.getSelections();
+    syncingExternalValueRef.current = true;
+    editorInstance.executeEdits('external-value-sync', [{
+      range: model.getFullModelRange(),
+      text: nextValue,
+      forceMoveMarkers: true,
+    }]);
+    if (selections) {
+      editorInstance.setSelections(selections);
+    }
+    syncingExternalValueRef.current = false;
+  }, []);
+
   const handleMount: OnMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor;
+      syncEditorValue(editor, code);
 
       const goToDefinitionAt = async (position: { lineNumber: number; column: number } | null | undefined) => {
         if (!position || !onGoToDefinition) return;
@@ -165,15 +185,22 @@ export default function CadenceEditor({
 
       editor.focus();
     },
-    [onGoToDefinition]
+    [code, onGoToDefinition, syncEditorValue]
   );
 
   const handleChange = useCallback(
     (value: string | undefined) => {
+      if (syncingExternalValueRef.current) return;
       onChange(value ?? '');
     },
     [onChange]
   );
+
+  useEffect(() => {
+    const editorInstance = editorRef.current;
+    if (!editorInstance) return;
+    syncEditorValue(editorInstance, code);
+  }, [code, path, editorRef, syncEditorValue]);
 
   return (
     <Editor

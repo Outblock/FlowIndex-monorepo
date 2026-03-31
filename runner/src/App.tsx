@@ -3,7 +3,7 @@ import type * as MonacoNS from 'monaco-editor';
 import JSZip from 'jszip';
 import axios from 'axios';
 import CadenceEditor from './editor/CadenceEditor';
-import CadenceDiffEditor from './editor/CadenceDiffEditor';
+import CadenceDiffEditor, { type DiffHunk } from './editor/CadenceDiffEditor';
 import { useLsp } from './editor/useLsp';
 import { useSolidityLsp } from './editor/useSolidityLsp';
 import { compileSolidity, compileSolidityMultiFile, deploySolidity, detectPragmaVersion } from './flow/evmExecute';
@@ -196,6 +196,13 @@ interface PendingDiffEntry {
 
 type PendingDiffMap = Record<string, PendingDiffEntry>;
 
+function samePendingDiffEntry(a: PendingDiffEntry | undefined, b: PendingDiffEntry | undefined): boolean {
+  if (!a || !b) return false;
+  return a.original === b.original
+    && a.modified === b.modified
+    && a.assistantId === b.assistantId;
+}
+
 function upsertPendingDiff(
   prev: PendingDiffMap,
   path: string,
@@ -220,16 +227,22 @@ function upsertPendingDiff(
   };
 }
 
-function findSubarray(lines: string[], sub: string[]): number {
-  if (sub.length === 0) return -1;
-  outer:
-  for (let i = 0; i <= lines.length - sub.length; i++) {
-    for (let j = 0; j < sub.length; j++) {
-      if (lines[i + j] !== sub[j]) continue outer;
-    }
-    return i;
-  }
-  return -1;
+function splitLinesPreserveEmpty(text: string): string[] {
+  if (text.length === 0) return [];
+  return text.split('\n');
+}
+
+function replaceLineRange(
+  source: string,
+  startLineNumber: number,
+  deleteCount: number,
+  replacementText: string,
+): string {
+  const sourceLines = splitLinesPreserveEmpty(source);
+  const replacementLines = splitLinesPreserveEmpty(replacementText);
+  const startIndex = Math.max(0, Math.min(sourceLines.length, Math.max(startLineNumber - 1, 0)));
+  sourceLines.splice(startIndex, deleteCount, ...replacementLines);
+  return sourceLines.join('\n');
 }
 
 function applyCodeToPath(state: ProjectState, path: string, newCode: string): ProjectState {
@@ -370,6 +383,8 @@ export default function App() {
   const [aiPendingMessage, setAiPendingMessage] = useState<string | undefined>();
   const [aiPrefillInput, setAiPrefillInput] = useState<string | undefined>();
   const [pendingDiffs, setPendingDiffs] = useState<PendingDiffMap>({});
+  const projectRef = useRef(project);
+  const pendingDiffsRef = useRef(pendingDiffs);
   const { user, loading: authLoading, signOut } = useAuth();
   const openLogin = useCallback(() => setShowLoginModal(true), []);
   useKeys();
@@ -400,6 +415,15 @@ export default function App() {
   const [showPasskeyOnboarding, setShowPasskeyOnboarding] = useState(false);
   const networkMenuRef = useRef<HTMLDivElement>(null);
   const fileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+
+  useEffect(() => {
+    pendingDiffsRef.current = pendingDiffs;
+  }, [pendingDiffs]);
+
   useEffect(() => {
     try {
       localStorage.setItem('runner:show-ai', String(showAI));
@@ -1346,11 +1370,13 @@ export default function App() {
     });
     if (sanitized.length === 0) return;
 
+    const projectSnapshot = projectRef.current;
+
     const lastTargetPath = sanitized.reduce<string | null>((acc, edit) => {
-      const targetPath = normalizeEditablePath(edit.path || project.activeFile);
+      const targetPath = normalizeEditablePath(edit.path || projectSnapshot.activeFile);
       if (!targetPath) return acc;
 
-      const targetFile = project.files.find((file) => file.path === targetPath);
+      const targetFile = projectSnapshot.files.find((file) => file.path === targetPath);
       if (targetFile?.readOnly) return acc;
       if (!targetFile && edit.path) return acc;
 
@@ -1361,14 +1387,14 @@ export default function App() {
       let next = { ...prev };
 
       for (const edit of sanitized) {
-        const targetPath = normalizeEditablePath(edit.path || project.activeFile);
+        const targetPath = normalizeEditablePath(edit.path || projectSnapshot.activeFile);
         if (!targetPath) continue;
 
-        const targetFile = project.files.find((file) => file.path === targetPath);
+        const targetFile = projectSnapshot.files.find((file) => file.path === targetPath);
         if (targetFile?.readOnly) continue;
         if (!targetFile && edit.path) continue;
 
-        const currentContent = getFileContent(project, targetPath) || '';
+        const currentContent = getFileContent(projectSnapshot, targetPath) || '';
         const original = next[targetPath]?.original ?? currentContent;
 
         let modified: string;
@@ -1393,42 +1419,65 @@ export default function App() {
     if (lastTargetPath) {
       setProject((prev) => openFile(prev, lastTargetPath!));
     }
-  }, [project]);
+  }, []);
 
   const handleAcceptAllDiffs = useCallback(() => {
+    const acceptedEntries = Object.entries(pendingDiffsRef.current);
+    if (acceptedEntries.length === 0) return;
+
     setProject((prev) => {
       let next = prev;
-      for (const [path, entry] of Object.entries(pendingDiffs)) {
+      for (const [path, entry] of acceptedEntries) {
         next = updateFileContent(next, path, entry.modified);
       }
       return next;
     });
-    setPendingDiffs({});
-  }, [pendingDiffs]);
 
-  const handleRejectAllDiffs = useCallback(() => {
-    setPendingDiffs({});
+    setPendingDiffs((prev) => {
+      let next = prev;
+      let changed = false;
+
+      for (const [path, entry] of acceptedEntries) {
+        if (!samePendingDiffEntry(prev[path], entry)) continue;
+        if (!changed) next = { ...prev };
+        delete next[path];
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
   }, []);
 
-  const handleAcceptHunk = useCallback((filePath: string, hunkOriginal: string, hunkModified: string) => {
+  const handleRejectAllDiffs = useCallback(() => {
+    const rejectedEntries = Object.entries(pendingDiffsRef.current);
+    if (rejectedEntries.length === 0) return;
+
+    setPendingDiffs((prev) => {
+      let next = prev;
+      let changed = false;
+
+      for (const [path, entry] of rejectedEntries) {
+        if (!samePendingDiffEntry(prev[path], entry)) continue;
+        if (!changed) next = { ...prev };
+        delete next[path];
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const handleAcceptHunk = useCallback((filePath: string, hunk: DiffHunk) => {
     setPendingDiffs((prev) => {
       const entry = prev[filePath];
       if (!entry) return prev;
 
-      const origLines = entry.original.split('\n');
-      const hunkOrigLines = hunkOriginal.split('\n');
-      const hunkModLines = hunkModified.split('\n');
-
-      const origIdx = findSubarray(origLines, hunkOrigLines);
-      if (origIdx < 0) return prev;
-
-      const newOrigLines = [
-        ...origLines.slice(0, origIdx),
-        ...hunkModLines,
-        ...origLines.slice(origIdx + hunkOrigLines.length),
-      ];
-
-      const newOriginal = newOrigLines.join('\n');
+      const newOriginal = replaceLineRange(
+        entry.original,
+        hunk.originalStartLineNumber,
+        hunk.originalLineCount,
+        hunk.modifiedText,
+      );
       const newModified = entry.modified;
 
       if (newOriginal === newModified) {
@@ -1442,35 +1491,27 @@ export default function App() {
 
     setProject((prev) => {
       const current = getFileContent(prev, filePath) || '';
-      const lines = current.split('\n');
-      const hunkLines = hunkOriginal.split('\n');
-      const idx = findSubarray(lines, hunkLines);
-      if (idx < 0) return prev;
-      const newLines = [
-        ...lines.slice(0, idx),
-        ...hunkModified.split('\n'),
-        ...lines.slice(idx + hunkLines.length),
-      ];
-      return updateFileContent(prev, filePath, newLines.join('\n'));
+      const nextContent = replaceLineRange(
+        current,
+        hunk.originalStartLineNumber,
+        hunk.originalLineCount,
+        hunk.modifiedText,
+      );
+      return updateFileContent(prev, filePath, nextContent);
     });
   }, []);
 
-  const handleRejectHunk = useCallback((filePath: string, hunkOriginal: string, hunkModified: string) => {
+  const handleRejectHunk = useCallback((filePath: string, hunk: DiffHunk) => {
     setPendingDiffs((prev) => {
       const entry = prev[filePath];
       if (!entry) return prev;
 
-      const modLines = entry.modified.split('\n');
-      const hunkModLines = hunkModified.split('\n');
-      const modIdx = findSubarray(modLines, hunkModLines);
-      if (modIdx < 0) return prev;
-
-      const newModLines = [
-        ...modLines.slice(0, modIdx),
-        ...hunkOriginal.split('\n'),
-        ...modLines.slice(modIdx + hunkModLines.length),
-      ];
-      const newModified = newModLines.join('\n');
+      const newModified = replaceLineRange(
+        entry.modified,
+        hunk.modifiedStartLineNumber,
+        hunk.modifiedLineCount,
+        hunk.originalText,
+      );
 
       if (newModified === entry.original) {
         const next = { ...prev };
@@ -2401,12 +2442,8 @@ export default function App() {
                   darkMode={true}
                   onAcceptAll={handleAcceptAllDiffs}
                   onRejectAll={handleRejectAllDiffs}
-                  onAcceptHunk={(hunkOrig, hunkMod) =>
-                    handleAcceptHunk(project.activeFile, hunkOrig, hunkMod)
-                  }
-                  onRejectHunk={(hunkOrig, hunkMod) =>
-                    handleRejectHunk(project.activeFile, hunkOrig, hunkMod)
-                  }
+                  onAcceptHunk={(hunk) => handleAcceptHunk(project.activeFile, hunk)}
+                  onRejectHunk={(hunk) => handleRejectHunk(project.activeFile, hunk)}
                 />
               ) : (
                 <CadenceEditor
