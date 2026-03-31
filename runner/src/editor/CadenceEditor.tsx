@@ -63,11 +63,13 @@ export default function CadenceEditor({
 
     const selections = editorInstance.getSelections();
     syncingExternalValueRef.current = true;
+    editorInstance.pushUndoStop();
     editorInstance.executeEdits('external-value-sync', [{
       range: model.getFullModelRange(),
       text: nextValue,
       forceMoveMarkers: true,
     }]);
+    editorInstance.pushUndoStop();
     if (selections) {
       editorInstance.setSelections(selections);
     }

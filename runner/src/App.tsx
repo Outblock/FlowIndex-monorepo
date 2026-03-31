@@ -240,7 +240,13 @@ function replaceLineRange(
 ): string {
   const sourceLines = splitLinesPreserveEmpty(source);
   const replacementLines = splitLinesPreserveEmpty(replacementText);
-  const startIndex = Math.max(0, Math.min(sourceLines.length, Math.max(startLineNumber - 1, 0)));
+  // Monaco reports empty diff ranges using the previous line number.
+  // For insertions we need to place new lines *after* that anchor line,
+  // while normal replacements still start at the 1-based line itself.
+  const rawStartIndex = deleteCount === 0
+    ? startLineNumber
+    : startLineNumber - 1;
+  const startIndex = Math.max(0, Math.min(sourceLines.length, rawStartIndex));
   sourceLines.splice(startIndex, deleteCount, ...replacementLines);
   return sourceLines.join('\n');
 }
