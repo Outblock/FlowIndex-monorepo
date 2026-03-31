@@ -298,7 +298,7 @@ func (s *Server) buildScheduledTxOutput(ctx context.Context, txHash string) (map
 
 	// Fetch handler contract code from DB (case-sensitive name match)
 	contractAddr := parseScheduledContractAddress(st.HandlerType) // "0xaddr"
-	contractName := parseScheduledContractName(st.HandlerType)     // "FlowYieldVaultsEVMWorkerOps"
+	contractName := parseScheduledContractName(st.HandlerType)    // "FlowYieldVaultsEVMWorkerOps"
 	if contractAddr != "" && contractName != "" {
 		addr := strings.TrimPrefix(contractAddr, "0x")
 		if code, err := s.repo.GetContractCode(ctx, addr, contractName); err == nil && code != "" {
@@ -443,6 +443,8 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 	evtCtx := buildTxEventContext(txEvents)
 	canonicalFTTransfers := canonicalizeFTTransfers(ftTransfers, evmExecs, evtCtx)
 	ftMeta := map[string]repository.TokenMetadataInfo{}
+	ftPrices := map[string]float64{}
+	var canonicalSummary *repository.TransferSummary
 	if len(canonicalFTTransfers) > 0 {
 		tokenIDSet := make(map[string]bool)
 		for _, ft := range canonicalFTTransfers {
@@ -453,6 +455,7 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 			tokenIDs = append(tokenIDs, id)
 		}
 		ftMeta, _ = s.repo.GetFTTokenMetadataByIdentifiers(r.Context(), tokenIDs)
+		ftPrices = s.buildFTPrices(ftMeta, tx.Timestamp)
 
 		addrSet := make(map[string]bool)
 		for _, ft := range canonicalFTTransfers {
@@ -526,17 +529,14 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 			transfersOut = append(transfersOut, item)
 		}
 		out["ft_transfers"] = transfersOut
-
-		ftPrices := s.buildFTPrices(ftMeta, tx.Timestamp)
 		summary := buildCanonicalTransferSummary(canonicalFTTransfers)
-		summaryOutput := toTransferSummaryOutput(summary, ftMeta, map[string]repository.TokenMetadataInfo{}, ftPrices)
-		out["transfer_summary"] = summaryOutput
-		out["canonical_transfer_summary"] = summaryOutput
+		canonicalSummary = &summary
 	}
 
 	// Enrich: NFT transfers (lightweight — no public path or item metadata lookups,
 	// frontend can query NFT details via Cadence script when needed)
 	nftTransfers, _ := s.repo.GetNFTTransfersByTransactionID(r.Context(), tx.ID)
+	nftMeta := map[string]repository.TokenMetadataInfo{}
 	if len(nftTransfers) > 0 {
 		collIDSet := make(map[string]bool)
 		for _, nt := range nftTransfers {
@@ -547,6 +547,7 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 			collIDs = append(collIDs, id)
 		}
 		nftCollMeta, _ := s.repo.GetNFTCollectionMetadataByIdentifiers(r.Context(), collIDs)
+		nftMeta = nftCollMeta
 
 		nftAddrSet := make(map[string]bool)
 		for _, nt := range nftTransfers {
@@ -591,6 +592,31 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 			nftTransfersOut = append(nftTransfersOut, item)
 		}
 		out["nft_transfers"] = nftTransfersOut
+	}
+
+	// Build transfer summary from canonical FT summary + NFT transfers.
+	if canonicalSummary != nil || len(nftTransfers) > 0 {
+		summary := repository.TransferSummary{FT: []repository.FTTransferSummaryItem{}, NFT: []repository.NFTTransferSummaryItem{}}
+		if canonicalSummary != nil {
+			summary.FT = canonicalSummary.FT
+		}
+		if len(nftTransfers) > 0 {
+			nftCounts := make(map[string]int)
+			for _, nt := range nftTransfers {
+				nftCounts[nt.Token]++
+			}
+			for token, count := range nftCounts {
+				summary.NFT = append(summary.NFT, repository.NFTTransferSummaryItem{
+					Collection: token,
+					Count:      count,
+					Direction:  "transfer",
+				})
+			}
+		}
+		out["transfer_summary"] = toTransferSummaryOutput(summary, ftMeta, nftMeta, ftPrices)
+		if canonicalSummary != nil {
+			out["canonical_transfer_summary"] = toTransferSummaryOutput(*canonicalSummary, ftMeta, map[string]repository.TokenMetadataInfo{}, ftPrices)
+		}
 	}
 	if _, ok := out["transfer_summary"]; !ok {
 		out["transfer_summary"] = map[string]interface{}{"ft": []interface{}{}, "nft": []interface{}{}}
