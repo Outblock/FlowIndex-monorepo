@@ -147,6 +147,11 @@ func (r *Repository) ListTokenTransfersWithContractFiltered(ctx context.Context,
 		return nil, 0, err
 	}
 
+	// If a token filter is present, skip COUNT to avoid huge scans on hot tokens.
+	if tokenAddress != "" || tokenName != "" {
+		return out, -1, nil
+	}
+
 	// Count query deliberately avoids window functions; those can trigger shared memory allocation
 	// failures on constrained Postgres instances (we've seen /dev/shm exhaustion on Railway).
 	// If COUNT fails, return the page data and mark total as unknown (-1) instead of failing.
