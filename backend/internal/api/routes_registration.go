@@ -66,6 +66,7 @@ func registerAPIRoutes(r *mux.Router, s *Server) {
 	registerCadenceRoutes(r, s)
 	registerWebhookRoutes(r, s)
 	registerAuthRoutes(r, s)
+	registerBlockscoutInterpreterRoutes(r, s)
 }
 
 func registerAuthRoutes(r *mux.Router, s *Server) {
@@ -121,6 +122,11 @@ func registerWebhookRoutes(r *mux.Router, s *Server) {
 func registerAIRoutes(r *mux.Router, s *Server) {
 	r.HandleFunc("/ai/tx-summary", s.handleAITxSummary).Methods("POST", "OPTIONS")
 	r.HandleFunc("/ai/workflow-generate", s.handleAIWorkflowGenerate).Methods("POST", "OPTIONS")
+}
+
+func registerBlockscoutInterpreterRoutes(r *mux.Router, s *Server) {
+	r.HandleFunc("/blockscout/transactions/summary", s.handleBsTxInterpret).Methods("POST", "OPTIONS")
+	r.HandleFunc("/blockscout/cache/{hash}", s.handleBsTxInterpretCache).Methods("GET", "OPTIONS")
 }
 
 func registerFlowRoutes(r *mux.Router, s *Server) {
