@@ -183,6 +183,16 @@ func parseFloatOrZero(val string) float64 {
 	return f
 }
 
+func hasMoreFromTotal(total int64, limit, offset, got int) bool {
+	if limit <= 0 {
+		return false
+	}
+	if total >= 0 {
+		return int64(offset+got) < total
+	}
+	return got == limit
+}
+
 func splitContractIdentifier(value string) (address, name, identifier string) {
 	value = strings.TrimSpace(value)
 	if value == "" {

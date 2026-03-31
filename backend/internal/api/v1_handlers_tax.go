@@ -48,7 +48,7 @@ func (s *Server) handleTaxReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch FT transfers for this address
-	ftTransfers, ftHasMore, err := s.repo.ListTokenTransfersWithContractFiltered(
+	ftTransfers, ftTotal, err := s.repo.ListTokenTransfersWithContractFiltered(
 		r.Context(), false, address, "", "", "", nil, limit, offset)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
@@ -56,7 +56,7 @@ func (s *Server) handleTaxReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch NFT transfers for this address
-	nftTransfers, nftHasMore, err := s.repo.ListTokenTransfersWithContractFiltered(
+	nftTransfers, nftTotal, err := s.repo.ListTokenTransfersWithContractFiltered(
 		r.Context(), true, address, "", "", "", nil, limit, offset)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
@@ -162,7 +162,7 @@ func (s *Server) handleTaxReport(w http.ResponseWriter, r *http.Request) {
 	writeAPIResponse(w, []interface{}{summary}, map[string]interface{}{
 		"limit":        limit,
 		"offset":       offset,
-		"ft_has_more":  ftHasMore,
-		"nft_has_more": nftHasMore,
+		"ft_has_more":  hasMoreFromTotal(ftTotal, limit, offset, len(ftTransfers)),
+		"nft_has_more": hasMoreFromTotal(nftTotal, limit, offset, len(nftTransfers)),
 	}, nil)
 }

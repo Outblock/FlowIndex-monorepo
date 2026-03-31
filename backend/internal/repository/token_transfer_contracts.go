@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -94,13 +95,6 @@ func (r *Repository) ListTokenTransfersWithContractFiltered(ctx context.Context,
 		offset = 0
 	}
 
-	// Count query deliberately avoids window functions; those can trigger shared memory allocation
-	// failures on constrained Postgres instances (we've seen /dev/shm exhaustion on Railway).
-	var total int64
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM `+table+` t `+where, args...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	rows, err := r.db.Query(ctx, `
 			SELECT
@@ -152,6 +146,16 @@ func (r *Repository) ListTokenTransfersWithContractFiltered(ctx context.Context,
 	if err := rows.Err(); err != nil {
 		return nil, 0, err
 	}
+
+	// Count query deliberately avoids window functions; those can trigger shared memory allocation
+	// failures on constrained Postgres instances (we've seen /dev/shm exhaustion on Railway).
+	// If COUNT fails, return the page data and mark total as unknown (-1) instead of failing.
+	var total int64
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM `+table+` t `+where, args...).Scan(&total); err != nil {
+		log.Printf("count token transfers failed (table=%s token=%s.%s address=%s): %v", table, tokenAddress, tokenName, address, err)
+		return out, -1, nil
+	}
+
 	return out, total, nil
 }
 

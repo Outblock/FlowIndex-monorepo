@@ -19,8 +19,13 @@ func (s *Server) handleFlowFTTransfers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	addrFilter := normalizeAddr(r.URL.Query().Get("address"))
-	tokenAddr, tokenName := parseTokenParam(r.URL.Query().Get("token"))
-	transfers, hasMore, err := s.repo.ListTokenTransfersWithContractFiltered(r.Context(), false, addrFilter, tokenAddr, tokenName, r.URL.Query().Get("transaction_hash"), height, limit, offset)
+	tokenParam := r.URL.Query().Get("token")
+	tokenAddr, tokenName := parseTokenParam(tokenParam)
+	if tokenParam != "" && tokenAddr == "" {
+		writeAPIError(w, http.StatusBadRequest, "invalid token")
+		return
+	}
+	transfers, total, err := s.repo.ListTokenTransfersWithContractFiltered(r.Context(), false, addrFilter, tokenAddr, tokenName, r.URL.Query().Get("transaction_hash"), height, limit, offset)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -42,7 +47,12 @@ func (s *Server) handleFlowFTTransfers(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, toFTTransferOutput(t.TokenTransfer, t.ContractName, addrFilter, m, usdPrice))
 	}
-	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": len(out), "has_more": hasMore}, nil)
+	hasMore := hasMoreFromTotal(total, limit, offset, len(out))
+	count := len(out)
+	if total >= 0 {
+		count = int(total)
+	}
+	writeAPIResponse(w, out, map[string]interface{}{"limit": limit, "offset": offset, "count": count, "has_more": hasMore}, nil)
 }
 
 // handleFlowAllTransfers returns FT and NFT transfers merged in chronological order.
@@ -201,7 +211,12 @@ func (s *Server) handleFlowGetFTToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleFlowFTHoldingsByToken(w http.ResponseWriter, r *http.Request) {
-	tokenAddr, tokenName := parseTokenParam(mux.Vars(r)["token"])
+	tokenParam := mux.Vars(r)["token"]
+	tokenAddr, tokenName := parseTokenParam(tokenParam)
+	if tokenParam != "" && tokenAddr == "" {
+		writeAPIError(w, http.StatusBadRequest, "invalid token")
+		return
+	}
 	limit, offset := parseLimitOffset(r)
 	holdings, err := s.repo.ListFTHoldingsByToken(r.Context(), tokenAddr, tokenName, limit, offset)
 	if err != nil {
@@ -212,6 +227,18 @@ func (s *Server) handleFlowFTHoldingsByToken(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if len(holdings) == 0 && tokenName != "" {
+		holdings, err = s.repo.ListFTHoldingsByToken(r.Context(), tokenAddr, "", limit, offset)
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		total, err = s.repo.CountFTHoldingsByToken(r.Context(), tokenAddr, "")
+		if err != nil {
+			writeAPIError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	out := make([]map[string]interface{}, 0, len(holdings))
 	for _, h := range holdings {
