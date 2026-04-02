@@ -526,9 +526,12 @@ export function extractFlowConditions(
       break
 
     case 'flow_scheduled_tx':
-      // Go matcher (scheduled.executed): handler_owner (string), hide_idle (bool)
+      // Go matcher (scheduled.executed): handler_owner (string), handler_type (string), hide_idle (bool)
       if (subBlockValues.handlerAddress) {
         conditions.handler_owner = normalizeAddr(subBlockValues.handlerAddress)
+      }
+      if (subBlockValues.handlerName) {
+        conditions.handler_type = String(subBlockValues.handlerName).trim()
       }
       if (subBlockValues.hideIdle === 'true' || subBlockValues.hideIdle === true) {
         conditions.hide_idle = true

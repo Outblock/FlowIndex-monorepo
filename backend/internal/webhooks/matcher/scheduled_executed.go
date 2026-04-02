@@ -9,6 +9,7 @@ import (
 
 type scheduledExecutedConditions struct {
 	HandlerOwner string `json:"handler_owner"`
+	HandlerType  string `json:"handler_type"`
 	HideIdle     bool   `json:"hide_idle"`
 }
 
@@ -35,6 +36,11 @@ func (m *ScheduledExecutedMatcher) Match(data interface{}, conditions json.RawMe
 		if normalizeAddress(cond.HandlerOwner) != st.HandlerOwner {
 			return MatchResult{}
 		}
+	}
+
+	// Filter by handler type name (e.g. "DeFiActions")
+	if cond.HandlerType != "" && cond.HandlerType != st.HandlerType {
+		return MatchResult{}
 	}
 
 	// Filter out idle runs if requested
