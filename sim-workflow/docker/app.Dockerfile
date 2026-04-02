@@ -78,10 +78,11 @@ ARG NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
 # Build workspace packages that export from dist/
-# devDeps not installed; install tsup+typescript locally then build with explicit entry points
+# Bun's hoisted workspace layout does not guarantee a package-local node_modules/.bin,
+# so install tsup+typescript here and invoke tsup via bun x.
 RUN cd packages/agent-wallet \
-    && bun add -d typescript tsup \
-    && ./node_modules/.bin/tsup src/index.ts src/templates/index.ts --format esm --no-dts \
+    && HUSKY=0 bun add -d typescript tsup \
+    && bun x tsup src/index.ts src/templates/index.ts --format esm --no-dts \
     && cp -r src/templates/cadence dist/cadence
 
 RUN --mount=type=cache,id=next-cache,target=/app/apps/sim/.next/cache \
