@@ -310,14 +310,6 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if height == nil && offset == 0 {
-		fallbackTxs, fallbackErr := s.repo.GetRecentTransactionsByAddressFallback(r.Context(), address, limit+1, 0)
-		if fallbackErr != nil {
-			log.Printf("[WARN] GetRecentTransactionsByAddressFallback failed for address=%s: %v", address, fallbackErr)
-		} else if len(fallbackTxs) > 0 {
-			txs = mergeTransactionsByRecency(txs, fallbackTxs)
-		}
-	}
 	// Filter by height if provided
 	if height != nil {
 		filtered := make([]models.Transaction, 0, len(txs))
