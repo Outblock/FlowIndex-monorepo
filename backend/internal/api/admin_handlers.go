@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"flowscan-clone/internal/config"
-	flowclient "flowscan-clone/internal/flow"
 	"flowscan-clone/internal/ingester"
 	"flowscan-clone/internal/models"
 
@@ -1344,50 +1343,13 @@ func (s *Server) handleAdminReprocessWorker(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Instantiate the worker
-	var proc ingester.Processor
-	var reprocessFlowClient *flowclient.Client
-	if hc, ok := s.historyClient.(*flowclient.Client); ok && hc != nil {
-		reprocessFlowClient = hc
-	} else if c, ok := s.client.(*flowclient.Client); ok && c != nil {
-		reprocessFlowClient = c
-	}
-	switch req.Worker {
-	case "token_worker":
-		proc = ingester.NewTokenWorker(s.repo)
-	case "evm_worker":
-		proc = ingester.NewEVMWorker(s.repo)
-	case "meta_worker":
-		proc = ingester.NewMetaWorker(s.repo, reprocessFlowClient)
-	case "accounts_worker":
-		proc = ingester.NewAccountsWorker(s.repo)
-	case "tx_contracts_worker":
-		proc = ingester.NewTxContractsWorker(s.repo)
-	case "tx_metrics_worker":
-		proc = ingester.NewTxMetricsWorker(s.repo)
-	case "staking_worker":
-		proc = ingester.NewStakingWorker(s.repo)
-	case "defi_worker":
-		proc = ingester.NewDefiWorker(s.repo)
-	case "ft_holdings_worker":
-		proc = ingester.NewFTHoldingsWorker(s.repo)
-	case "nft_ownership_worker":
-		proc = ingester.NewNFTOwnershipWorker(s.repo)
-	case "daily_balance_worker":
-		proc = ingester.NewDailyBalanceWorker(s.repo)
-	case "daily_stats_worker":
-		proc = ingester.NewDailyStatsWorker(s.repo)
-	case "analytics_deriver_worker":
-		proc = ingester.NewAnalyticsDeriverWorker(s.repo)
-	case "scheduled_worker":
-		proc = ingester.NewScheduledWorker(s.repo, nil)
-	case "proposer_key_backfill":
-		if reprocessFlowClient == nil {
-			writeAPIError(w, http.StatusServiceUnavailable, "no Flow client configured")
-			return
+	proc, err := s.newReprocessWorker(req.Worker)
+	if err != nil {
+		status := http.StatusBadRequest
+		if strings.Contains(err.Error(), "no Flow client configured") {
+			status = http.StatusServiceUnavailable
 		}
-		proc = ingester.NewProposerKeyBackfillWorker(s.repo, reprocessFlowClient)
-	default:
-		writeAPIError(w, http.StatusBadRequest, fmt.Sprintf("unsupported worker: %s (supported: token_worker, evm_worker, meta_worker, accounts_worker, tx_contracts_worker, tx_metrics_worker, staking_worker, defi_worker, ft_holdings_worker, nft_ownership_worker, daily_balance_worker, daily_stats_worker, analytics_deriver_worker, scheduled_worker, proposer_key_backfill)", req.Worker))
+		writeAPIError(w, status, err.Error())
 		return
 	}
 

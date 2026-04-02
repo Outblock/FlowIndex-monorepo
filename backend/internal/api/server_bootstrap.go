@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"flowscan-clone/internal/ingester"
 	"flowscan-clone/internal/market"
 	"flowscan-clone/internal/repository"
 
@@ -29,7 +28,7 @@ type BackfillProgress struct {
 	TargetHeight  uint64    `json:"target_height"`
 	CurrentHeight uint64    `json:"current_height"`
 	Processed     uint64    `json:"processed"`
-	Speed         float64   `json:"speed"`         // blocks/sec
+	Speed         float64   `json:"speed"` // blocks/sec
 	StartedAt     time.Time `json:"started_at"`
 	Done          bool      `json:"done"`
 }
@@ -120,21 +119,21 @@ type APIKeyResolver func(ctx context.Context, keyHash string) (userID string, er
 type TierRPSResolver func(ctx context.Context, userID string) (rps int, err error)
 
 type Server struct {
-	repo               *repository.Repository
-	client             FlowClient
-	historyClient      interface{} // flow client with historic spork nodes (for backfill workers)
-	httpServer         *http.Server
-	startBlock         uint64
-	blockscoutURL      string // e.g. "https://evm.flowindex.dev"
-	blockscoutAPIKey   string // optional API key for Blockscout rate limit bypass
-	blockscoutDB       *repository.BlockscoutDB
-	backfillProgress   *BackfillProgress
-	priceCache         *market.PriceCache
+	repo                 *repository.Repository
+	client               FlowClient
+	historyClient        interface{} // flow client with historic spork nodes (for backfill workers)
+	httpServer           *http.Server
+	startBlock           uint64
+	blockscoutURL        string // e.g. "https://evm.flowindex.dev"
+	blockscoutAPIKey     string // optional API key for Blockscout rate limit bypass
+	blockscoutDB         *repository.BlockscoutDB
+	backfillProgress     *BackfillProgress
+	priceCache           *market.PriceCache
 	webhookHandlers      WebhookRouteRegistrar
 	webhookAdminHandlers WebhookAdminRegistrar
 	apiKeyResolver       APIKeyResolver
 	tierRPSResolver      TierRPSResolver
-	statusCache      struct {
+	statusCache          struct {
 		mu        sync.Mutex
 		payload   []byte
 		expiresAt time.Time
@@ -144,7 +143,7 @@ type Server struct {
 		payload   []byte
 		expiresAt time.Time
 	}
-	statusFlight singleflight.Group
+	statusFlight      singleflight.Group
 	latestHeightCache struct {
 		mu        sync.Mutex
 		height    uint64
@@ -173,13 +172,13 @@ func NewServer(repo *repository.Repository, client FlowClient, port string, star
 	}
 
 	s := &Server{
-		repo:          repo,
-		client:        client,
-		startBlock:    startBlock,
+		repo:             repo,
+		client:           client,
+		startBlock:       startBlock,
 		blockscoutURL:    bsURL,
 		blockscoutAPIKey: os.Getenv("BLOCKSCOUT_API_KEY"),
-		blockscoutDB:    bsDB,
-		priceCache:    market.NewPriceCache(),
+		blockscoutDB:     bsDB,
+		priceCache:       market.NewPriceCache(),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -300,25 +299,9 @@ func (s *Server) autoResumeReprocessJobs() {
 }
 
 func (s *Server) resumeReprocessJob(job repository.ReprocessJob) {
-	// Instantiate the worker
-	var proc ingester.Processor
-	switch job.Worker {
-	case "token_worker":
-		proc = ingester.NewTokenWorker(s.repo)
-	case "evm_worker":
-		proc = ingester.NewEVMWorker(s.repo)
-	case "proposer_key_backfill":
-		flowCli := s.historyClient
-		if flowCli == nil {
-			flowCli = s.client
-		}
-		if flowCli == nil {
-			log.Printf("[auto-resume] cannot resume %s: no Flow client configured", job.Worker)
-			return
-		}
-		proc = ingester.NewProposerKeyBackfillWorker(s.repo, flowCli)
-	default:
-		log.Printf("[auto-resume] unsupported worker type: %s", job.Worker)
+	proc, err := s.newReprocessWorker(job.Worker)
+	if err != nil {
+		log.Printf("[auto-resume] %v", err)
 		return
 	}
 
