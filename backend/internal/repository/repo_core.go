@@ -51,6 +51,11 @@ func NewRepository(dbURL string) (*Repository, error) {
 	if _, ok := config.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"]; !ok {
 		config.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = getEnvDefault("DB_IDLE_TX_TIMEOUT", "120000") // 2 min
 	}
+	// PostgreSQL JIT is counterproductive for our short, partition-heavy OLTP queries.
+	// It can spend seconds compiling plans that execute in milliseconds.
+	if _, ok := config.ConnConfig.RuntimeParams["jit"]; !ok {
+		config.ConnConfig.RuntimeParams["jit"] = getEnvDefault("DB_JIT", "off")
+	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
