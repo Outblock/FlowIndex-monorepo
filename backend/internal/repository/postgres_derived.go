@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -263,8 +264,17 @@ func (r *Repository) UpsertContractRegistry(ctx context.Context, rows []models.S
 		}
 	}
 
+	keys := make([]string, 0, len(deduped))
+	for key := range deduped {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
 	batch := &pgx.Batch{}
-	for _, c := range deduped {
+	// Queue rows in a deterministic order so concurrent live/reprocess workers
+	// acquire smart_contracts row locks consistently and do not deadlock.
+	for _, key := range keys {
+		c := deduped[key]
 		firstSeen := c.FirstSeenHeight
 		lastSeen := c.LastSeenHeight
 		if firstSeen == 0 {

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,8 +18,12 @@ func (r *Repository) UpsertAccounts(ctx context.Context, accounts []models.Accou
 	if len(accounts) == 0 {
 		return nil
 	}
+	ordered := append([]models.AccountCatalog(nil), accounts...)
+	sort.Slice(ordered, func(i, j int) bool {
+		return ordered[i].Address < ordered[j].Address
+	})
 	batch := &pgx.Batch{}
-	for _, a := range accounts {
+	for _, a := range ordered {
 		batch.Queue(`
 			INSERT INTO app.accounts (address, first_seen_height, last_seen_height, created_at, updated_at)
 			VALUES ($1, $2, $3, NOW(), NOW())
@@ -163,8 +168,15 @@ func (r *Repository) UpsertFTTokens(ctx context.Context, tokens []models.FTToken
 	if len(tokens) == 0 {
 		return nil
 	}
+	ordered := append([]models.FTToken(nil), tokens...)
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].ContractAddress != ordered[j].ContractAddress {
+			return ordered[i].ContractAddress < ordered[j].ContractAddress
+		}
+		return ordered[i].ContractName < ordered[j].ContractName
+	})
 	batch := &pgx.Batch{}
-	for _, t := range tokens {
+	for _, t := range ordered {
 		batch.Queue(`
 			INSERT INTO app.ft_tokens (contract_address, contract_name, name, symbol, decimals,
 				description, external_url, logo, vault_path, receiver_path, balance_path, socials, evm_address, total_supply, updated_at)
@@ -189,7 +201,7 @@ func (r *Repository) UpsertFTTokens(ctx context.Context, tokens []models.FTToken
 	}
 	br := r.db.SendBatch(ctx, batch)
 	defer br.Close()
-	for i := 0; i < len(tokens); i++ {
+	for i := 0; i < len(ordered); i++ {
 		if _, err := br.Exec(); err != nil {
 			return fmt.Errorf("upsert ft tokens: %w", err)
 		}
@@ -620,8 +632,15 @@ func (r *Repository) UpsertNFTCollections(ctx context.Context, collections []mod
 	if len(collections) == 0 {
 		return nil
 	}
+	ordered := append([]models.NFTCollection(nil), collections...)
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].ContractAddress != ordered[j].ContractAddress {
+			return ordered[i].ContractAddress < ordered[j].ContractAddress
+		}
+		return ordered[i].ContractName < ordered[j].ContractName
+	})
 	batch := &pgx.Batch{}
-	for _, c := range collections {
+	for _, c := range ordered {
 		batch.Queue(`
 			INSERT INTO app.nft_collections (contract_address, contract_name, name, symbol, description, external_url, square_image, banner_image, socials, evm_address, updated_at)
 			VALUES ($1, $2, NULLIF($3,''), NULLIF($4,''), NULLIF($5,''), NULLIF($6,''), NULLIF($7,''), NULLIF($8,''), $9, NULLIF($10,''), NOW())
@@ -640,7 +659,7 @@ func (r *Repository) UpsertNFTCollections(ctx context.Context, collections []mod
 	}
 	br := r.db.SendBatch(ctx, batch)
 	defer br.Close()
-	for i := 0; i < len(collections); i++ {
+	for i := 0; i < len(ordered); i++ {
 		if _, err := br.Exec(); err != nil {
 			return fmt.Errorf("upsert nft collections: %w", err)
 		}

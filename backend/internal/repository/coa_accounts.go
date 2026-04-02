@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"sort"
 
 	"flowscan-clone/internal/models"
 
@@ -12,9 +13,13 @@ func (r *Repository) UpsertCOAAccounts(ctx context.Context, rows []models.COAAcc
 	if len(rows) == 0 {
 		return nil
 	}
+	ordered := append([]models.COAAccount(nil), rows...)
+	sort.Slice(ordered, func(i, j int) bool {
+		return ordered[i].COAAddress < ordered[j].COAAddress
+	})
 
 	batch := &pgx.Batch{}
-	for _, row := range rows {
+	for _, row := range ordered {
 		batch.Queue(`
 			INSERT INTO app.coa_accounts (coa_address, flow_address, transaction_id, block_height, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, NOW(), NOW())
