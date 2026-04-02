@@ -65,6 +65,7 @@ import { FlowStakeBlock } from '@/blocks/blocks/flow_stake'
 import { FlowUnstakeBlock } from '@/blocks/blocks/flow_unstake'
 import { FlowWithdrawRewardsBlock } from '@/blocks/blocks/flow_withdraw_rewards'
 import { FlowEvmCallBlock } from '@/blocks/blocks/flow_evm_call'
+import { FlowEvmNativeSendBlock } from '@/blocks/blocks/flow_evm_native_send'
 import { FlowEvmSendBlock } from '@/blocks/blocks/flow_evm_send'
 import { FlowCreateAccountBlock } from '@/blocks/blocks/flow_create_account'
 import { FlowAddKeyBlock } from '@/blocks/blocks/flow_add_key'
@@ -323,6 +324,7 @@ export const registry: Record<string, BlockConfig> = {
   flow_unstake: FlowUnstakeBlock,
   flow_withdraw_rewards: FlowWithdrawRewardsBlock,
   flow_evm_call: FlowEvmCallBlock,
+  flow_evm_native_send: FlowEvmNativeSendBlock,
   flow_evm_send: FlowEvmSendBlock,
   flow_create_account: FlowCreateAccountBlock,
   flow_add_key: FlowAddKeyBlock,

@@ -453,3 +453,17 @@ export interface FlowCancelTransactionParams {
 export interface FlowListPendingParams {
   status?: string
 }
+
+/** Parameters for evm_native_send tool */
+export interface FlowEvmNativeSendParams {
+  mode: string
+  to?: string
+  data?: string
+  value?: string
+  tokenAddress?: string
+  recipient?: string
+  amount?: string
+  gasLimit?: string
+  privateKey: string
+  network?: string
+}

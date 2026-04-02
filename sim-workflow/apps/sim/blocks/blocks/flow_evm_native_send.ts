@@ -1,0 +1,128 @@
+import { EthIcon } from '@/components/icons'
+import type { BlockConfig } from '@/blocks/types'
+
+export const FlowEvmNativeSendBlock: BlockConfig = {
+  type: 'flow_evm_native_send',
+  name: 'Flow EVM Native Send',
+  description:
+    'Send a native EVM transaction on Flow using an EVM private key. Supports general transactions and ERC-20 transfers.',
+  category: 'tools',
+  bgColor: '#8B5CF6',
+  icon: EthIcon,
+  subBlocks: [
+    {
+      id: 'mode',
+      title: 'Mode',
+      type: 'dropdown',
+      options: [
+        { label: 'General Transaction', id: 'general' },
+        { label: 'ERC-20 Transfer', id: 'erc20' },
+      ],
+    },
+    {
+      id: 'to',
+      title: 'To Address',
+      type: 'short-input',
+      placeholder: '0x1234...abcd',
+      condition: { field: 'mode', value: 'general' },
+      required: { field: 'mode', value: 'general' },
+    },
+    {
+      id: 'data',
+      title: 'Calldata (hex)',
+      type: 'short-input',
+      placeholder: '0x...',
+      condition: { field: 'mode', value: 'general' },
+    },
+    {
+      id: 'value',
+      title: 'Value (FLOW)',
+      type: 'short-input',
+      placeholder: '0.0',
+      condition: { field: 'mode', value: 'general' },
+    },
+    {
+      id: 'tokenAddress',
+      title: 'Token Contract Address',
+      type: 'short-input',
+      placeholder: '0x...',
+      condition: { field: 'mode', value: 'erc20' },
+      required: { field: 'mode', value: 'erc20' },
+    },
+    {
+      id: 'recipient',
+      title: 'Recipient Address',
+      type: 'short-input',
+      placeholder: '0x...',
+      condition: { field: 'mode', value: 'erc20' },
+      required: { field: 'mode', value: 'erc20' },
+    },
+    {
+      id: 'amount',
+      title: 'Amount',
+      type: 'short-input',
+      placeholder: '100.5',
+      condition: { field: 'mode', value: 'erc20' },
+      required: { field: 'mode', value: 'erc20' },
+    },
+    {
+      id: 'gasLimit',
+      title: 'Gas Limit (optional)',
+      type: 'short-input',
+      placeholder: 'Auto-estimate if empty',
+    },
+    {
+      id: 'privateKey',
+      title: 'EVM Private Key',
+      type: 'short-input',
+      placeholder: '0x... or hex without prefix',
+    },
+    {
+      id: 'network',
+      title: 'Network',
+      type: 'dropdown',
+      options: [
+        { label: 'Mainnet', id: 'mainnet' },
+        { label: 'Testnet', id: 'testnet' },
+      ],
+    },
+  ],
+  tools: {
+    access: ['flow_evm_native_send'],
+    config: {
+      tool: () => 'flow_evm_native_send',
+      params: (params) => ({
+        mode: (params.mode as string) || 'general',
+        to: params.to as string | undefined,
+        data: params.data as string | undefined,
+        value: params.value as string | undefined,
+        tokenAddress: params.tokenAddress as string | undefined,
+        recipient: params.recipient as string | undefined,
+        amount: params.amount as string | undefined,
+        gasLimit: params.gasLimit as string | undefined,
+        privateKey: params.privateKey as string,
+        network: (params.network as string) || 'mainnet',
+      }),
+    },
+  },
+  inputs: {
+    mode: { type: 'string', description: 'Transaction mode: general or erc20' },
+    to: { type: 'string', description: 'Destination address (general mode)' },
+    data: { type: 'string', description: 'Calldata hex (general mode)' },
+    value: { type: 'string', description: 'Value in FLOW (general mode)' },
+    tokenAddress: { type: 'string', description: 'ERC-20 contract address (erc20 mode)' },
+    recipient: { type: 'string', description: 'Recipient address (erc20 mode)' },
+    amount: { type: 'string', description: 'Token amount (erc20 mode)' },
+    gasLimit: { type: 'string', description: 'Gas limit' },
+    privateKey: { type: 'string', description: 'EVM private key' },
+    network: { type: 'string', description: 'mainnet or testnet' },
+  },
+  outputs: {
+    content: { type: 'string', description: 'Human-readable transaction summary' },
+    transactionHash: { type: 'string', description: 'EVM transaction hash' },
+    status: { type: 'string', description: 'success or reverted' },
+    gasUsed: { type: 'number', description: 'Gas consumed' },
+    blockNumber: { type: 'number', description: 'Block number' },
+    logs: { type: 'json', description: 'Parsed event logs' },
+  },
+}

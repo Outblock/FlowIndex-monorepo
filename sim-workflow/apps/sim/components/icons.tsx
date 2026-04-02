@@ -6062,6 +6062,29 @@ export function FlowIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function EthIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 100 100" {...props}>
+      <circle cx="50" cy="50" r="50" fill="#8B5CF6" />
+      <path
+        d="M50.1 18L49.5 20v39.2l.6.6L70 49.3z"
+        fill="rgba(255,255,255,0.6)"
+      />
+      <path d="M50.1 18L30 49.3l20.1 10.5V18z" fill="#fff" />
+      <path
+        d="M50.1 63.7l-.3.4v15.4l.3.9L70 53.2z"
+        fill="rgba(255,255,255,0.6)"
+      />
+      <path d="M50.1 80.4V63.7L30 53.2z" fill="#fff" />
+      <path
+        d="M50.1 59.8L70 49.3l-19.9-11v21.5z"
+        fill="rgba(255,255,255,0.2)"
+      />
+      <path d="M30 49.3l20.1 10.5V38.3z" fill="rgba(255,255,255,0.6)" />
+    </svg>
+  )
+}
+
 export function HexIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...props} xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1450.3 600'>
