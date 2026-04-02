@@ -102,6 +102,47 @@ func (s *Server) handleFlowListTransactions(w http.ResponseWriter, r *http.Reque
 	ftMeta, _ := s.repo.GetFTTokenMetadataByIdentifiers(r.Context(), ftIDs)
 	nftMeta, _ := s.repo.GetNFTCollectionMetadataByIdentifiers(r.Context(), nftIDs)
 
+	needFallbackSummaries := false
+	for _, tx := range txs {
+		if !hasTransferSummaryData(transferSummaries[tx.ID]) || !hasTransferSummaryData(canonicalTransferSummaries[tx.ID]) {
+			needFallbackSummaries = true
+			break
+		}
+	}
+	if needFallbackSummaries {
+		fallbackSummaries, fallbackCanonical, err := s.buildEventFallbackTransferSummaries(r.Context(), txs, "", eventsByTx)
+		if err != nil {
+			log.Printf("[WARN] buildEventFallbackTransferSummaries (list) failed refs=%d: %v", len(txRefs), err)
+		} else {
+			for txID, summary := range fallbackSummaries {
+				if !hasTransferSummaryData(transferSummaries[txID]) {
+					transferSummaries[txID] = summary
+				}
+			}
+			for txID, summary := range fallbackCanonical {
+				if !hasTransferSummaryData(canonicalTransferSummaries[txID]) {
+					canonicalTransferSummaries[txID] = summary
+				}
+			}
+
+			fallbackFTIDs, fallbackNFTIDs := collectTokenIdentifiers(fallbackSummaries)
+			if len(fallbackFTIDs) > 0 {
+				if extraMeta, err := s.repo.GetFTTokenMetadataByIdentifiers(r.Context(), fallbackFTIDs); err == nil {
+					for id, meta := range extraMeta {
+						ftMeta[id] = meta
+					}
+				}
+			}
+			if len(fallbackNFTIDs) > 0 {
+				if extraMeta, err := s.repo.GetNFTCollectionMetadataByIdentifiers(r.Context(), fallbackNFTIDs); err == nil {
+					for id, meta := range extraMeta {
+						nftMeta[id] = meta
+					}
+				}
+			}
+		}
+	}
+
 	out := make([]map[string]interface{}, 0, len(txs))
 	for _, t := range txs {
 		ts := transferSummaries[t.ID]
@@ -440,6 +481,10 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 	// Enrich: FT transfers with token metadata
 	ftTransfers, _ := s.repo.GetFTTransfersByTransactionID(r.Context(), tx.ID)
 	txEvents, _ := s.repo.GetEventsByTransactionID(r.Context(), tx.ID)
+	fallbackFTTransfers, fallbackNFTTransfers := deriveTransferRowsFromEvents(txEvents)
+	if len(ftTransfers) == 0 && len(fallbackFTTransfers) > 0 {
+		ftTransfers = fallbackFTTransfers
+	}
 	evtCtx := buildTxEventContext(txEvents)
 	canonicalFTTransfers := canonicalizeFTTransfers(ftTransfers, evmExecs, evtCtx)
 	ftMeta := map[string]repository.TokenMetadataInfo{}
@@ -539,6 +584,9 @@ func (s *Server) enrichTransactionOutput(r *http.Request, out map[string]interfa
 	// Enrich: NFT transfers (lightweight — no public path or item metadata lookups,
 	// frontend can query NFT details via Cadence script when needed)
 	nftTransfers, _ := s.repo.GetNFTTransfersByTransactionID(r.Context(), tx.ID)
+	if len(nftTransfers) == 0 && len(fallbackNFTTransfers) > 0 {
+		nftTransfers = fallbackNFTTransfers
+	}
 	nftMeta := map[string]repository.TokenMetadataInfo{}
 	if len(nftTransfers) > 0 {
 		collIDSet := make(map[string]bool)

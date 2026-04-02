@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -308,10 +309,14 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	// The repo fetches limit+1 rows; trim to detect hasMore.
-	hasMore := len(txs) > limit
-	if hasMore {
-		txs = txs[:limit]
+
+	if height == nil && offset == 0 {
+		fallbackTxs, fallbackErr := s.repo.GetRecentTransactionsByAddressFallback(r.Context(), address, limit+1, 0)
+		if fallbackErr != nil {
+			log.Printf("[WARN] GetRecentTransactionsByAddressFallback failed for address=%s: %v", address, fallbackErr)
+		} else if len(fallbackTxs) > 0 {
+			txs = mergeTransactionsByRecency(txs, fallbackTxs)
+		}
 	}
 	// Filter by height if provided
 	if height != nil {
@@ -322,6 +327,10 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 			}
 		}
 		txs = filtered
+	}
+	hasMore := len(txs) > limit
+	if hasMore {
+		txs = txs[:limit]
 	}
 	txIDs := collectTxIDs(txs)
 	txRefs := collectTxRefs(txs)
@@ -392,6 +401,57 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 	go func() { defer wg2.Done(); nftMeta, _ = s.repo.GetNFTCollectionMetadataByIdentifiers(ctx, nftIDs) }()
 	wg2.Wait()
 
+	needFallbackSummaries := false
+	for _, tx := range txs {
+		if !hasTransferSummaryData(transferSummaries[tx.ID]) || !hasTransferSummaryData(canonicalSummaries[tx.ID]) {
+			needFallbackSummaries = true
+			break
+		}
+	}
+	if needFallbackSummaries {
+		fallbackSummaries, fallbackCanonical, err := s.buildEventFallbackTransferSummaries(ctx, txs, address, eventsByTx)
+		if err != nil {
+			log.Printf("[WARN] buildEventFallbackTransferSummaries failed for address=%s refs=%d: %v", address, len(txRefs), err)
+		} else {
+			for txID, summary := range fallbackSummaries {
+				if !hasTransferSummaryData(transferSummaries[txID]) {
+					transferSummaries[txID] = summary
+				}
+			}
+			for txID, summary := range fallbackCanonical {
+				if !hasTransferSummaryData(canonicalSummaries[txID]) {
+					canonicalSummaries[txID] = summary
+				}
+			}
+
+			fallbackFTIDs, fallbackNFTIDs := collectTokenIdentifiers(fallbackSummaries)
+			if len(fallbackFTIDs) > 0 {
+				if extraMeta, err := s.repo.GetFTTokenMetadataByIdentifiers(ctx, fallbackFTIDs); err == nil {
+					for id, meta := range extraMeta {
+						ftMeta[id] = meta
+					}
+				}
+			}
+			if len(fallbackNFTIDs) > 0 {
+				if extraMeta, err := s.repo.GetNFTCollectionMetadataByIdentifiers(ctx, fallbackNFTIDs); err == nil {
+					for id, meta := range extraMeta {
+						nftMeta[id] = meta
+					}
+				}
+			}
+		}
+	}
+
+	sort.SliceStable(txs, func(i, j int) bool {
+		if txs[i].BlockHeight != txs[j].BlockHeight {
+			return txs[i].BlockHeight > txs[j].BlockHeight
+		}
+		if txs[i].TransactionIndex != txs[j].TransactionIndex {
+			return txs[i].TransactionIndex > txs[j].TransactionIndex
+		}
+		return txs[i].ID > txs[j].ID
+	})
+
 	out := make([]map[string]interface{}, 0, len(txs))
 	for _, t := range txs {
 		ts := transferSummaries[t.ID]
@@ -404,6 +464,9 @@ func (s *Server) handleFlowAccountTransactions(w http.ResponseWriter, r *http.Re
 	}
 	meta := map[string]interface{}{"limit": limit, "offset": offset, "count": len(out), "has_more": hasMore}
 	if totalCount > 0 {
+		if totalCount < int64(len(out)) {
+			totalCount = int64(len(out))
+		}
 		meta["total"] = totalCount
 	}
 	writeAPIResponse(w, out, meta, nil)

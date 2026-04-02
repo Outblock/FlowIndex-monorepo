@@ -398,6 +398,13 @@ func processTokenEvents(events []models.Event) processTokenEventsResult {
 	}
 }
 
+// DeriveTokenTransfersFromEvents parses raw events into FT/NFT transfer rows without
+// mutating derived tables. API read paths use this as a fallback when token_worker lags.
+func DeriveTokenTransfersFromEvents(events []models.Event) ([]models.TokenTransfer, []models.TokenTransfer) {
+	result := processTokenEvents(events)
+	return result.ftTransfers, result.nftTransfers
+}
+
 // enrichBridgeTransfersFromCallData decodes EVM call data to fill missing
 // to_address on bridge token transfers. Returns true if any transfer still
 // needs Blockscout fallback (unknown selector).
