@@ -1069,6 +1069,9 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@v3
 
+      - name: Configure Docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
       - name: Upload Sim Studio seed SQL
         run: |
           gcloud compute scp studio/seed/simstudio_seed.sql flowindex-backend:~/simstudio_seed.sql --zone=us-central1-a
