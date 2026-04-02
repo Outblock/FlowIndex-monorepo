@@ -722,7 +722,11 @@ func (w *TokenWorker) ProcessRange(ctx context.Context, fromHeight, toHeight uin
 			out = append(out, c)
 		}
 		if err := w.repo.UpsertContractRegistry(ctx, out); err != nil {
-			return fmt.Errorf("failed to upsert contracts registry: %w", err)
+			if shouldSkipTokenMetaUpsert(err) {
+				log.Printf("[token_worker] skipping contracts registry upsert (will retry later): %v", err)
+			} else {
+				return fmt.Errorf("failed to upsert contracts registry: %w", err)
+			}
 		}
 	}
 
