@@ -204,6 +204,8 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 
 	forwardEnabled := os.Getenv("ENABLE_FORWARD_INGESTER") != "false"
 	historyEnabled := os.Getenv("ENABLE_HISTORY_INGESTER") != "false"
+	liveDeriversEnabled := os.Getenv("ENABLE_LIVE_DERIVERS") != "false"
+	historyLiveDeriverEnabled := os.Getenv("ENABLE_HISTORY_LIVE_DERIVER") == "true"
 	workerEnabled := map[string]bool{
 		"main_ingester":            forwardEnabled,
 		"history_ingester":         historyEnabled,
@@ -448,6 +450,8 @@ func (s *Server) buildStatusPayload(ctx context.Context, includeRanges bool) ([]
 		"total_addresses":        totalAddresses,
 		"total_contracts":        totalContracts,
 		"checkpoints":            checkpoints,
+		"live_derivers_enabled":  liveDeriversEnabled,
+		"history_live_deriver":   historyLiveDeriverEnabled,
 		"forward_enabled":        forwardEnabled,
 		"history_enabled":        historyEnabled,
 		"worker_enabled":         workerEnabled,

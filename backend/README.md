@@ -54,6 +54,7 @@ Ingest / Worker:
 | `TX_SCRIPT_INLINE_MAX_BYTES` | `0` | If >0, store `raw.transactions.script` inline only when <= this size (otherwise NULL + `raw.scripts`) |
 | `ENABLE_LIVE_DERIVERS` | `true` | Enable near-head derived materialization (Blockscout-style) |
 | `LIVE_DERIVERS_CHUNK` | `10` | Block chunk size for the live derivers |
+| `ENABLE_HISTORY_LIVE_DERIVER` | `false` | Also run a live-style deriver on backward-ingested history batches. Leave this off unless you explicitly want faster history materialization and can afford the extra DB contention. |
 
 Raw Storage (optional, heavy):
 | Variable | Default | Purpose |

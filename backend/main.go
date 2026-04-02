@@ -398,8 +398,10 @@ func main() {
 		// Optionally create a live-style deriver for real-time processing of new history batches.
 		// This runs processors immediately as the backward ingester commits each batch,
 		// so we don't have to wait for the HistoryDeriver scan to reach those heights.
-		// Disable with ENABLE_HISTORY_LIVE_DERIVER=false to reduce DB contention.
-		if os.Getenv("ENABLE_HISTORY_LIVE_DERIVER") != "false" {
+		//
+		// Default OFF: running a second live deriver against history batches competes with the
+		// head live deriver for the same derived tables and can delay recent account activity.
+		if os.Getenv("ENABLE_HISTORY_LIVE_DERIVER") == "true" {
 			historyLiveDeriver := ingester.NewLiveDeriver(repo, histProcessors, ingester.LiveDeriverConfig{
 				ChunkSize:     liveDeriverChunk,
 				DisableRepair: true, // Only the primary LiveDeriver runs repair to avoid duplicate work
@@ -407,7 +409,7 @@ func main() {
 			historyLiveDeriver.Start(context.Background())
 			onHistoryIndexedRange = historyLiveDeriver.NotifyRange
 		} else {
-			log.Println("History Live Deriver is DISABLED (ENABLE_HISTORY_LIVE_DERIVER=false)")
+			log.Println("History Live Deriver is DISABLED by default (set ENABLE_HISTORY_LIVE_DERIVER=true to enable)")
 		}
 	} else {
 		log.Println("History Derivers are DISABLED (ENABLE_HISTORY_DERIVERS=false)")
