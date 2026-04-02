@@ -10,11 +10,22 @@ import (
 )
 
 // ScheduledExecUpdate holds data for marking a scheduled tx as executed.
+// Handler fields are populated from the Executed event payload so that the
+// record can be created on-the-fly if the corresponding Scheduled event was
+// missed (e.g., due to deriver gaps or restarts).
 type ScheduledExecUpdate struct {
 	ScheduledID int64
 	Block       uint64
 	TxID        string
 	Timestamp   time.Time
+
+	// Handler info from the Executed event (used for upsert fallback).
+	Priority        int
+	ExecutionEffort int64
+	HandlerOwner    string
+	HandlerType     string
+	HandlerUUID     int64
+	HandlerPath     string
 }
 
 // ScheduledCancelUpdate holds data for marking a scheduled tx as canceled.
@@ -96,32 +107,49 @@ func (r *Repository) UpdateScheduledTransactionsExecuted(ctx context.Context, it
 
 	for _, item := range items {
 		txIDBytes, _ := hex.DecodeString(item.TxID)
+		ownerBytes, _ := hex.DecodeString(item.HandlerOwner)
+
+		// Use upsert: if the Scheduled event was missed (deriver gaps, restarts),
+		// create the record from Executed event data so the webhook can still fire.
 		_, err := tx.Exec(ctx, `
-			UPDATE app.scheduled_transactions st
-			SET status = 'EXECUTED',
-			    executed_block = $2,
-			    executed_tx_id = $3,
-			    executed_at = $4,
-			    has_activity = EXISTS (
-					SELECT 1
-					FROM raw.events e
-					WHERE e.transaction_id = $3
-					  AND e.block_height = $2
+			INSERT INTO app.scheduled_transactions (
+				scheduled_id, priority, expected_timestamp, execution_effort, fees,
+				handler_owner, handler_type, handler_uuid, handler_public_path,
+				scheduled_block, scheduled_tx_id, scheduled_at,
+				status, executed_block, executed_tx_id, executed_at,
+				has_activity
+			) VALUES (
+				$1, $5, $4, $6, '0',
+				$7, $8, $9, $10,
+				$2, $3, $4,
+				'EXECUTED', $2, $3, $4,
+				EXISTS (
+					SELECT 1 FROM raw.events e
+					WHERE e.transaction_id = $3 AND e.block_height = $2
 					  AND e.type NOT LIKE 'A.e467b9dd11fa00df.FlowTransactionScheduler%%'
 					  AND e.type NOT LIKE 'A.1654653399040a61.FlowToken%%'
 					  AND e.type NOT LIKE 'A.f233dcee88fe0abe.FungibleToken%%'
 					  AND e.type NOT LIKE 'A.e467b9dd11fa00df.FlowFees%%'
 					  AND e.type NOT LIKE 'A.e467b9dd11fa00df.FlowServiceAccount%%'
 					  AND (
-							split_part(st.handler_type, '.', 2) = ''
-						 OR split_part(st.handler_type, '.', 3) = ''
-						 OR e.type NOT LIKE ('A.' || split_part(st.handler_type, '.', 2) || '.' || split_part(st.handler_type, '.', 3) || '%%')
+							split_part($8, '.', 2) = ''
+						 OR split_part($8, '.', 3) = ''
+						 OR e.type NOT LIKE ('A.' || split_part($8, '.', 2) || '.' || split_part($8, '.', 3) || '%%')
 					  )
 				)
-			WHERE scheduled_id = $1 AND status != 'EXECUTED'
-		`, item.ScheduledID, item.Block, txIDBytes, item.Timestamp)
+			)
+			ON CONFLICT (scheduled_id) DO UPDATE SET
+				status = 'EXECUTED',
+				executed_block = EXCLUDED.executed_block,
+				executed_tx_id = EXCLUDED.executed_tx_id,
+				executed_at = EXCLUDED.executed_at,
+				has_activity = EXCLUDED.has_activity
+			WHERE app.scheduled_transactions.status != 'EXECUTED'
+		`, item.ScheduledID, item.Block, txIDBytes, item.Timestamp,
+			item.Priority, item.ExecutionEffort,
+			ownerBytes, item.HandlerType, item.HandlerUUID, item.HandlerPath)
 		if err != nil {
-			return fmt.Errorf("update executed scheduled_id %d: %w", item.ScheduledID, err)
+			return fmt.Errorf("upsert executed scheduled_id %d: %w", item.ScheduledID, err)
 		}
 	}
 	return tx.Commit(ctx)

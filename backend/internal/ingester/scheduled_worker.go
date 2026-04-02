@@ -88,11 +88,24 @@ func (w *ScheduledWorker) ProcessRange(ctx context.Context, fromHeight, toHeight
 
 		case "Executed":
 			id, _ := strconv.ParseInt(extractString(fields["id"]), 10, 64)
+			priority, _ := strconv.Atoi(extractString(fields["priority"]))
+			effort, _ := strconv.ParseInt(extractString(fields["executionEffort"]), 10, 64)
+			uuid, _ := strconv.ParseInt(extractString(fields["transactionHandlerUUID"]), 10, 64)
+			owner := strings.TrimPrefix(strings.ToLower(extractString(fields["transactionHandlerOwner"])), "0x")
+			handlerType := extractString(fields["transactionHandlerTypeIdentifier"])
+			publicPath := extractString(fields["transactionHandlerPublicPath"])
+
 			executed = append(executed, repository.ScheduledExecUpdate{
-				ScheduledID: id,
-				Block:       evt.BlockHeight,
-				TxID:        evt.TransactionID,
-				Timestamp:   evt.Timestamp,
+				ScheduledID:     id,
+				Block:           evt.BlockHeight,
+				TxID:            evt.TransactionID,
+				Timestamp:       evt.Timestamp,
+				Priority:        priority,
+				ExecutionEffort: effort,
+				HandlerOwner:    owner,
+				HandlerType:     handlerType,
+				HandlerUUID:     uuid,
+				HandlerPath:     publicPath,
 			})
 
 		case "Canceled":
