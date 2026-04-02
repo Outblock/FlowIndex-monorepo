@@ -54,6 +54,65 @@ export async function POST(request: NextRequest) {
     }
 
     const fcl = await import('@onflow/fcl')
+    const t = await import('@onflow/types')
+
+    /**
+     * Map Cadence type name to its @onflow/types transformer.
+     * Falls back to String for unknown types.
+     */
+    const typeMap: Record<string, unknown> = {
+      Int: t.Int,
+      Int8: t.Int8,
+      Int16: t.Int16,
+      Int32: t.Int32,
+      Int64: t.Int64,
+      Int128: t.Int128,
+      Int256: t.Int256,
+      UInt: t.UInt,
+      UInt8: t.UInt8,
+      UInt16: t.UInt16,
+      UInt32: t.UInt32,
+      UInt64: t.UInt64,
+      UInt128: t.UInt128,
+      UInt256: t.UInt256,
+      Fix64: t.Fix64,
+      UFix64: t.UFix64,
+      Word8: t.Word8,
+      Word16: t.Word16,
+      Word32: t.Word32,
+      Word64: t.Word64,
+      String: t.String,
+      Address: t.Address,
+      Bool: t.Bool,
+      Path: t.Path,
+      StoragePath: t.StoragePath,
+      PublicPath: t.PublicPath,
+      PrivatePath: t.PrivatePath,
+      Character: t.Character,
+    }
+
+    function resolveType(typeName: string): unknown {
+      return typeMap[typeName] || t.String
+    }
+
+    /**
+     * Convert raw {type, value} objects into fcl.arg() calls.
+     * Coerces Bool string values to actual booleans.
+     */
+    function buildFclArgs(args: unknown[]): unknown[] {
+      return args.map((arg) => {
+        if (arg && typeof arg === 'object' && 'type' in arg && 'value' in arg) {
+          const { type, value } = arg as { type: string; value: unknown }
+          const fclType = resolveType(type)
+          let coercedValue = value
+          if (type === 'Bool' && typeof value === 'string') {
+            coercedValue = value === 'true'
+          }
+          return fcl.arg(coercedValue, fclType)
+        }
+        return arg
+      })
+    }
 
     fcl.config().put('accessNode.api', accessNode)
 
@@ -83,9 +142,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const fclArgs = buildFclArgs(parsedArgs)
+
     const txId: string = await fcl.mutate({
       cadence: script,
-      args: () => parsedArgs,
+      args: () => fclArgs,
       proposer: typedAuthz,
       payer: typedAuthz,
       authorizations: [typedAuthz] as unknown as FclAuthz[],
