@@ -10,8 +10,10 @@
  *  - 9 token strategies (Flow-to-Flow, Flow-to-EVM, EVM-to-Flow, etc.)
  *  - 8 NFT strategies (Flow-to-Flow, bridges, child accounts, TopShot, etc.)
  */
-import { CadenceService, addresses } from '@onflow/frw-cadence'
+
 import * as fcl from '@onflow/fcl'
+import { addresses, CadenceService } from '@onflow/frw-cadence'
+import { httpTransport } from '@onflow/transport-http'
 import { createLogger } from '@sim/logger'
 
 const logger = createLogger('FlowTransferStrategy')
@@ -111,13 +113,12 @@ export function createConfiguredCadenceService(
 /**
  * Configure FCL with network-specific settings and contract address aliases.
  */
-export function configureFclForNetwork(
-  network: 'mainnet' | 'testnet',
-  accessNode: string
-): void {
-  fcl.config()
+export function configureFclForNetwork(network: 'mainnet' | 'testnet', accessNode: string): void {
+  fcl
+    .config()
     .put('flow.network', network)
     .put('accessNode.api', accessNode)
+    .put('sdk.transport', httpTransport)
 
   const addrMap = addresses[network]
   for (const key in addrMap) {
@@ -135,7 +136,20 @@ export async function executeTransfer(
   svc: CadenceService,
   payload: SendPayload
 ): Promise<string | null> {
-  const { type, assetType, proposer, receiver, sender, childAddrs, flowIdentifier, amount, ids, coaAddr, decimal, tokenContractAddr } = payload
+  const {
+    type,
+    assetType,
+    proposer,
+    receiver,
+    sender,
+    childAddrs,
+    flowIdentifier,
+    amount,
+    ids,
+    coaAddr,
+    decimal,
+    tokenContractAddr,
+  } = payload
 
   // ─── Token Strategies ───────────────────────────────────────────────
 
@@ -165,7 +179,12 @@ export async function executeTransfer(
     }
 
     // Parent-to-child token transfer (EVM sender = COA)
-    if (childAddrs.length > 0 && childAddrs.includes(receiver) && assetType === 'evm' && sender === coaAddr) {
+    if (
+      childAddrs.length > 0 &&
+      childAddrs.includes(receiver) &&
+      assetType === 'evm' &&
+      sender === coaAddr
+    ) {
       const { parseUnits } = await import('ethers')
       const valueBig = parseUnits(amount, decimal)
       logger.info('Strategy: ParentToChildToken (EVM bridge)')
@@ -212,10 +231,9 @@ export async function executeTransfer(
           [],
           30_000_000
         )
-      } else {
-        const data = await encodeEvmContractCallData(payload)
-        return await svc.callContract(tokenContractAddr, '0.0', data, 30_000_000)
       }
+      const data = await encodeEvmContractCallData(payload)
+      return await svc.callContract(tokenContractAddr, '0.0', data, 30_000_000)
     }
   }
 
@@ -247,7 +265,12 @@ export async function executeTransfer(
     }
 
     // Parent-to-child NFT transfer (EVM sender = COA)
-    if (childAddrs.length > 0 && childAddrs.includes(receiver) && assetType === 'evm' && sender === coaAddr) {
+    if (
+      childAddrs.length > 0 &&
+      childAddrs.includes(receiver) &&
+      assetType === 'evm' &&
+      sender === coaAddr
+    ) {
       logger.info('Strategy: ParentToChildNft (EVM bridge)')
       return await svc.batchBridgeChildNftFromEvm(flowIdentifier, receiver, ids.map(String))
     }

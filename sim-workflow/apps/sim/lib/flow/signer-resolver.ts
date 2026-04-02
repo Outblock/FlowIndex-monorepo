@@ -1,5 +1,10 @@
-import { CloudSigner, LocalSigner, PasskeySigner, createAuthzFromSigner } from '@flowindex/flow-signer'
 import type { FlowSigner, SignerConfig } from '@flowindex/flow-signer'
+import {
+  CloudSigner,
+  createAuthzFromSigner,
+  LocalSigner,
+  PasskeySigner,
+} from '@flowindex/flow-signer'
 import { createLogger } from '@sim/logger'
 
 const logger = createLogger('SignerResolver')
@@ -25,12 +30,20 @@ const FLOWINDEX_URL = process.env.FLOWINDEX_API_URL || 'https://flowindex.io'
  */
 export async function resolveSignerFromParams(
   params: SignerParams,
-  fiAuthToken?: string
+  fiAuthToken?: string,
+  network?: SignerConfig['network']
 ): Promise<{ signer: FlowSigner; authz: ReturnType<typeof createAuthzFromSigner> }> {
-  const config: SignerConfig = { flowindexUrl: FLOWINDEX_URL }
+  const config: SignerConfig = {
+    flowindexUrl: FLOWINDEX_URL,
+    ...(network ? { network } : {}),
+  }
 
   // Legacy mode: raw private key (backward compatible)
-  if (params.signerMode === 'legacy' || params.signerMode === 'manual' || (!params.signerMode && params.signerPrivateKey)) {
+  if (
+    params.signerMode === 'legacy' ||
+    params.signerMode === 'manual' ||
+    (!params.signerMode && params.signerPrivateKey)
+  ) {
     if (!params.signerPrivateKey || !params.signerAddress) {
       throw new Error('signerAddress and signerPrivateKey required for legacy/manual mode')
     }

@@ -1,16 +1,16 @@
+import { createLogger } from '@sim/logger'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createLogger } from '@sim/logger'
 import { checkInternalAuth } from '@/lib/auth/hybrid'
-import { resolveSignerFromParams, extractFiAuthFromRequest } from '@/lib/flow/signer-resolver'
-import type { SignerParams } from '@/lib/flow/signer-resolver'
-import { ACCESS_NODES, formatTxResult } from '@/app/api/tools/flow/tx-helpers'
+import type { SendPayload } from '@/lib/flow/cadence-service-adapter'
 import {
-  createConfiguredCadenceService,
   configureFclForNetwork,
+  createConfiguredCadenceService,
   executeTransfer,
 } from '@/lib/flow/cadence-service-adapter'
-import type { SendPayload } from '@/lib/flow/cadence-service-adapter'
+import type { SignerParams } from '@/lib/flow/signer-resolver'
+import { extractFiAuthFromRequest, resolveSignerFromParams } from '@/lib/flow/signer-resolver'
+import { ACCESS_NODES, formatTxResult, waitForSeal } from '@/app/api/tools/flow/tx-helpers'
 
 const logger = createLogger('FlowSend')
 
@@ -105,7 +105,11 @@ export async function POST(request: NextRequest) {
 
     // Resolve signer
     const fiAuth = extractFiAuthFromRequest(request)
-    const { signer, authz } = await resolveSignerFromParams(signerParams, fiAuth ?? undefined)
+    const { signer, authz } = await resolveSignerFromParams(
+      signerParams,
+      fiAuth ?? undefined,
+      network === 'testnet' ? 'testnet' : 'mainnet'
+    )
 
     // Validate network
     const accessNode = ACCESS_NODES[network]
@@ -126,7 +130,10 @@ export async function POST(request: NextRequest) {
 
     // Build NFT IDs array
     const ids: number[] = nftIds
-      ? nftIds.split(',').map((id) => parseInt(id.trim(), 10)).filter((id) => !isNaN(id))
+      ? nftIds
+          .split(',')
+          .map((id) => Number.parseInt(id.trim(), 10))
+          .filter((id) => !Number.isNaN(id))
       : []
 
     // Build the SendPayload
@@ -174,13 +181,11 @@ export async function POST(request: NextRequest) {
 
     logger.info(`Transaction submitted: ${txId}`)
 
-    // Wait for transaction to seal
-    const fcl = await import('@onflow/fcl')
-    const txStatus = await fcl.tx(txId).onceSealed()
+    const { txStatus, timedOut, timeoutMs } = await waitForSeal(txId, accessNode)
 
     return NextResponse.json({
       success: true,
-      output: formatTxResult(txId, txStatus),
+      output: formatTxResult(txId, txStatus, { timedOut, timeoutMs }),
     })
   } catch (error) {
     logger.error('Failed to send', { error })

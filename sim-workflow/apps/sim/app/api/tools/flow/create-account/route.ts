@@ -2,9 +2,9 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createLogger } from '@sim/logger'
 import { checkInternalAuth } from '@/lib/auth/hybrid'
-import { resolveSignerFromParams, extractFiAuthFromRequest } from '@/lib/flow/signer-resolver'
 import type { SignerParams } from '@/lib/flow/signer-resolver'
-import { sendTransaction } from '@/app/api/tools/flow/tx-helpers'
+import { extractFiAuthFromRequest, resolveSignerFromParams } from '@/lib/flow/signer-resolver'
+import { formatTxResult, sendTransaction } from '@/app/api/tools/flow/tx-helpers'
 import { createAccountCadence } from '@/app/api/tools/flow/cadence-templates'
 
 const logger = createLogger('FlowCreateAccount')
@@ -37,8 +37,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { publicKey, sigAlgo, hashAlgo, signer: signerJson, signerAddress, signerPrivateKey, network } =
-      Schema.parse(body)
+    const {
+      publicKey,
+      sigAlgo,
+      hashAlgo,
+      signer: signerJson,
+      signerAddress,
+      signerPrivateKey,
+      network,
+    } = Schema.parse(body)
 
     const sigAlgoNum = SIG_ALGO_MAP[sigAlgo]
     const hashAlgoNum = HASH_ALGO_MAP[hashAlgo]
@@ -70,34 +77,50 @@ export async function POST(request: NextRequest) {
     let authz: unknown
     if (signerJson) {
       let signerParams: SignerParams
-      try { signerParams = JSON.parse(signerJson) as SignerParams } catch {
-        return NextResponse.json({ success: false, error: 'Invalid signer JSON configuration' }, { status: 400 })
+      try {
+        signerParams = JSON.parse(signerJson) as SignerParams
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'Invalid signer JSON configuration' },
+          { status: 400 }
+        )
       }
       const fiAuth = extractFiAuthFromRequest(request)
-      const resolved = await resolveSignerFromParams(signerParams, fiAuth ?? undefined)
+      const resolved = await resolveSignerFromParams(
+        signerParams,
+        fiAuth ?? undefined,
+        network === 'testnet' ? 'testnet' : 'mainnet'
+      )
       authz = resolved.authz
     }
 
-    const { txId, txStatus } = await sendTransaction({
+    const { txId, txStatus, timedOut, timeoutMs } = await sendTransaction({
       cadence,
       args,
       ...(authz ? { authz } : { signerAddress, signerPrivateKey }),
       network,
     })
 
-    const statusLabel = txStatus.errorMessage ? 'ERROR' : 'SEALED'
+    if (txStatus === null) {
+      return NextResponse.json({
+        success: true,
+        output: {
+          ...formatTxResult(txId, txStatus, { timedOut, timeoutMs }),
+          address: '',
+        },
+      })
+    }
 
     let newAddress = ''
-    const events = (txStatus as unknown as { events?: Array<{ type: string; data: Record<string, string> }> }).events
+    const events = txStatus.events
     if (events) {
-      const accountCreated = events.find(
-        (e) => e.type === 'flow.AccountCreated'
-      )
-      if (accountCreated?.data?.address) {
+      const accountCreated = events.find((event) => event.type === 'flow.AccountCreated')
+      if (typeof accountCreated?.data?.address === 'string') {
         newAddress = accountCreated.data.address
       }
     }
 
+    const statusLabel = txStatus.errorMessage ? 'ERROR' : 'SEALED'
     const content = txStatus.errorMessage
       ? `Account creation failed: ${txStatus.errorMessage}`
       : `Account created successfully. Address: ${newAddress || 'unknown'}, TX: ${txId}`

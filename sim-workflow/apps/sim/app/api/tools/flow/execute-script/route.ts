@@ -1,6 +1,7 @@
+import { httpTransport } from '@onflow/transport-http'
+import { createLogger } from '@sim/logger'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createLogger } from '@sim/logger'
 import { checkInternalAuth } from '@/lib/auth/hybrid'
 
 const logger = createLogger('FlowExecuteScript')
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const fcl = await import('@onflow/fcl')
 
-    fcl.config().put('accessNode.api', accessNode)
+    fcl.config().put('accessNode.api', accessNode).put('sdk.transport', httpTransport)
 
     logger.info(`Executing Cadence script on ${network}`)
 

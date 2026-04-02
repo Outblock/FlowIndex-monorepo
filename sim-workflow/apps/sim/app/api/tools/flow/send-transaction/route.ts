@@ -1,11 +1,19 @@
+import { httpTransport } from '@onflow/transport-http'
+import type { TypeDescriptor } from '@onflow/types'
+import * as cadenceTypes from '@onflow/types'
+import { createLogger } from '@sim/logger'
 import { type NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createLogger } from '@sim/logger'
 import { checkInternalAuth } from '@/lib/auth/hybrid'
-import { resolveSignerFromParams, extractFiAuthFromRequest } from '@/lib/flow/signer-resolver'
 import type { SignerParams } from '@/lib/flow/signer-resolver'
-import { ACCESS_NODES, createAuthz } from '@/app/api/tools/flow/tx-helpers'
+import { extractFiAuthFromRequest, resolveSignerFromParams } from '@/lib/flow/signer-resolver'
 import type { FclAuthz } from '@/app/api/tools/flow/tx-helpers'
+import {
+  ACCESS_NODES,
+  createAuthz,
+  formatTxResult,
+  waitForSeal,
+} from '@/app/api/tools/flow/tx-helpers'
 
 const logger = createLogger('FlowSendTransaction')
 
@@ -26,8 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { script, arguments: argsJson, signer: signerJson, signerAddress, signerPrivateKey, network } =
-      Schema.parse(body)
+    const {
+      script,
+      arguments: argsJson,
+      signer: signerJson,
+      signerAddress,
+      signerPrivateKey,
+      network,
+    } = Schema.parse(body)
 
     const accessNode = ACCESS_NODES[network]
     if (!accessNode) {
@@ -54,45 +68,41 @@ export async function POST(request: NextRequest) {
     }
 
     const fcl = await import('@onflow/fcl')
-    const t = await import('@onflow/types')
 
     /**
      * Map Cadence type name to its @onflow/types transformer.
      * Falls back to String for unknown types.
      */
-    const typeMap: Record<string, unknown> = {
-      Int: t.Int,
-      Int8: t.Int8,
-      Int16: t.Int16,
-      Int32: t.Int32,
-      Int64: t.Int64,
-      Int128: t.Int128,
-      Int256: t.Int256,
-      UInt: t.UInt,
-      UInt8: t.UInt8,
-      UInt16: t.UInt16,
-      UInt32: t.UInt32,
-      UInt64: t.UInt64,
-      UInt128: t.UInt128,
-      UInt256: t.UInt256,
-      Fix64: t.Fix64,
-      UFix64: t.UFix64,
-      Word8: t.Word8,
-      Word16: t.Word16,
-      Word32: t.Word32,
-      Word64: t.Word64,
-      String: t.String,
-      Address: t.Address,
-      Bool: t.Bool,
-      Path: t.Path,
-      StoragePath: t.StoragePath,
-      PublicPath: t.PublicPath,
-      PrivatePath: t.PrivatePath,
-      Character: t.Character,
+    const typeMap: Record<string, TypeDescriptor<any, any>> = {
+      Int: cadenceTypes.Int,
+      Int8: cadenceTypes.Int8,
+      Int16: cadenceTypes.Int16,
+      Int32: cadenceTypes.Int32,
+      Int64: cadenceTypes.Int64,
+      Int128: cadenceTypes.Int128,
+      Int256: cadenceTypes.Int256,
+      UInt: cadenceTypes.UInt,
+      UInt8: cadenceTypes.UInt8,
+      UInt16: cadenceTypes.UInt16,
+      UInt32: cadenceTypes.UInt32,
+      UInt64: cadenceTypes.UInt64,
+      UInt128: cadenceTypes.UInt128,
+      UInt256: cadenceTypes.UInt256,
+      Fix64: cadenceTypes.Fix64,
+      UFix64: cadenceTypes.UFix64,
+      Word8: cadenceTypes.Word8,
+      Word16: cadenceTypes.Word16,
+      Word32: cadenceTypes.Word32,
+      Word64: cadenceTypes.Word64,
+      String: cadenceTypes.String,
+      Address: cadenceTypes.Address,
+      Bool: cadenceTypes.Bool,
+      Path: cadenceTypes.Path,
+      Character: cadenceTypes.Character,
     }
 
-    function resolveType(typeName: string): unknown {
-      return typeMap[typeName] || t.String
+    function resolveType(typeName: string): TypeDescriptor<any, any> {
+      return typeMap[typeName] ?? cadenceTypes.String
     }
 
     /**
@@ -108,13 +118,13 @@ export async function POST(request: NextRequest) {
           if (type === 'Bool' && typeof value === 'string') {
             coercedValue = value === 'true'
           }
-          return fcl.arg(coercedValue, fclType)
+          return fcl.arg(coercedValue as never, fclType as never)
         }
         return arg
       })
     }
 
-    fcl.config().put('accessNode.api', accessNode)
+    fcl.config().put('accessNode.api', accessNode).put('sdk.transport', httpTransport)
 
     logger.info(`Sending transaction on ${network}`)
 
@@ -130,14 +140,21 @@ export async function POST(request: NextRequest) {
         )
       }
       const fiAuth = extractFiAuthFromRequest(request)
-      const { authz } = await resolveSignerFromParams(signerParams, fiAuth ?? undefined)
+      const { authz } = await resolveSignerFromParams(
+        signerParams,
+        fiAuth ?? undefined,
+        network === 'testnet' ? 'testnet' : 'mainnet'
+      )
       typedAuthz = authz as unknown as FclAuthz
     } else if (signerAddress && signerPrivateKey) {
-      const authz = createAuthz(fcl, signerAddress, signerPrivateKey)
+      const authz = await createAuthz(signerAddress, signerPrivateKey, network)
       typedAuthz = authz as unknown as FclAuthz
     } else {
       return NextResponse.json(
-        { success: false, error: 'Either signer config or signerAddress+signerPrivateKey required' },
+        {
+          success: false,
+          error: 'Either signer config or signerAddress+signerPrivateKey required',
+        },
         { status: 400 }
       )
     }
@@ -155,19 +172,12 @@ export async function POST(request: NextRequest) {
 
     logger.info(`Transaction submitted: ${txId}`)
 
-    const txStatus = await fcl.tx(txId).onceSealed()
-    const statusLabel = txStatus.errorMessage ? 'ERROR' : 'SEALED'
-
-    const content = txStatus.errorMessage
-      ? `Transaction ${txId} failed: ${txStatus.errorMessage}`
-      : `Transaction ${txId} sealed successfully (status: ${txStatus.status})`
+    const { txStatus, timedOut, timeoutMs } = await waitForSeal(txId, accessNode)
 
     return NextResponse.json({
       success: true,
       output: {
-        content,
-        transactionId: txId,
-        status: statusLabel,
+        ...formatTxResult(txId, txStatus, { timedOut, timeoutMs }),
       },
     })
   } catch (error) {

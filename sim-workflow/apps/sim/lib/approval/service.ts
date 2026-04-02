@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
+import { httpTransport } from '@onflow/transport-http'
 import { createLogger } from '@sim/logger'
-import { encryptSecret, decryptSecret } from '@/lib/core/security/encryption'
-import { buildCallbackUrls } from '@/lib/approval/token'
 import { getApprovalStore } from '@/lib/approval/store'
+import { buildCallbackUrls } from '@/lib/approval/token'
 import type { PendingTransaction, SignerConfig } from '@/lib/approval/types'
+import type { FclAuthz } from '@/app/api/tools/flow/tx-helpers'
+import { decryptSecret, encryptSecret } from '@/lib/core/security/encryption'
 
 const logger = createLogger('approval/service')
 
@@ -206,15 +208,19 @@ export async function approveTransaction(
       })
 
       const fcl = await import('@onflow/fcl')
-      await fcl.config().put('accessNode.api', ACCESS_NODES[tx.network])
+      await fcl
+        .config()
+        .put('accessNode.api', ACCESS_NODES[tx.network])
+        .put('sdk.transport', httpTransport)
 
       const parsedArgs = JSON.parse(tx.arguments)
+      const typedAuthz = authz as unknown as FclAuthz
       txId = await fcl.mutate({
         cadence: tx.cadence,
         args: () => parsedArgs,
-        proposer: authz,
-        payer: authz,
-        authorizations: [authz],
+        proposer: typedAuthz,
+        payer: typedAuthz,
+        authorizations: [typedAuthz] as unknown as FclAuthz[],
       })
 
       await fcl.tx(txId).onceSealed()
@@ -321,9 +327,7 @@ export async function getTransaction(
 /**
  * Get a transaction by ID only (for public API with token auth).
  */
-export async function getTransactionById(
-  pendingId: string
-): Promise<PendingTransaction | null> {
+export async function getTransactionById(pendingId: string): Promise<PendingTransaction | null> {
   const store = getApprovalStore()
   return store.getById(pendingId)
 }
