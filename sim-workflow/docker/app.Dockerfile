@@ -79,7 +79,7 @@ ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
 # Build workspace packages that export from dist/
 # Use bunx tsup directly (devDeps not installed; codegen output already in source)
-RUN cd packages/agent-wallet && bun add -d typescript tsup && bunx tsup
+RUN cd packages/agent-wallet && bun add -d typescript tsup && bunx tsup --config tsup.config.ts
 
 RUN --mount=type=cache,id=next-cache,target=/app/apps/sim/.next/cache \
     cd apps/sim && bun run build
