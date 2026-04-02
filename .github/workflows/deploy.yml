@@ -1078,6 +1078,7 @@ jobs:
           SIM_COPILOT_API_KEY: ${{ secrets.SIM_COPILOT_API_KEY }}
           SIM_CRON_SECRET: ${{ secrets.CRON_SECRET }}
           FLOWINDEX_SERVICE_KEY: ${{ secrets.FLOWINDEX_SERVICE_KEY }}
+          SIM_OPENAI_API_KEY: ${{ secrets.SIM_OPENAI_API_KEY }}
         run: |
           gcloud compute ssh flowindex-backend --zone=us-central1-a --command="
             SIM_ENV=/mnt/stateful_partition/pgdata/sim-studio.env
@@ -1085,10 +1086,12 @@ jobs:
               sed -i '/^COPILOT_API_KEY=/d' \"\$SIM_ENV\"
               sed -i '/^CRON_SECRET=/d' \"\$SIM_ENV\"
               sed -i '/^FLOWINDEX_SERVICE_KEY=/d' \"\$SIM_ENV\"
+              sed -i '/^OPENAI_API_KEY=/d' \"\$SIM_ENV\"
             fi
             echo 'COPILOT_API_KEY=${SIM_COPILOT_API_KEY}' >> \"\$SIM_ENV\"
             echo 'CRON_SECRET=${SIM_CRON_SECRET}' >> \"\$SIM_ENV\"
             echo 'FLOWINDEX_SERVICE_KEY=${FLOWINDEX_SERVICE_KEY}' >> \"\$SIM_ENV\"
+            echo 'OPENAI_API_KEY=${SIM_OPENAI_API_KEY}' >> \"\$SIM_ENV\"
           "
           # Also add WEBHOOK_SERVICE_KEY to backend.env (same key, different env var name)
           gcloud compute ssh flowindex-backend --zone=us-central1-a --command="
@@ -1284,6 +1287,7 @@ jobs:
               -e GCS_PROJECT_ID="${GCS_PROJECT_ID:-}" \
               -e GCS_KEY_PREFIX="${GCS_KEY_PREFIX:-}" \
               -e GCS_CREDENTIALS_JSON="${GCS_CREDENTIALS_JSON:-}" \
+              -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
               -e PORT=3200 \
               "$SIM_STUDIO_IMAGE"
 
