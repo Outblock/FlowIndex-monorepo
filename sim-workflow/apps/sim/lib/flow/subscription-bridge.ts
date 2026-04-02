@@ -525,6 +525,16 @@ export function extractFlowConditions(
       conditions.event_names = ['AccountContractAdded', 'AccountContractUpdated']
       break
 
+    case 'flow_scheduled_tx':
+      // Go matcher (scheduled.executed): handler_owner (string), hide_idle (bool)
+      if (subBlockValues.handlerAddress) {
+        conditions.handler_owner = normalizeAddr(subBlockValues.handlerAddress)
+      }
+      if (subBlockValues.hideIdle === 'true' || subBlockValues.hideIdle === true) {
+        conditions.hide_idle = true
+      }
+      break
+
     case 'flow_new_account':
       // Go matcher (account.created) currently has no extra conditions.
       break

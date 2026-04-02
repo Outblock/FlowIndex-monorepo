@@ -12,6 +12,7 @@ export const FLOW_TRIGGER_EVENT_TYPES = {
   flow_whale_activity: 'address.activity',
   flow_contract_deploy: 'contract.event',
   flow_new_account: 'account.created',
+  flow_scheduled_tx: 'scheduled.executed',
 } as const
 
 export const FLOW_TRIGGER_IDS_WITHOUT_SUBSCRIPTIONS = ['flow_schedule'] as const
