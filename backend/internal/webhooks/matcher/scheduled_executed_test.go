@@ -91,6 +91,58 @@ func TestScheduledExecutedMatcher_HideIdle(t *testing.T) {
 	}
 }
 
+func TestMatchesScheduledHandlerType(t *testing.T) {
+	cases := []struct {
+		filter, actual string
+		want           bool
+	}{
+		// Empty filter matches anything
+		{"", "A.1234.FlowCron.Executor", true},
+		// Exact match
+		{"A.1234.FlowCron.Executor", "A.1234.FlowCron.Executor", true},
+		// Case-insensitive exact
+		{"a.1234.flowcron.executor", "A.1234.FlowCron.Executor", true},
+		// Contract name (3rd segment)
+		{"FlowCron", "A.1234.FlowCron.Executor", true},
+		{"flowcron", "A.1234.FlowCron.Executor", true},
+		// Last segment (type name)
+		{"Executor", "A.1234.FlowCron.Executor", true},
+		// Real-world: user types contract name for a scheduled handler
+		{"FlowYieldVaultsEVMWorkerOps", "A.a7d9a1bece1378a3.FlowYieldVaultsEVMWorkerOps.ScheduledHandler", true},
+		// No match
+		{"SomethingElse", "A.1234.FlowCron.Executor", false},
+		// Short actual (no dots)
+		{"Executor", "Executor", true},
+		{"Other", "Executor", false},
+	}
+	for _, tc := range cases {
+		got := matchesScheduledHandlerType(tc.filter, tc.actual)
+		if got != tc.want {
+			t.Errorf("matchesScheduledHandlerType(%q, %q) = %v, want %v", tc.filter, tc.actual, got, tc.want)
+		}
+	}
+}
+
+func TestScheduledExecutedMatcher_HandlerTypeShortName(t *testing.T) {
+	m := &ScheduledExecutedMatcher{}
+	// makeScheduledTx sets HandlerType to "A.1234.FlowCron.Executor"
+	st := makeScheduledTx("abcdef1234567890", true, 0)
+
+	// Match by contract name only
+	cond, _ := json.Marshal(scheduledExecutedConditions{HandlerType: "FlowCron"})
+	result := m.Match(st, cond)
+	if !result.Matched {
+		t.Fatal("expected match by contract short name")
+	}
+
+	// No match with wrong name
+	cond, _ = json.Marshal(scheduledExecutedConditions{HandlerType: "WrongName"})
+	result = m.Match(st, cond)
+	if result.Matched {
+		t.Fatal("expected no match with wrong handler type")
+	}
+}
+
 func TestScheduledExecutedMatcher_WrongType(t *testing.T) {
 	m := &ScheduledExecutedMatcher{}
 	result := m.Match("not a scheduled tx", nil)

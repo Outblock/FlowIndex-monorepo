@@ -2,6 +2,7 @@ package matcher
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	"flowscan-clone/internal/models"
@@ -17,6 +18,27 @@ type scheduledExecutedConditions struct {
 type ScheduledExecutedMatcher struct{}
 
 func (m *ScheduledExecutedMatcher) EventType() string { return "scheduled.executed" }
+
+func matchesScheduledHandlerType(filter, actual string) bool {
+	filter = strings.TrimSpace(filter)
+	actual = strings.TrimSpace(actual)
+	if filter == "" {
+		return true
+	}
+	if strings.EqualFold(filter, actual) {
+		return true
+	}
+
+	parts := strings.Split(actual, ".")
+	if len(parts) >= 3 && strings.EqualFold(filter, parts[2]) {
+		return true
+	}
+	if len(parts) > 0 && strings.EqualFold(filter, parts[len(parts)-1]) {
+		return true
+	}
+
+	return false
+}
 
 func (m *ScheduledExecutedMatcher) Match(data interface{}, conditions json.RawMessage) MatchResult {
 	st, ok := data.(*models.ScheduledTransaction)
@@ -38,8 +60,8 @@ func (m *ScheduledExecutedMatcher) Match(data interface{}, conditions json.RawMe
 		}
 	}
 
-	// Filter by handler type name (e.g. "DeFiActions")
-	if cond.HandlerType != "" && cond.HandlerType != st.HandlerType {
+	// Accept either the full type identifier or the contract/type name users see in the UI.
+	if cond.HandlerType != "" && !matchesScheduledHandlerType(cond.HandlerType, st.HandlerType) {
 		return MatchResult{}
 	}
 
