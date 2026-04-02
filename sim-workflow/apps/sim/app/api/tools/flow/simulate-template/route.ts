@@ -17,11 +17,14 @@ function normalizeAddress(addr: string): string {
 function toJsonCdc(
   kvArgs: Record<string, string>,
   schema: Array<{ name: string; type: string }>
-): Array<{ type: string; value: string }> {
-  return schema.map((arg) => ({
-    type: arg.type,
-    value: kvArgs[arg.name] ?? '',
-  }))
+): Array<{ type: string; value: string | boolean }> {
+  return schema.map((arg) => {
+    const raw = kvArgs[arg.name] ?? ''
+    if (arg.type === 'Bool') {
+      return { type: arg.type, value: raw === 'true' }
+    }
+    return { type: arg.type, value: raw }
+  })
 }
 
 export async function POST(request: NextRequest) {

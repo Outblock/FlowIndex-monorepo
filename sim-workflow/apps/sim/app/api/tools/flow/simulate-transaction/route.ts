@@ -50,6 +50,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Coerce Bool string values to native JSON booleans for JSON-Cadence encoding
+    parsedArgs = parsedArgs.map((arg: unknown) => {
+      if (arg && typeof arg === 'object' && 'type' in arg && 'value' in arg) {
+        const typed = arg as { type: string; value: unknown }
+        if (typed.type === 'Bool' && typeof typed.value === 'string') {
+          return { ...typed, value: typed.value === 'true' }
+        }
+      }
+      return arg
+    })
+
     const simulatorResponse = await fetch(`${simulatorUrl}/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
